@@ -199,7 +199,7 @@ void MovePicker::scoreQsCaptures() {
     
     for (unsigned int index = 0; index < qscaps.size; index++) {
         
-        qscaps.scores[index] = board.mvvlva(qscaps.moves[index]);//board.see(qscaps.moves[index], board.turn);
+        qscaps.scores[index] = board.mvvlva(qscaps.moves[index]);
         
     }
     
@@ -371,8 +371,7 @@ Move MovePicker::pick() {
             }
             
         default:
-        
-            std::cout << "Error! (Hey there!)" << std::endl;
+			
             assert(false);
             
     }            
@@ -641,8 +640,6 @@ const Move bestmove(Board& board, const unsigned int limit, const unsigned int d
     } else if (limit == MOVETIME_LIMIT) {
         info.timeLeft = timeleft;
     }
-    
-    //std::cout << info.timeLeft << std::endl;
 
     info.limit = limit;
     
@@ -724,13 +721,11 @@ const Move bestmove(Board& board, const unsigned int limit, const unsigned int d
                 if (info.limit == TIME_LIMIT || info.limit == MOVETIME_LIMIT) {
                     
                     iterduration = (iterend - iterstart) / (CLOCKS_PER_SEC / 1000);
-                    //std::cout << iterduration << std::endl;
-                    //std::cout << info.timeLeft << std::endl;
                     info.timeLeft -= iterduration;
                     
                 }
                 
-                // Drawn/mate positions return a empty pv
+                // Drawn/mate positions return an empty pv
                 if (pv.size > 0) {
 
                     info.lastPv = pv;               
