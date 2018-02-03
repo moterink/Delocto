@@ -72,7 +72,7 @@ void clearHistory(SearchInfo * info) {
     for (unsigned int pt = WHITE_PAWN; pt <= BLACK_KING; pt++) {
         for (unsigned int sq = 0; sq < 64; sq++) {
             info->history[pt][sq] = 0;
-			info->countermove[pt][sq] = NOMOVE;
+            info->countermove[pt][sq] = NOMOVE;
         }        
     }
     
@@ -154,7 +154,7 @@ int Board::see(const Move move, Side side) const {
     
     do {
         
-		side = !side;
+	side = !side;
         d++;
         value[d] = SeeMaterial[attacker] - value[d - 1];
 		
@@ -184,9 +184,7 @@ int Board::see(const Move move, Side side) const {
 void MovePicker::scoreCaptures() {
     
     for (unsigned int index = 0; index < caps.size; index++) {
-        
         caps.scores[index] = board.mvvlva(caps.moves[index]);
-        
     }
     
 }
@@ -198,9 +196,7 @@ void MovePicker::scoreQuiets() {
 void MovePicker::scoreQsCaptures() {
     
     for (unsigned int index = 0; index < qscaps.size; index++) {
-        
         qscaps.scores[index] = board.mvvlva(qscaps.moves[index]);
-        
     }
     
 }
@@ -275,13 +271,13 @@ Move MovePicker::pick() {
                 return killers[1];
             }
 			
-		case CounterMove:
-		
-			++phase;
+	case CounterMove:
+
+            ++phase;
 			
-			if (countermove != hashmove && countermove != NOMOVE && countermove != killers[0] && countermove != killers[1] && !board.is_capture(countermove) && board.is_valid(countermove) && board.is_legal(countermove, board.turn())) {				
-				return countermove;
-			}
+	    if (countermove != hashmove && countermove != NOMOVE && countermove != killers[0] && countermove != killers[1] && !board.is_capture(countermove) && board.is_valid(countermove) && board.is_legal(countermove, board.turn())) {				
+		return countermove;
+	    }
             
         case GenQuiets:
             
@@ -395,7 +391,7 @@ static int quiescence(int alpha, int beta, int depth, Board& board, SearchInfo *
         return DRAWVALUE;
     }
     
-	int score, eval;
+    int score, eval;
     score = eval = evaluate(board);
     
     if (score >= beta) {
@@ -416,9 +412,9 @@ static int quiescence(int alpha, int beta, int depth, Board& board, SearchInfo *
     
     while ( (move = picker.pick() ) != NOMOVE )  {
         
-		if (eval + DeltaMaterial[board.piecetype(to_sq(move))] < alpha - DELTA_MARGIN) {
-			continue;
-		}
+	if (eval + DeltaMaterial[board.piecetype(to_sq(move))] < alpha - DELTA_MARGIN) {
+	    continue;
+	}
 		
         board.do_move(move);
         
@@ -526,21 +522,21 @@ static int alphabeta(int alpha, int beta, int depth, NodeType nodetype, Board& b
         int movenum = 0;
         int bestScore = -INFINITE;
         Move bestmove = NOMOVE;
-		unsigned int pmsq = NOSQ;
+	unsigned int pmsq = NOSQ;
         
         MovePicker picker(board, info);
         
         (hashmove != NOMOVE) ? picker.hashmove = hashmove : picker.phase++;
-		if (!board.moves.empty()) {
-			pmsq = to_sq(board.moves.back());
-			picker.countermove = info->countermove[board.piecetype(pmsq)][pmsq];
+	if (!board.moves.empty()) {
+	    pmsq = to_sq(board.moves.back());
+	    picker.countermove = info->countermove[board.piecetype(pmsq)][pmsq];
         }
 
         Move move;
         
         while ( (move = picker.pick() ) != NOMOVE) {
             
-			movenum++;
+	    movenum++;
 			
             const bool capture = board.is_capture(move);
             const bool givescheck = board.gives_check(move);
@@ -557,18 +553,18 @@ static int alphabeta(int alpha, int beta, int depth, NodeType nodetype, Board& b
             int reductions = 0;
             int extensions = 0;
 
-			if (checked && board.see(move, board.turn()) >= 0) {
+	    if (checked && board.see(move, board.turn()) >= 0) {
                 extensions++;
             }
 			
-			// Late Move Reduction
+	    // Late Move Reduction
             if (!capture && !checked && !givescheck && !promotion && movenum > (nodetype == PvNode ? 4 : 2) && depth >= 3) {
                 reductions = std::max(0, std::min((depth / 4) + (movenum / 8) + ((nodetype != PvNode) ? 1 : -1) + ((move == info->killers[board.plies()][0] || move == info->killers[board.plies()][1]) ? -1 : 0),  depth - 2));
-			}
-			
-			board.do_move(move);
+	    }
+
+	    board.do_move(move);
             
-			newpv.size = 0;
+	    newpv.size = 0;
             
             if (movenum > 1) {
                 score = -alphabeta(-alpha - 1, -alpha, depth - 1 + extensions - reductions, CutNode, board, info, newpv, nullmove);
@@ -591,7 +587,7 @@ static int alphabeta(int alpha, int beta, int depth, NodeType nodetype, Board& b
                         info->killers[board.plies()][1] = info->killers[board.plies()][0];
                         info->killers[board.plies()][0] = move;
                         info->history[board.piecetype(from_sq(move))][to_sq(move)] += depth * depth;
-						if (pmsq != NOSQ) info->countermove[board.piecetype(pmsq)][pmsq] = move;
+			if (pmsq != NOSQ) info->countermove[board.piecetype(pmsq)][pmsq] = move;
                     }
                     #ifdef INFO_OUTPUT
                         if (movenum == 1) {
