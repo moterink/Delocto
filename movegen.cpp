@@ -578,13 +578,6 @@ bool Board::gives_check(const Move move) {
         default:
         
             assert(false);
-            /*printMove(move);
-            print();
-            for (unsigned int mcount = 0; mcount < moves.size(); mcount++) {
-                printMove(moves[mcount]);
-            }
-            printBitboard(checkers());
-            std::cout << "Error (Hello?)" << std::endl;*/
         
     }
     
