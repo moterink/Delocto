@@ -161,14 +161,14 @@ static const int OutpostValues[2][64] = {
     },
     {
         
-        0, 0, 0,  0,  0, 0,	0, 0,
-        0, 0, 0,  0,  0, 0,	0, 0,
-        0, 0, 2,  4,  4, 2,	0, 0,
-        0, 1, 4,  9,  9, 4,	1, 0,
-        0, 1, 4,  9,  9, 4,	1, 0,
-        0, 2, 1,  0,  0, 1,	2, 0,
-        0, 0, 0,  0,  0, 0,	0, 0,
-        0, 0, 0,  0,  0, 0,	0, 0
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 2, 4, 4, 2, 0, 0,
+        0, 1, 4, 9, 9, 4, 1, 0,
+        0, 1, 4, 9, 9, 4, 1, 0,
+        0, 2, 1, 0, 0, 1, 2, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0
         
     }
     
@@ -259,7 +259,7 @@ static const Score pawnPassedBonus[8]           = { S(0, 0), S(2, 4), S(4, 6), S
 static const Score passerFileBonus[8]           = { S(3, 4), S(2, 3), S(-2, -8), S(-7, -6), S(-7, -6), S(-2, -8), S(2, 3), S(3, 4) };
 static const Score pawnCandidateBonus[8]        = { S(0, 0), S(0, 0), S(5, 15),  S(10, 30), S(20, 45), S(30, 50),   S(40, 60),   S(0, 0) };
 
-static const Score passerPushBonus				= S(3, 4);
+static const Score passerPushBonus		= S(3, 4);
 static const Score passerSafePushBonus          = S(2, 3);
 static const Score passerFullyDefendedBonus     = S(6, 8);
 static const Score passerNoAttackersBonus       = S(3, 4);
@@ -318,8 +318,8 @@ static const int kingPawnStormPenalty[2][8] = {
 };
 
 // Threats
-static const Score safePawnAttack		  = S(65, 60);
-static const Score loosePawnAttack		  = S(15,  6);
+static const Score safePawnAttack	  = S(65, 60);
+static const Score loosePawnAttack	  = S(15,  6);
 static const Score loosePawnWeight        = S(10,  8);
 static const Score loosePieceWeight       = S(25, 21);
 static const Score pawnPushThreat         = S(16,  9);
@@ -603,7 +603,7 @@ static const Score evaluate_king_safety(const Board& board, const Side side, con
     
     const int kingFile             = file(info.kingSq[side]);
     const int centralFile          = std::max(1, std::min(kingFile, 6));
-	const uint64_t kingSpan 	   = PassedPawnMask[side][info.kingSq[side]];
+    const uint64_t kingSpan 	   = PassedPawnMask[side][info.kingSq[side]];
     const unsigned int kingRelRank = relative_rank(side, info.kingSq[side]);	
     
     for (unsigned int f = centralFile - 1; f <= centralFile + 1; f++) {
@@ -636,8 +636,6 @@ static const Score evaluate_king_safety(const Board& board, const Side side, con
         }
         
     }
-    
-    //std::cout << std::endl << side << std::endl;
 
     if (info.kingAttackersNum[side]) {
         
@@ -656,57 +654,33 @@ static const Score evaluate_king_safety(const Board& board, const Side side, con
         
         safety -= (info.kingAttackersNum[side] * info.kingAttackWeight[side]) / 6;
         
-        //std::cout << safety << std::endl;
-        
-        safety -= popcount(undefendedRing) * undefendedRingPenalty;                
-        
-        //std::cout << safety << std::endl;
+        safety -= popcount(undefendedRing) * undefendedRingPenalty;
         
         safety -= popcount(undefendedZone) * undefendedZonePenalty;
         
-        //std::cout << safety << std::endl;
-        
         safety -= info.kingRingAttackWeight[side];
-        
-        //std::cout << safety << std::endl;
         
         if ((info.attackedSquares[Queen(!side)] & (bishopCheckSquares | rookCheckSquares)) & safeSquares) {
             safety -= queenSafeCheckWeight;
-        }				
-        
-        //safeSquares |= info.multiAttackedSquares[!side] & ~(info.multiAttackedSquares[side] | board.pieces(!side)) & info.attackedSquares[Queen(!side)];        		
-		
-        //std::cout << safety << std::endl;
-        
+        }
+	
         if ((info.attackedSquares[Rook(!side)] & rookCheckSquares) & safeSquares) {
             safety -= rookSafeCheckWeight;
         }
         
-        //std::cout << safety << std::endl;
-        
         if ((info.attackedSquares[Bishop(!side)] & bishopCheckSquares) & safeSquares) {
             safety -= bishopSafeCheckWeight;
         }
-
-        //std::cout << safety << std::endl;
         
         if ((info.attackedSquares[Knight(!side)] & knightCheckSquares) & safeSquares) {
             safety -= knightSafeCheckWeight;
         }
-
-        //std::cout << safety << std::endl;                
-        
-        //std::cout << pawnScore << std::endl;
         
         safety += pawnScore / 4;
-        
-        //std::cout << safety << std::endl;
         
         if (!board.pieces(QUEEN, !side)) {
             safety += noQueenWeight;
         }
-        
-        //std::cout << safety << std::endl << std::endl;
         
         score.mg += std::min(0, safety);
         
@@ -716,7 +690,6 @@ static const Score evaluate_king_safety(const Board& board, const Side side, con
     
     score.mg += castlingRightBonus[popcount(board.castleRights() & CASTLE_MASKS[side])];        
     
-	// Don't exceed maximum king safety value(=80)
     return S(std::min(80, score.mg), score.eg);
     
 }
@@ -740,13 +713,13 @@ static const Score evaluate_passers(const Board& board, const Side side, const E
             const uint64_t path = FrontFileMask[side][sq];
             const uint64_t defended = path & info.attackedSquares[side];
             const uint64_t attacked = path & (info.attackedSquares[!side] | board.pieces(!side));
-			const uint64_t push = !(SQUARES[blocksq] & attacked);
+	    const uint64_t push = !(SQUARES[blocksq] & attacked);
         
             if (push) {
                 score += (passerPushBonus * rfactor);
-				if (defended & SQUARES[blocksq]) {
-					score += (passerSafePushBonus * rfactor);
-				}
+	        if (defended & SQUARES[blocksq]) {
+		    score += (passerSafePushBonus * rfactor);
+	        }
             }
             
             if (!attacked) {
@@ -813,33 +786,33 @@ static const Score evaluate_threats(const Board& board, const Side side, const E
     
     const uint64_t undefendedPawns = board.pieces(PAWN, !side) & ~info.attackedSquares[!side];
     const uint64_t loosePawns = undefendedPawns & info.attackedSquares[side];
-	const uint64_t safePawns  = (~undefendedPawns & board.pieces(PAWN, side)) & info.attackedSquares[side];
+    const uint64_t safePawns  = (~undefendedPawns & board.pieces(PAWN, side)) & info.attackedSquares[side];
 	
-	const uint64_t minorsAndMajors = board.pieces(!side) & ~(board.pieces(KING, !side) | board.pieces(PAWN, !side));	
+    const uint64_t minorsAndMajors = board.pieces(!side) & ~(board.pieces(KING, !side) | board.pieces(PAWN, !side));	
 	
-	score += safePawnAttack  * popcount(generate_pawns_attacks(safePawns, side) & minorsAndMajors);
-	score += loosePawnAttack * popcount(generate_pawns_attacks(loosePawns, side) & minorsAndMajors);    
+    score += safePawnAttack  * popcount(generate_pawns_attacks(safePawns, side) & minorsAndMajors);
+    score += loosePawnAttack * popcount(generate_pawns_attacks(loosePawns, side) & minorsAndMajors);    
     score += loosePawnWeight * popcount(loosePawns);
     
-	uint64_t pawnPushes = 0;
-	if (side == WHITE) {
-		pawnPushes = (board.pieces(WHITE_PAWN) << 8) & ~board.pieces(ALLPIECES);
-		pawnPushes |= ((pawnPushes & RANK_6) << 8) & ~board.pieces(ALLPIECES);
-		pawnPushes &= ~info.attackedSquares[BLACK_PAWN] & (info.attackedSquares[side] | ~info.attackedSquares[!side]);
-	} else {
-		pawnPushes = (board.pieces(BLACK_PAWN) >> 8) & ~board.pieces(ALLPIECES);
-		pawnPushes |= ((pawnPushes & RANK_3) >> 8) & ~board.pieces(ALLPIECES);
-		pawnPushes &= ~info.attackedSquares[WHITE_PAWN] & (info.attackedSquares[side] | ~info.attackedSquares[!side]);
-	}
+    uint64_t pawnPushes = 0;
+    if (side == WHITE) {
+        pawnPushes = (board.pieces(WHITE_PAWN) << 8) & ~board.pieces(ALLPIECES);
+	pawnPushes |= ((pawnPushes & RANK_6) << 8) & ~board.pieces(ALLPIECES);
+	pawnPushes &= ~info.attackedSquares[BLACK_PAWN] & (info.attackedSquares[side] | ~info.attackedSquares[!side]);
+    } else {
+	pawnPushes = (board.pieces(BLACK_PAWN) >> 8) & ~board.pieces(ALLPIECES);
+	pawnPushes |= ((pawnPushes & RANK_3) >> 8) & ~board.pieces(ALLPIECES);
+	pawnPushes &= ~info.attackedSquares[WHITE_PAWN] & (info.attackedSquares[side] | ~info.attackedSquares[!side]);
+    }
 	
-	score += pawnPushThreat * popcount(generate_pawns_attacks(pawnPushes, side) & minorsAndMajors);
+    score += pawnPushThreat * popcount(generate_pawns_attacks(pawnPushes, side) & minorsAndMajors);
 
     const uint64_t weak   = minorsAndMajors & ~info.attackedSquares[!side] & info.attackedSquares[side];
     uint64_t minorAttacks = minorsAndMajors & (info.attackedSquares[Knight(side)] | info.attackedSquares[Bishop(side)]);
     uint64_t rookAttacks  = weak & info.attackedSquares[Rook(side)];
     
     while (minorAttacks) {
-		const unsigned int sq = pop_lsb(minorAttacks);
+	const unsigned int sq = pop_lsb(minorAttacks);
         score += minorAttackWeight[type(board.piecetype(sq)) / 2 - 1];
     }
     
@@ -848,7 +821,7 @@ static const Score evaluate_threats(const Board& board, const Side side, const E
         score += rookAttackWeight[type(board.piecetype(sq)) / 2 - 1];
     }
 	
-	score += loosePieceWeight * popcount(weak);
+    score += loosePieceWeight * popcount(weak);
     
     return score;
     
@@ -895,7 +868,7 @@ const int evaluate(const Board& board) {
     info.kingRing[WHITE] = KingRing[WHITE][info.kingSq[WHITE]];
     info.kingRing[BLACK] = KingRing[BLACK][info.kingSq[BLACK]];
 	
-	info.attackedSquares[WHITE] |= info.kingRing[WHITE] | info.attackedSquares[WHITE_PAWN];
+    info.attackedSquares[WHITE] |= info.kingRing[WHITE] | info.attackedSquares[WHITE_PAWN];
     info.attackedSquares[BLACK] |= info.kingRing[BLACK] | info.attackedSquares[BLACK_PAWN];
 
     info.multiAttackedSquares[WHITE] = info.kingRing[WHITE] & info.attackedSquares[WHITE_PAWN];
@@ -985,7 +958,7 @@ void evaluateInfo(const Board& board) {
     info.kingRing[WHITE] = KingRing[WHITE][info.kingSq[WHITE]];
     info.kingRing[BLACK] = KingRing[BLACK][info.kingSq[BLACK]];
 	
-	info.attackedSquares[WHITE] |= info.kingRing[WHITE] | info.attackedSquares[WHITE_PAWN];
+    info.attackedSquares[WHITE] |= info.kingRing[WHITE] | info.attackedSquares[WHITE_PAWN];
     info.attackedSquares[BLACK] |= info.kingRing[BLACK] | info.attackedSquares[BLACK_PAWN];
 
     info.multiAttackedSquares[WHITE] = info.kingRing[WHITE] & info.attackedSquares[WHITE_PAWN];
@@ -1073,15 +1046,15 @@ void evaluateInfo(const Board& board) {
     score += whiteKingSafety - blackKingSafety;
     score += whiteThreats - blackThreats;        
 	
-	int finalScore = scaled_eval(board.scale(), score);
-	int normalEval = evaluate(board);
+    int finalScore = scaled_eval(board.scale(), score);
+    int normalEval = evaluate(board);
 	
-	if (std::abs(finalScore + (board.turn() == WHITE ? tempoBonus : -tempoBonus)) != std::abs(normalEval)) {
-		std::cout << "ERROR: Difference between evaluation functions!!!" << std::endl;
-		std::cout << (finalScore + (board.turn() == WHITE ? tempoBonus : -tempoBonus)) << std::endl;
-		std::cout << normalEval - tempoBonus << std::endl;
-		abort();
-	}
+    if (std::abs(finalScore + (board.turn() == WHITE ? tempoBonus : -tempoBonus)) != std::abs(normalEval)) {
+	std::cout << "ERROR: Difference between evaluation functions!!!" << std::endl;
+	std::cout << (finalScore + (board.turn() == WHITE ? tempoBonus : -tempoBonus)) << std::endl;
+	std::cout << normalEval - tempoBonus << std::endl;
+	abort();
+    }
 
     std::cout << "Total(For White): " << scaled_eval(board.scale(), score) << std::endl;
     
