@@ -93,10 +93,8 @@ void uciloop() {
             playSequence(board, STARTFEN, input, 24);
         } else if (input.find("position fen ") == 0) {            
             const std::string::size_type end = input.find("moves ");
-            std::cout << end << std::endl;            
             if (end != std::string::npos) {
                 const std::string fen = input.substr(13, end - 13);
-                std::cout << fen << std::endl;
                 playSequence(board, fen, input, end + 6);
             } else {
                 board.set_fen(input.substr(13));

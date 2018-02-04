@@ -32,12 +32,12 @@
 
 #define MAXDEPTH 100
 
-#define TIME_LIMIT          0
-#define MOVETIME_LIMIT      1
-#define DEPTH_LIMIT         2
-#define INFINITE_LIMIT      3
+#define TIME_LIMIT      0
+#define MOVETIME_LIMIT  1
+#define DEPTH_LIMIT     2
+#define INFINITE_LIMIT  3
 
-#define DELTA_MARGIN 	  125
+#define DELTA_MARGIN  125
 
 enum NodeType {
     
@@ -74,7 +74,7 @@ typedef struct {
     PvLine lastPv;
     Move killers[MAXDEPTH][2];
     Move history[14][64];
-	Move countermove[14][64];
+    Move countermove[14][64];
     
     float fhf;
     float fh;
@@ -93,7 +93,7 @@ class MovePicker {
     
         Move killers[2];
         Move hashmove = NOMOVE;
-		Move countermove = NOMOVE;
+        Move countermove = NOMOVE;
         unsigned int phase = HashMove;
         
         const Board& board;
