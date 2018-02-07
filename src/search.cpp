@@ -639,7 +639,7 @@ const Move bestmove(Board& board, const unsigned int limit, const unsigned int d
 
     info.limit = limit;
     
-    int score, lastscore;
+    int score = 0;
     
     clock_t start, end, iterend;
     long long duration, iterduration;
@@ -676,27 +676,32 @@ const Move bestmove(Board& board, const unsigned int limit, const unsigned int d
 
         clock_t iterstart = std::clock();
 
-        if (dcount > 5 && std::abs(lastscore) < MATEVALUE) {
+        if (dcount > 5 && std::abs(score) < MINMATE) {
 
-            int alphawindow, betawindow;
-            alphawindow = betawindow = 25 - std::min(dcount / 3, 10);
-        
+            int window = 25 - std::min(dcount / 3, 10) + std::abs(score) / 25;
+            int alpha = score - window;
+            int beta = score + window;
+
             while (true) {
-                
-                int alpha = lastscore - alphawindow;
-                int beta = lastscore + betawindow;
                 
                 score = alphabeta(alpha, beta, dcount, PvNode, board, &info, pv, true);
                 
                 if (score <= alpha) {
-                    alphawindow *= 2;
+                    beta = (alpha + beta) / 2;
+                    alpha = score - window;
                 } else if (score >= beta) {
-                    betawindow *= 2;
+                    beta = score + window;
                 } else {
                     break;
                 }
 
+                window += window / 4;
+
                 pv.clear();
+
+                if (std::abs(score) >= MINMATE) {
+                    break;
+                }
                 
             }
             
@@ -707,8 +712,6 @@ const Move bestmove(Board& board, const unsigned int limit, const unsigned int d
         }
         
         end:
-        
-            lastscore = score;
             
             if (!info.stopped) {
                 
