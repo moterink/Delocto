@@ -108,7 +108,7 @@ void TranspositionTable::clear() {
 }
 
 // Check if hashkey in table, and if so, return the saved score for the position
-TTEntry * TranspositionTable::probe(const uint64_t key, const int depth, const int alpha, const int beta) {            
+TTEntry * TranspositionTable::probe(const uint64_t key) {            
     
     TTEntry * entry = &(table[key % size]);
     

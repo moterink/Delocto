@@ -78,7 +78,7 @@ class TranspositionTable {
         
         void setSize(const int hashsize);
         void clear();
-        TTEntry * probe(const uint64_t key, const int depth, const int alpha, const int beta);
+        TTEntry * probe(const uint64_t key);
         void store(const uint64_t key, const int depth, const int score, const Move bestmove, const int flag);
         
         ~TranspositionTable() {

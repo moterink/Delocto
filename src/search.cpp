@@ -475,7 +475,7 @@ static int alphabeta(int alpha, int beta, int depth, NodeType nodetype, Board& b
         PvLine newpv;
         int eval;
 
-        TTEntry * entry = tTable.probe(board.hashkey(), depth, alpha, beta);
+        TTEntry * entry = tTable.probe(board.hashkey());
         
         Move hashmove = NOMOVE;
         
@@ -523,6 +523,18 @@ static int alphabeta(int alpha, int beta, int depth, NodeType nodetype, Board& b
         int bestScore = -INFINITE;
         Move bestmove = NOMOVE;
 	unsigned int pmsq = NOSQ;
+
+        // Internal Iterative Deepening
+        if (nodetype == PvNode && !checked && hashmove == NOMOVE && depth >= 6) {
+            
+            score = alphabeta(alpha, beta, depth - 2, nodetype, board, info, newpv, nullmove);
+            
+            TTEntry * entry = tTable.probe(board.hashkey());
+
+            if (entry != NULL) {
+                hashmove = entry->bestmove;
+            }
+        }
         
         MovePicker picker(board, info);
         
