@@ -137,8 +137,8 @@ static const int Imbalance[2][5][5] = {
         {  0 },
         {  4,  0 },
         {  1,  0,  0 },
-        {  2, -4, -7,  0 },
-        {  7, -5,  8, 5, 0 }
+        {  3, -4, -7, 0 },
+        {  6, -7,  5, -8, 0 }
     }
     
 };
@@ -603,7 +603,7 @@ static const Score evaluate_king_safety(const Board& board, const Side side, con
     
     const int kingFile             = file(info.kingSq[side]);
     const int centralFile          = std::max(1, std::min(kingFile, 6));
-    const uint64_t kingSpan 	   = PassedPawnMask[side][info.kingSq[side]];
+    const uint64_t kingSpan 	   = KingShelterSpan[side][info.kingSq[side] - (kingFile - centralFile)];
     const unsigned int kingRelRank = relative_rank(side, info.kingSq[side]);	
     
     for (unsigned int f = centralFile - 1; f <= centralFile + 1; f++) {

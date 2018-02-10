@@ -25,25 +25,27 @@
 #include "movegen.hpp"
 
 uint64_t PawnAttacksSpan[2][64];
+uint64_t KingShelterSpan[2][64];
 uint64_t RayTable[64][64];
 uint64_t LineTable[64][64];
 
 void initBitboards() {
     
     for (unsigned int sq = 0; sq < 64; sq++) {
-        PawnAttacksSpan[WHITE][sq] = 0;
-        PawnAttacksSpan[BLACK][sq] = 0;                
         
-        uint64_t frontW = 0;
-        uint64_t frontB = 0;
+        uint64_t pawnsFrontW = 0, pawnsFrontB = 0, kingsFrontW = SQUARES[sq], kingsFrontB = SQUARES[sq];
         
         for (int i = 1; i < 6; i++) {
-            frontW |= SQUARES[sq] << (i * 8);
-            frontB |= SQUARES[sq] >> (i * 8);
+            pawnsFrontW |= SQUARES[sq] << (i * 8);
+            pawnsFrontB |= SQUARES[sq] >> (i * 8);
+            kingsFrontW |= pawnsFrontW;
+            kingsFrontB |= pawnsFrontB;
         }
 
-        PawnAttacksSpan[WHITE][sq] = ((frontW & ~FILE_A) << 1) | ((frontW & ~FILE_H) >> 1);
-        PawnAttacksSpan[BLACK][sq] = ((frontB & ~FILE_A) << 1) | ((frontB & ~FILE_H) >> 1);
+        PawnAttacksSpan[WHITE][sq] = ((pawnsFrontW & ~FILE_A) << 1) | ((pawnsFrontW & ~FILE_H) >> 1);
+        PawnAttacksSpan[BLACK][sq] = ((pawnsFrontB & ~FILE_A) << 1) | ((pawnsFrontB & ~FILE_H) >> 1);
+        KingShelterSpan[WHITE][sq] = ((kingsFrontW & ~FILE_A) << 1) | ((kingsFrontW & ~FILE_H) >> 1) | kingsFrontW;
+        KingShelterSpan[BLACK][sq] = ((kingsFrontB & ~FILE_A) << 1) | ((kingsFrontB & ~FILE_H) >> 1) | kingsFrontB;
         
     }            
     

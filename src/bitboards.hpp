@@ -27,6 +27,7 @@
 #include "types.hpp"
 
 extern uint64_t PawnAttacksSpan[2][64];
+extern uint64_t KingShelterSpan[2][64];
 extern uint64_t RayTable[64][64];
 extern uint64_t LineTable[64][64];
 
