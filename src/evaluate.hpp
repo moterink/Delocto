@@ -34,9 +34,9 @@
 #define PawnValueMg     85
 #define PawnValueEg    110
 #define KnightValueMg  325
-#define KnightValueEg  345
+#define KnightValueEg  348
 #define BishopValueMg  340
-#define BishopValueEg  360
+#define BishopValueEg  363
 #define RookValueMg    525
 #define RookValueEg    560
 #define QueenValueMg  1050
@@ -69,6 +69,7 @@ typedef struct {
     int kingAttackersNum[2] = { 0 };  
     int kingRingAttackWeight[2] = { 0 };
     uint64_t kingZoneAttacks[2] = { 0 };
+    int kingRingDefense[2] = { 0 };
     unsigned int kingSq[2] = { 0 };
     unsigned int kingFile[2] = { 0 };
     uint64_t passedPawns = { 0 };
@@ -86,7 +87,7 @@ inline const int scaled_eval(const int scale, const Score score) {
 extern const Score Material[14];
 extern Score Pst[14][64];
 
-extern unsigned int kingDistance[64][64];
+extern int kingDistance[64][64];
 
 extern void initKingDistance();
 extern void initPSQT();
