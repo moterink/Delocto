@@ -43,8 +43,8 @@ static const Move BQCAS_MOVE = make_move(4, 2, CASTLING);
 void MoveList::merge(MoveList list) {
     
     unsigned int lcount;
-    for (lcount = 0; lcount < list.size; lcount++) {
-        moves[size + lcount] = list.moves[lcount];
+    for (lcount = 0; lcount < (list.size-list.index); lcount++) {
+        moves[size + lcount] = list.moves[list.index + lcount];
     }
     size += lcount;
 

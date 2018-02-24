@@ -148,6 +148,24 @@ uint64_t Board::get_pinned(const Side side) {
     
 }
 
+int Board::mvvlva(const Move move) const {
+
+    if (is_ep(move)) {
+        return 0;
+    }
+
+    int value = 0;
+    
+    if (is_promotion(move)) {
+        value += MvvLvaMaterial[prom_piecetype(move, 0)];
+    }
+
+    value += MvvLvaMaterial[piecetypes[to_sq(move)]] * 8 + 4 - MvvLvaMaterial[piecetypes[from_sq(move)]];
+
+    return value;
+
+}
+
 // Get board from fen string
 void Board::set_fen(std::string fen) {
     

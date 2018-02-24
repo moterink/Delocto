@@ -570,8 +570,24 @@ static int alphabeta(int alpha, int beta, int depth, NodeType nodetype, Board& b
             }
 			
 	    // Late Move Reduction
-            if (!capture && !checked && !givescheck && !promotion && movenum > (nodetype == PvNode ? 4 : 2) && depth >= 3) {
-                reductions = std::max(0, std::min((depth / 4) + (movenum / 8) + ((nodetype != PvNode) ? 1 : -1) + ((move == info->killers[board.plies()][0] || move == info->killers[board.plies()][1]) ? -1 : 0),  depth - 2));
+            if (   !capture
+                && !givescheck
+                && !promotion
+                && depth >= 3
+                && movenum > (nodetype == PvNode ? 4 : 2))
+            {
+
+                reductions = (std::max(9, depth) / 6) + (movenum - 4) / 4;
+
+                reductions += (nodetype != PvNode) ? 1 : -1;
+
+                reductions -= (move == picker.killers[0] || move == picker.killers[1]);
+
+                reductions -= checked;
+
+                reductions -= std::min(1, info->history[board.piecetype(from_sq(move))][to_sq(move)] / 512);
+
+                reductions = std::max(0, std::min(reductions, depth - 2));
 	    }
 
 	    board.do_move(move);

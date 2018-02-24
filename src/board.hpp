@@ -100,7 +100,7 @@ class Board {
         bool is_castling_valid(const unsigned int flag) const;
         bool gives_check(const Move move);                
         
-        inline const int mvvlva(const Move move) const;
+        int mvvlva(const Move move) const;
         int see(const Move move, Side side) const;
         
         inline uint64_t minors_or_majors(const Side side) const;
@@ -167,12 +167,6 @@ class Board {
 	uint64_t getLeastValuablePiece(uint64_t attackers, const Side side, PieceType& pt) const;                
         
 };
-
-inline const int Board::mvvlva(const Move move) const {
-
-    return (move_type(move) != ENPASSANT) ? (MvvLvaMaterial[piecetypes[to_sq(move)]] * 8) + (4 - MvvLvaMaterial[piecetypes[from_sq(move)]]) : 0;    
-    
-}
 
 inline uint64_t Board::minors_or_majors(const Side side) const {
     
