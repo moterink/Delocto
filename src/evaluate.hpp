@@ -31,14 +31,14 @@
 #include <complex> // for std::abs
 
 // Scores for pieces
-#define PawnValueMg     85
-#define PawnValueEg    110
-#define KnightValueMg  325
-#define KnightValueEg  348
-#define BishopValueMg  340
-#define BishopValueEg  363
-#define RookValueMg    525
-#define RookValueEg    560
+#define PawnValueMg     80
+#define PawnValueEg    105
+#define KnightValueMg  320
+#define KnightValueEg  350
+#define BishopValueMg  345
+#define BishopValueEg  370
+#define RookValueMg    530
+#define RookValueEg    570
 #define QueenValueMg  1050
 #define QueenValueEg  1100
 #define KingValueMg      0
@@ -72,7 +72,8 @@ typedef struct {
     int kingRingDefense[2] = { 0 };
     unsigned int kingSq[2] = { 0 };
     unsigned int kingFile[2] = { 0 };
-    uint64_t passedPawns = { 0 };
+    uint64_t weakPawns = 0;
+    uint64_t passedPawns = 0;
     uint64_t pawnAttacksSpan[2] = { 0 };
     Score mobility[2] = { S(0, 0), S(0, 0) };
     

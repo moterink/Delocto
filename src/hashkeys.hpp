@@ -54,6 +54,7 @@ typedef struct {
     Score score;
     uint64_t pawnWAttacks;
     uint64_t pawnBAttacks;
+    uint64_t weakPawns;
     uint64_t passedPawns;
     uint64_t pawnWAttacksSpan;
     uint64_t pawnBAttacksSpan;    
@@ -96,7 +97,7 @@ class PawnTable {
         
         void clear();
         PawnEntry * probe(const uint64_t key);
-        void store(const uint64_t key, const Score score, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan);
+        void store(const uint64_t key, const Score score, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t weakPawns, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan);
         
         PawnTable() {
             table = new PawnEntry [size];

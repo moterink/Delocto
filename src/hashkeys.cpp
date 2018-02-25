@@ -68,6 +68,7 @@ void PawnTable::clear() {
     for (entry = table; entry < table + size; entry++) {
         entry->key = 0;
         entry->score = S( 0, 0 );
+        entry->weakPawns = 0;
         entry->passedPawns = 0;
         entry->pawnWAttacksSpan = 0;
         entry->pawnBAttacksSpan = 0;
@@ -87,9 +88,9 @@ PawnEntry * PawnTable::probe(const uint64_t key) {
     
 }
 
-void PawnTable::store(const uint64_t key, const Score score, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan) {
+void PawnTable::store(const uint64_t key, const Score score, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t weakPawns, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan) {
     
-    table[key % size] = { key, score, pawnWAttacks, pawnBAttacks, passedPawns, pawnWAttacksSpan, pawnBAttacksSpan };
+    table[key % size] = { key, score, pawnWAttacks, pawnBAttacks, weakPawns, passedPawns, pawnWAttacksSpan, pawnBAttacksSpan };
     
 }
 
