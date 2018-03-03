@@ -71,7 +71,6 @@ typedef struct {
     uint64_t kingZoneAttacks[2] = { 0 };
     int kingRingDefense[2] = { 0 };
     unsigned int kingSq[2] = { 0 };
-    unsigned int kingFile[2] = { 0 };
     uint64_t weakPawns = 0;
     uint64_t passedPawns = 0;
     uint64_t pawnAttacksSpan[2] = { 0 };
