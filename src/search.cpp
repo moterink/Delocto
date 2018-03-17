@@ -391,30 +391,30 @@ static int quiescence(int alpha, int beta, int depth, Board& board, SearchInfo *
         return DRAWVALUE;
     }
     
-    int score, eval;
-    score = eval = evaluate(board);
+    int bestScore, score, eval;
+    bestScore = eval = evaluate(board);
     
-    if (score >= beta) {
+    if (eval >= beta) {
         return beta;
     }
     
-    if (score > alpha) {
+    if (eval > alpha) {
         alpha = score;
     }
     
     int movenum = 0;
-    Move move;
+    Move bestMove = NOMOVE;
+    Move move = NOMOVE;
 
     MovePicker picker(board, info);
     picker.phase = GenCapsQS;
     int hashtype = ALPHAHASH;
-    int bestScore = -INFINITE;
     
     while ( (move = picker.pick() ) != NOMOVE )  {
         
-    if (eval + DeltaMaterial[board.piecetype(to_sq(move))] < alpha - DELTA_MARGIN) {
-        continue;
-    }
+        if (eval + DeltaMaterial[board.piecetype(to_sq(move))] < alpha - DELTA_MARGIN) {
+            continue;
+        }
         
         board.do_move(move);
         
@@ -438,14 +438,15 @@ static int quiescence(int alpha, int beta, int depth, Board& board, SearchInfo *
             }
             
             if (score > alpha) {
-                alpha = score;                
+                alpha = score;
+                bestMove = move;
                 hashtype = EXACTHASH;
             }
         }
         
     }    
-    tTable.store(board.hashkey(), 0, bestScore, move, hashtype);
-    return alpha;
+    tTable.store(board.hashkey(), 0, bestScore, bestMove, hashtype);
+    return bestScore;
     
 }
 
@@ -548,19 +549,19 @@ static int alphabeta(int alpha, int beta, int depth, NodeType nodetype, Board& b
         
         while ( (move = picker.pick() ) != NOMOVE) {
             
-            movenum++;
-            
             const bool capture = board.is_capture(move);
             const bool givescheck = board.gives_check(move);
             const bool promotion = is_promotion(move);
             
             const bool doFutility = !checked && !capture && !givescheck && !promotion;
             
-            if (nodetype != PvNode && movenum >= 1 && depth <= 3 && doFutility) {
+            if (nodetype != PvNode && movenum > 0 && depth <= 3 && doFutility) {
                 if ((eval + FutilityMargin[depth]) <= alpha) {
                     continue;
                 }
             }
+
+            movenum++;
 
             int reductions = 0;
             int extensions = 0;
@@ -607,6 +608,9 @@ static int alphabeta(int alpha, int beta, int depth, NodeType nodetype, Board& b
             }
             
             board.undo_move();
+
+            if (info->stopped)
+                return UNKNOWNVALUE;
             
             if (score > bestScore) {
                 bestScore = score;
