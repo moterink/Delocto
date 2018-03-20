@@ -420,7 +420,7 @@ static int quiescence(int alpha, int beta, int depth, Board& board, SearchInfo *
         
         movenum++;
         
-        score = -quiescence(-beta, -alpha, depth + 1, board, info);
+        score = -quiescence(-beta, -alpha, depth - 1, board, info);
         
         board.undo_move();
 
@@ -433,7 +433,7 @@ static int quiescence(int alpha, int beta, int depth, Board& board, SearchInfo *
                 }
                 info->fh++;
             #endif
-                tTable.store(board.hashkey(), 0, beta, move, BETAHASH);
+                tTable.store(board.hashkey(), depth, beta, move, BETAHASH);
                 return beta;
             }
             
@@ -445,7 +445,7 @@ static int quiescence(int alpha, int beta, int depth, Board& board, SearchInfo *
         }
         
     }    
-    tTable.store(board.hashkey(), 0, bestScore, bestMove, hashtype);
+    tTable.store(board.hashkey(), depth, bestScore, bestMove, hashtype);
     return bestScore;
     
 }
@@ -555,7 +555,7 @@ static int alphabeta(int alpha, int beta, int depth, NodeType nodetype, Board& b
             
             const bool doFutility = !checked && !capture && !givescheck && !promotion;
             
-            if (nodetype != PvNode && movenum > 0 && depth <= 3 && doFutility) {
+            if (nodetype != PvNode && movenum > 0 && depth <= 5 && doFutility) {
                 if ((eval + FutilityMargin[depth]) <= alpha) {
                     continue;
                 }

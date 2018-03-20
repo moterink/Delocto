@@ -446,6 +446,12 @@ inline PieceType King(const Side side) {
     
 }
 
+inline PieceType pt_index(const PieceType pt) {
+
+    return (type(pt) / 2 - 1);
+
+}
+
 inline Score S(const int mg, const int eg) {
     
     Score score;

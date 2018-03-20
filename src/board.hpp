@@ -48,7 +48,8 @@ typedef struct {
 }StateInfo;
 
 static const uint64_t DangerousPawnZone[2] = { 0xffffffff00000000, 0xffffffff };
-static const int MvvLvaMaterial[14] = { 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, -1, -1 };
+static const int MvvLvaVictim[5] = { 100, 200, 300, 400, 500 };
+static const int MvvLvaAttacker[6] = { 1, 2, 3, 4, 5, 0 };
 
 // Board class: Stores all necessary information e.g bitboards and piecelists
 class Board {
@@ -109,9 +110,9 @@ class Board {
         inline uint64_t getAllOccupancy(const uint64_t squares) const;
         inline uint64_t getPieceOccupancy(const uint64_t squares, const PieceType type);
         
-	inline uint64_t gen_wpawns_attacks() const;
+        inline uint64_t gen_wpawns_attacks() const;
         inline uint64_t gen_bpawns_attacks() const;
-	inline uint64_t gen_pawns_attacks(const Side side) const;                      
+        inline uint64_t gen_pawns_attacks(const Side side) const;                      
         
     private:
     
@@ -140,7 +141,7 @@ class Board {
 
         void clear();
         void updateSideBitboards();
-	uint64_t get_pinned(const Side side);
+        uint64_t get_pinned(const Side side);
         
         inline void hash_pawn(const Side side, const unsigned int sq);
         inline void hash_piece(const PieceType pt, const unsigned int sq);
@@ -150,21 +151,21 @@ class Board {
         inline void hash_material(const PieceType pt);
         
         void calc_keys();
-		
-	inline uint64_t pseudo_bb(const PieceType pt, const Side side, const unsigned int sq) const;
+                
+        inline uint64_t pseudo_bb(const PieceType pt, const Side side, const unsigned int sq) const;
             
         inline bool singleSquareAttacked(uint64_t squares, const Side side) const;
         
-	inline uint64_t all_attackers(const unsigned int sq, const uint64_t occupied) const;
-	inline uint64_t side_attackers(const unsigned int sq, const uint64_t occupied, const Side side) const;
-	inline uint64_t all_slider_attackers(const unsigned int sq, const uint64_t occupied) const;
-	inline uint64_t side_slider_attackers(const unsigned int sq, const uint64_t occupied, const Side side) const;
-	inline uint64_t side_slider_attackers(const Side side, const unsigned int sq, const uint64_t bStart, const uint64_t bEnd);
-		
-	inline bool sq_attacked(const unsigned int sq, const Side side) const;
-	inline bool sq_attacked_noking(const unsigned int sq, const Side side) const;
-	
-	uint64_t getLeastValuablePiece(uint64_t attackers, const Side side, PieceType& pt) const;                
+        inline uint64_t all_attackers(const unsigned int sq, const uint64_t occupied) const;
+        inline uint64_t side_attackers(const unsigned int sq, const uint64_t occupied, const Side side) const;
+        inline uint64_t all_slider_attackers(const unsigned int sq, const uint64_t occupied) const;
+        inline uint64_t side_slider_attackers(const unsigned int sq, const uint64_t occupied, const Side side) const;
+        inline uint64_t side_slider_attackers(const Side side, const unsigned int sq, const uint64_t bStart, const uint64_t bEnd);
+                
+        inline bool sq_attacked(const unsigned int sq, const Side side) const;
+        inline bool sq_attacked_noking(const unsigned int sq, const Side side) const;
+        
+        uint64_t getLeastValuablePiece(uint64_t attackers, const Side side, PieceType& pt) const;                
         
 };
 

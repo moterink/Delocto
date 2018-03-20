@@ -128,7 +128,7 @@ class MovePicker {
 static const int DeltaMaterial[15] = { 0, 0, 100, 100, 320, 320, 330, 330, 500, 500, 950, 950, 999999, 999999, 100 };
 
 static const int SeeMaterial[15] = { 0, 0, 100, 100, 320, 320, 330, 330, 500, 500, 950, 950, 999999, 999999, 0 };
-static const int FutilityMargin[5] = { 0, 150, 300, 450, 600 };
+static const int FutilityMargin[6] = { 0, 100, 200, 320, 450, 590 };
 
 extern const Move bestmove(Board& board, const unsigned int limit, const unsigned int depth, const long long timeleft, const long long increment, bool uci);
 

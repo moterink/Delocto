@@ -151,16 +151,16 @@ uint64_t Board::get_pinned(const Side side) {
 int Board::mvvlva(const Move move) const {
 
     if (is_ep(move)) {
-        return 0;
+        return MvvLvaVictim[0] - MvvLvaAttacker[0];
     }
 
     int value = 0;
     
     if (is_promotion(move)) {
-        value += MvvLvaMaterial[prom_piecetype(move, 0)];
+        value += MvvLvaVictim[pt_index(prom_piecetype(move_type(move), 0))];
     }
 
-    value += MvvLvaMaterial[piecetypes[to_sq(move)]] * 8 + 4 - MvvLvaMaterial[piecetypes[from_sq(move)]];
+    value += MvvLvaVictim[pt_index(piecetypes[to_sq(move)])] - MvvLvaAttacker[pt_index(piecetypes[from_sq(move)])];
 
     return value;
 
