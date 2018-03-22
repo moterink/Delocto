@@ -25,8 +25,6 @@
 #include "movegen.hpp"
 #include "uci.hpp"
 
-static const unsigned int pieceIndex[14] = { 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 0, 0, };
-
 const Score Material[14] = {
     
     S(0, 0), S(0, 0),
@@ -257,12 +255,12 @@ static const Score pawnPhalanxBonus[2][8]  = {
 
 };
 static const Score pawnSupportBonus             = S(6, 2);
-static const Score pawnPassedBonus[8]           = { S(0, 0), S(2, 4), S(4, 6), S(12, 16), S(32, 32), S(72, 78), S(95, 110), S(0, 0) };//{ S(0, 0), S(-9, 25), S(4, 13), S(13, 22), S(41, 52), S(84, 105), S(182, 196), S(0, 0) }; //{ S(0, 0), S(3, 4), S(3, 8), S(20, 22), S(40, 42), S(85, 90), S(140, 150), S(0, 0) };
-static const Score passerFileBonus[8]           = { S(3, 4), S(2, 3), S(-2, -8), S(-7, -6), S(-7, -6), S(-2, -8), S(2, 3), S(3, 4) };
+static const Score pawnPassedBonus[8]           = { S(0, 0), S(2, 4), S(4, 6), S(12, 16), S(32, 32), S(69, 78), S(95, 110), S(0, 0) };//{ S(0, 0), S(-9, 25), S(4, 13), S(13, 22), S(41, 52), S(84, 105), S(182, 196), S(0, 0) }; //{ S(0, 0), S(3, 4), S(3, 8), S(20, 22), S(40, 42), S(85, 90), S(140, 150), S(0, 0) };
+static const Score passerFileBonus[8]           = { S(3, 4), S(2, 3), S(-2, -8), S(-9, -5), S(-9, -5), S(-2, -8), S(2, 3), S(3, 4) };
 static const Score pawnCandidateBonus[8]        = { S(0, 0), S(0, 0), S(5, 15),  S(10, 30), S(20, 45), S(30, 50),   S(40, 60),   S(0, 0) };
 
-static const Score passerPushBonus              = S(3, 4);
-static const Score passerSafePushBonus          = S(2, 3);
+static const Score passerPushBonus              = S(1, 3);
+static const Score passerSafePushBonus          = S(3, 4);
 static const Score passerFullyDefendedBonus     = S(6, 8);
 static const Score passerNoAttackersBonus       = S(3, 4);
 static const Score passerAttackedPenalty        = S(3, 6);
@@ -287,17 +285,16 @@ static const unsigned int rookTrappedPenalty    = 40;
 static const Score rookPairPenalty              = S(20, 16);
 
 // King
-static const unsigned int undefendedRingPenalty      =  22;
-static const unsigned int undefendedZonePenalty      =   9;
-static const unsigned int attackedRingPenalty[4]     = { 16, 15, 25, 13 };
-static const unsigned int noQueenWeight              = 125;
+static const unsigned int undefendedRingPenalty      =  16;
+static const unsigned int attackedRingPenalty[4]     = { 12, 11, 14, 8 };
+static const unsigned int noQueenWeight              =  80;
 static const unsigned int queenSafeCheckWeight       =  90;
 static const unsigned int rookSafeCheckWeight        = 120;
 static const unsigned int bishopSafeCheckWeight      =  65;
 static const unsigned int knightSafeCheckWeight      = 100;
-static const unsigned int attackerWeight[4]          = { 31, 34, 45, 25 };
-static const unsigned int defenderBonus[4]           = { 12, 14, 11,  9 };
-static const unsigned int defenderDistancePenalty[4] = {  2,  3,  2,  2 };
+static const unsigned int attackerWeight[4]          = { 25, 35, 41, 21 };
+static const unsigned int defenderBonus[4]           = { 28, 26, 32, 27 };
+static const unsigned int defenderDistancePenalty[4] = {  6,  7,  7,  8 };
 static const unsigned int closeEnemyPenalty          = 3;
 static const unsigned int castlingRightBonus[3]      = { 0, 12, 18 };
 static const unsigned int kingOpenFilePenalty[2]     = {  6, 8 };
@@ -306,25 +303,25 @@ static const unsigned int kingSemiOpenFilePenalty[2] = {  2, 6 };
 static const int kingPawnShelterValues[2][4][8] = {
 
     {
-        { -29,  0,  -6, -16, -29, -31, -32, 0 },
-        { -39,  0, -14, -31, -32, -35, -38, 0 },
-        { -42,  0, -27, -36, -25, -37, -39, 0 },
-        { -27, -2, -16, -25, -29, -30, -31, 0 }
+        { -31,  0,  -6, -16, -29, -31, -32, 0 },
+        { -34,  0, -13, -31, -32, -35, -38, 0 },
+        { -39,  0, -27, -36, -25, -37, -39, 0 },
+        { -28, -2, -16, -25, -29, -30, -31, 0 }
     },
     {
         { -34,  0,  -2,  -9, -28, -32, -33, 0 },
-        { -46,  0, -14, -35, -37, -38, -40, 0 },
-        { -45,  0, -24, -38, -27, -40, -42, 0 },
-        { -25,  0, -14, -23, -31, -34, -37, 0 }
+        { -38,  0, -14, -35, -37, -38, -40, 0 },
+        { -41,  0, -24, -38, -27, -40, -42, 0 },
+        { -24,  0, -14, -23, -31, -34, -37, 0 }
     }
 
 };
 
 static const int kingPawnStormPenalty[3][8] = {
     
-    { 0, 0, 0,  4,  9,  32,   0, 0 },
+    { 0, 0, 0,  4, 14,  32,   0, 0 },
     { 0, 0, 2, 14, 26, -48, -74, 0 },
-    { 0, 0, 4, 12, 23,  68,  24, 0 }
+    { 0, 0, 4, 12, 23,  46,  24, 0 }
     
 };
 
@@ -431,7 +428,7 @@ bool Board::checkMaterialDraw(const unsigned int pieceCount) const {
 
 static void update_attack_info(Side side, PieceType pt, unsigned int sq, uint64_t moves, EvalInfo& info) {
 
-    unsigned int pindex = pt / 2 - 2;
+    unsigned int pindex = pt_index(pt) - 1;
 
     info.attackedSquares[pt] |= moves;
     info.multiAttackedSquares[side] |= info.attackedSquares[side] & moves;
@@ -447,10 +444,7 @@ static void update_attack_info(Side side, PieceType pt, unsigned int sq, uint64_
        
     }
 
-    const uint64_t kingDefense = moves & info.kingRing[side];
-
-    if (kingDefense) 
-        info.kingRingDefense[side] += popcount(kingDefense) * defenderBonus[pindex] - defenderDistancePenalty[pindex] * kingDistance[sq][info.kingSq[side]];
+    info.kingRingDefense[side] += defenderBonus[pindex] - defenderDistancePenalty[pindex] * kingDistance[sq][info.kingSq[side]];
 
 }
 
@@ -704,7 +698,6 @@ static const Score evaluate_king_safety(const Board& board, const Side side, con
         const uint64_t ring = KingRing[side][info.kingSq[side]];
         
         const uint64_t undefendedRing     = (ring & info.attackedSquares[!side]) & ~info.multiAttackedSquares[side];
-        const uint64_t undefendedZone     = ((zone & info.attackedSquares[!side]) & ~info.multiAttackedSquares[side]) & ~board.pieces(!side);        
         
         const uint64_t knightCheckSquares = generateKnightMoves(info.kingSq[side], board.pieces(side));
         const uint64_t bishopCheckSquares = generateBishopMoves(info.kingSq[side], board.pieces(ALLPIECES), 0);
@@ -716,8 +709,6 @@ static const Score evaluate_king_safety(const Board& board, const Side side, con
         safety -= (info.kingAttackersNum[side] * info.kingAttackWeight[side]) / 6;
         
         safety -= popcount(undefendedRing) * undefendedRingPenalty;
-        
-        safety -= popcount(undefendedZone) * undefendedZonePenalty;
         
         safety -= info.kingRingAttackWeight[side];
         
@@ -739,9 +730,9 @@ static const Score evaluate_king_safety(const Board& board, const Side side, con
 
         safety -= popcount(zone & board.pieces(!side)) * closeEnemyPenalty;
 
-        safety += info.kingRingDefense[side] / 4;
+        safety += info.kingRingDefense[side] / 3;
 
-        safety += pawnScore / 3;
+        safety += pawnScore / 5;
 
         if (!board.pieces(QUEEN, !side)) {
             safety += noQueenWeight;
@@ -755,7 +746,7 @@ static const Score evaluate_king_safety(const Board& board, const Side side, con
     
     score.mg += castlingRightBonus[popcount(board.castleRights() & CASTLE_MASKS[side])];
 
-    score.mg += info.kingRingDefense[side] / 4;
+    score.mg += info.kingRingDefense[side] / 2;
 
     return S(std::min(80, score.mg), score.eg);
     
@@ -790,11 +781,11 @@ static const Score evaluate_passers(const Board& board, const Side side, const E
             }
             
             if (!attacked) {
-                score += (passerNoAttackersBonus * rfactor);                
+                score += (passerNoAttackersBonus * rfactor);
             }
             
             if (defended == path) {
-                score += (passerFullyDefendedBonus * rfactor);                
+                score += (passerFullyDefendedBonus * rfactor);
             }
             
             if (SQUARES[sq] & info.attackedSquares[!side]) {
@@ -808,8 +799,8 @@ static const Score evaluate_passers(const Board& board, const Side side, const E
         }
         
         score += pawnPassedBonus[r];
-        score += passerFileBonus[f];                
-        score.eg += (4 * rfactor * kingDistance[info.kingSq[!side]][blocksq]) - (2 * rfactor * kingDistance[info.kingSq[side]][blocksq]);               
+        score += passerFileBonus[f];
+        score.eg += (5 * rfactor * kingDistance[info.kingSq[!side]][blocksq]) - (3 * rfactor * kingDistance[info.kingSq[side]][blocksq]);               
         
     }        
     
