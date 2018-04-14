@@ -75,6 +75,8 @@ typedef struct {
     Move killers[MAXDEPTH][2];
     Move history[14][64];
     Move countermove[14][64];
+
+    Move currentmove[MAXDEPTH] = { NOMOVE };
     
     float fhf;
     float fh;
