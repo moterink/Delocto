@@ -101,10 +101,10 @@ class MovePicker {
         const Board& board;
         const SearchInfo * info;
         
-        MovePicker(const Board& b, SearchInfo * i) : board(b), info(i) {
+        MovePicker(const Board& b, SearchInfo * i, unsigned int p) : board(b), info(i) {
             
-            killers[0] = info->killers[b.plies()][0];
-            killers[1] = info->killers[b.plies()][1];
+            killers[0] = info->killers[p][0];
+            killers[1] = info->killers[p][1];
 			
         }
         
