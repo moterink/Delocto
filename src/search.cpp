@@ -522,6 +522,19 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutnode, Bo
         }
         
         if (pruning) {
+
+            // Razoring
+            if (   !pvnode
+                && !checked
+                && depth <= 4
+                && eval <= alpha - RazorMargin[depth])
+            {
+                int ralpha = alpha - RazorMargin[depth];
+                int score = quiescence(ralpha, ralpha + 1, 0, plies, board, info);
+                if (score <= ralpha)
+                    return score;
+            }
+
             // Null move pruning
             if (!pvnode && depth >= 2 && !checked && board.minors_or_majors(board.turn()) && eval >= beta) {
                 
@@ -534,6 +547,7 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutnode, Bo
                 }
                 
             }
+
         }
         
         int hashflag = ALPHAHASH;
@@ -692,7 +706,7 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutnode, Bo
             if (excluded != NOMOVE) {
                 return alpha;
             } else if (checked) {
-                return -MATEVALUE + plies;
+                return -MATEVALUE - 1 + plies;
             } else {
                 return DRAWVALUE;
             }
