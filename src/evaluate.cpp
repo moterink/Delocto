@@ -285,16 +285,16 @@ static const unsigned int rookTrappedPenalty    = 40;
 static const Score rookPairPenalty              = S(20, 16);
 
 // King
-static const unsigned int undefendedRingPenalty      =  16;
+static const unsigned int undefendedRingPenalty      =  18;
 static const unsigned int attackedRingPenalty[4]     = { 12, 11, 14, 8 };
 static const unsigned int noQueenWeight              =  80;
 static const unsigned int queenSafeCheckWeight       =  90;
 static const unsigned int rookSafeCheckWeight        = 120;
 static const unsigned int bishopSafeCheckWeight      =  65;
 static const unsigned int knightSafeCheckWeight      = 100;
-static const unsigned int attackerWeight[4]          = { 25, 35, 41, 21 };
-static const unsigned int defenderBonus[4]           = { 28, 26, 32, 27 };
-static const unsigned int defenderDistancePenalty[4] = {  6,  7,  7,  8 };
+static const unsigned int attackerWeight[4]          = { 25, 36, 41, 21 };
+static const unsigned int defenderBonus[4]           = { 28, 26, 25, 27 };
+static const unsigned int defenderDistancePenalty[4] = {  6,  7,  8,  8 };
 static const unsigned int closeEnemyPenalty          = 3;
 static const unsigned int castlingRightBonus[3]      = { 0, 12, 18 };
 static const unsigned int kingOpenFilePenalty[2]     = {  6, 8 };
@@ -317,11 +317,28 @@ static const int kingPawnShelterValues[2][4][8] = {
 
 };
 
-static const int kingPawnStormPenalty[3][8] = {
-    
-    { 0, 0, 0,  4, 14,  32,   0, 0 },
-    { 0, 0, 2, 14, 26, -48, -74, 0 },
-    { 0, 0, 4, 12, 23,  46,  24, 0 }
+static const int kingPawnStormValues[3][4][8] = {
+    // Blocked by pawn
+    {
+        { 0, 0, 0, 0,  8, 10, 0, 0 },
+        { 0, 0, 0, 1, 11, 37, 0, 0 },
+        { 0, 0, 0, 0,  7, 42, 0, 0 },
+        { 0, 0, 0, 6,  9, 46, 0, 0 }
+    },
+    // Blocked by king
+    {
+        { 0, 0, 0, 16, 24, -87, -92, 0 },
+        { 0, 0, 0,  5, 16,  56,  25, 0 },
+        { 0, 0, 0, 11, 17,  53,  28, 0 },
+        { 0, 0, 0,  6, 22,  48,  23, 0 }
+    },
+    // Unopposed
+    {
+        { 0, 0, 0, 13, 19, 54, 30, 0 },
+        { 0, 0, 0,  5, 11, 61, 27, 0 },
+        { 0, 0, 0, 10, 17, 45, 21, 0 },
+        { 0, 0, 0, 12, 20, 53, 30, 0 }
+    }
     
 };
 
@@ -348,6 +365,7 @@ static const int tempoBonus = 12;
 
 int kingDistance[64][64];
 static int kingPawnShelter[2][8][8];
+static int kingPawnStorm[3][8][8];
 
 void initKingDistance() {
 
@@ -395,6 +413,16 @@ void initEval() {
             for (unsigned int r = 0; r < 8; r++) {
                 kingPawnShelter[t][f][r]     = kingPawnShelterValues[t][f][r];
                 kingPawnShelter[t][7 - f][r] = kingPawnShelterValues[t][f][r];
+            }
+        }
+    }
+
+    // Mirror King Pawn Storm Values
+    for (unsigned int t = 0; t < 3; t++) {
+        for (unsigned int f = 0; f < 4; f++) {
+            for (unsigned int r = 0; r < 8; r++) {
+                kingPawnStorm[t][f][r]       = kingPawnStormValues[t][f][r];
+                kingPawnStorm[t][7 - f][r]   = kingPawnStormValues[t][f][r];
             }
         }
     }
@@ -681,7 +709,7 @@ static const Score evaluate_king_safety(const Board& board, const Side side, con
         if (opps) {
 
             const unsigned int sq = lsb_index(most_forward(!side, opps));
-            pawnScore -= kingPawnStormPenalty[owns ? 0 : (f == kingFile && info.kingSq[side] == sq + DIRECTIONS[!side][UP]) ? 1 : 2][relative_rank(!side, sq)];
+            pawnScore -= kingPawnStorm[owns ? 0 : (info.kingSq[side] == sq + DIRECTIONS[!side][UP]) ? 1 : 2][f][relative_rank(!side, sq)];
             
             if (!owns) {
                 score.mg -= kingSemiOpenFilePenalty[f == kingFile];
@@ -1001,8 +1029,8 @@ const int evaluate(const Board& board) {
         Score imbalanceScore = evaluate_imbalances(board, WHITE) - evaluate_imbalances(board, BLACK);
         materialTable.store(board.materialkey(), imbalanceScore);
         score += imbalanceScore;
-    }        
-    
+    }
+
     return ((board.turn() == WHITE) ? scaled_eval(board.scale(), score) : -scaled_eval(board.scale(), score)) + tempoBonus;
     
 }
