@@ -28,6 +28,10 @@ uint64_t PawnAttacksSpan[2][64];
 uint64_t KingShelterSpan[2][64];
 uint64_t RayTable[64][64];
 uint64_t LineTable[64][64];
+uint64_t AttackBitboards[14][64];
+uint64_t FrontFileMask[2][64];
+uint64_t PassedPawnMask[2][64];
+uint64_t BackwardPawnMask[2][64];
 
 void initBitboards() {
     
@@ -47,7 +51,30 @@ void initBitboards() {
         KingShelterSpan[WHITE][sq] = ((kingsFrontW & ~FILE_A) << 1) | ((kingsFrontW & ~FILE_H) >> 1) | kingsFrontW;
         KingShelterSpan[BLACK][sq] = ((kingsFrontB & ~FILE_A) << 1) | ((kingsFrontB & ~FILE_H) >> 1) | kingsFrontB;
         
-    }            
+        AttackBitboards[WHITE_PAWN][sq]   = ((SQUARES[sq] & ~FILE_A) << 9) | ((SQUARES[sq] & ~FILE_H) << 7);
+        AttackBitboards[BLACK_PAWN][sq]   = ((SQUARES[sq] & ~FILE_A) >> 7) | ((SQUARES[sq] & ~FILE_H) >> 9);
+
+        AttackBitboards[WHITE_KNIGHT][sq] = AttackBitboards[BLACK_KNIGHT][sq] = ((SQUARES[sq] & ~(FILE_A | RANK_1 | RANK_2)) << 17) | ((SQUARES[sq] & ~(FILE_H | RANK_1 | RANK_2)) << 15) | ((SQUARES[sq] & ~(FILE_A | FILE_B | RANK_1)) << 10) | ((SQUARES[sq] & ~(FILE_H | FILE_G | RANK_1)) << 6) | ((SQUARES[sq] & ~(FILE_A | FILE_B | RANK_8)) >> 6) | ((SQUARES[sq] & ~(FILE_H | FILE_G | RANK_8)) >> 10) | ((SQUARES[sq] & ~(FILE_A | RANK_8 | RANK_7)) >> 15) | ((SQUARES[sq] & ~(FILE_H | RANK_8 | RANK_7)) >> 17);
+        AttackBitboards[WHITE_BISHOP][sq] = AttackBitboards[BLACK_BISHOP][sq] = generateBishopMoves(sq, 0, 0);
+        AttackBitboards[WHITE_ROOK][sq]   = AttackBitboards[BLACK_ROOK][sq]   = generateRookMoves(sq, 0, 0);
+        AttackBitboards[WHITE_QUEEN][sq]  = AttackBitboards[BLACK_QUEEN][sq]  = AttackBitboards[WHITE_ROOK][sq] | AttackBitboards[WHITE_BISHOP][sq];
+        AttackBitboards[WHITE_KING][sq]   = AttackBitboards[BLACK_KING][sq]   = ((SQUARES[sq] & ~(FILE_A | RANK_1)) << 9) | ((SQUARES[sq] & ~RANK_1) << 8) | ((SQUARES[sq] & ~(FILE_H | RANK_1)) << 7) | ((SQUARES[sq] & ~FILE_A) << 1) | ((SQUARES[sq] & ~FILE_H) >> 1) | ((SQUARES[sq] & ~(FILE_A | RANK_8)) >> 7) | ((SQUARES[sq] & ~RANK_8) >> 8) | ((SQUARES[sq] & ~(FILE_H | RANK_8)) >> 9);
+
+        for (int i = 1; i < 8; i++) {
+            uint64_t nsq = (SQUARES[sq] << (8 * i));
+            FrontFileMask[WHITE][sq] |= nsq;
+            if (nsq & RANK_1)
+                break;
+        }
+
+        for (int i = 1; i < 8; i++) {
+            uint64_t nsq = (SQUARES[sq] >> (8 * i));
+            FrontFileMask[BLACK][sq] |= nsq;
+            if (nsq & RANK_8)
+                break;
+        }
+
+    }
     
     for (unsigned int sq1 = 0; sq1 < 64; sq1++) {               
         
@@ -65,7 +92,15 @@ void initBitboards() {
             }
             
         }
+
+        int f = file(sq1);
+        int r = rank(sq1);
+        PassedPawnMask[WHITE][sq1] = FrontFileMask[WHITE][sq1] | (f != 0 ? FrontFileMask[WHITE][sq1-1] : 0) | (f != 7 ? FrontFileMask[WHITE][sq1+1] : 0);
+        PassedPawnMask[BLACK][sq1] = FrontFileMask[BLACK][sq1] | (f != 0 ? FrontFileMask[BLACK][sq1-1] : 0) | (f != 7 ? FrontFileMask[BLACK][sq1+1] : 0);
         
+        BackwardPawnMask[WHITE][sq1] = (r != 0 ? (f != 0 ? FrontFileMask[BLACK][sq1-9] : 0) | (f != 7 ? FrontFileMask[BLACK][sq1-7] : 0) : 0);
+        BackwardPawnMask[BLACK][sq1] = (r != 7 ? (f != 0 ? FrontFileMask[WHITE][sq1+7] : 0) | (f != 7 ? FrontFileMask[WHITE][sq1+9] : 0) : 0);
+
     }
     
 }

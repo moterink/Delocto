@@ -42,7 +42,7 @@ int main() {
     generateMoveDatabase(false);
     
     // Init Bitboard Lookup Tables
-    initBitboards();        
+    initBitboards();
     
     // Initialize king distance array
     initKingDistance();

@@ -30,6 +30,10 @@ extern uint64_t PawnAttacksSpan[2][64];
 extern uint64_t KingShelterSpan[2][64];
 extern uint64_t RayTable[64][64];
 extern uint64_t LineTable[64][64];
+extern uint64_t AttackBitboards[14][64];
+extern uint64_t FrontFileMask[2][64];
+extern uint64_t PassedPawnMask[2][64];
+extern uint64_t BackwardPawnMask[2][64];
 
 extern void initBitboards();
 
