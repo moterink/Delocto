@@ -32,24 +32,24 @@
 
 // Hash flags
 enum HashFlag {
-    
+
     NOHASH, EXACTHASH, ALPHAHASH, BETAHASH
-    
+
 };
 
 // Hash entry
 typedef struct {
-    
+
     uint64_t key;
     int depth;
     int flag;
     int score;
     Move bestmove;
-    
+
 } TTEntry;
 
 typedef struct {
-    
+
     uint64_t key;
     Score score;
     uint64_t pawnWAttacks;
@@ -57,12 +57,12 @@ typedef struct {
     uint64_t weakPawns;
     uint64_t passedPawns;
     uint64_t pawnWAttacksSpan;
-    uint64_t pawnBAttacksSpan;    
-    
+    uint64_t pawnBAttacksSpan;
+
 } PawnEntry;
 
 typedef struct {
-    
+
     uint64_t key;
     Score score;
 
@@ -70,72 +70,72 @@ typedef struct {
 
 // Transposition Table class
 class TranspositionTable {
-    
+
     public:
 
         int size;
-        
+
         TTEntry *table;
-        
+
         void setSize(const int hashsize);
         void clear();
         TTEntry * probe(const uint64_t key);
         void store(const uint64_t key, const int depth, const int score, const Move bestmove, const int flag);
-        
+
         ~TranspositionTable() {
             delete[] table;
         }
 };
 
 class PawnTable {
-    
+
     public:
-    
+
         int size = 0x10000;
-        
+
         PawnEntry *table;
-        
+
         void clear();
         PawnEntry * probe(const uint64_t key);
         void store(const uint64_t key, const Score score, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t weakPawns, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan);
-        
+
         PawnTable() {
             table = new PawnEntry [size];
         }
-        
+
         ~PawnTable() {
             delete[] table;
         }
-    
+
 };
 
 class MaterialTable {
-    
+
     public:
-        
+
         int size = 0x2000;
-        
+
         MaterialEntry *table;
-        
+
         void clear();
         MaterialEntry * probe(const uint64_t key);
         void store(const uint64_t key, const Score score);
-        
+
         MaterialTable() {
-            table = new MaterialEntry [size];                        
+            table = new MaterialEntry [size];
         }
-        
+
         ~MaterialTable() {
             delete[] table;
         }
-    
+
 };
 
 // Generate a random 64bit integer
 static const uint64_t getRandomInteger() {
-    
+
     return rand() ^ ((uint64_t)rand() << 15) ^ ((uint64_t)rand() << 30) ^ ((uint64_t)rand() << 45) ^ ((uint64_t)rand() << 60);
-    
+
 }
 
 // Random keys for each piece on every possible position
@@ -146,7 +146,7 @@ static const uint64_t pieceHashKeys[16][64] = {
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },
-    { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },   
+    { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },
@@ -157,18 +157,18 @@ static const uint64_t pieceHashKeys[16][64] = {
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() }
-    
+
 };
 
 static const uint64_t pawnHashKeys[2][64] = {
-    
+
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() }
-    
+
 };
 
 static const uint64_t materialHashKeys[14][11] = {
-    
+
     { 0 },
     { 0 },
     { getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger(), getRandomInteger() },

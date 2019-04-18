@@ -41,7 +41,7 @@ static const Move BKCAS_MOVE = make_move(4, 6, CASTLING);
 static const Move BQCAS_MOVE = make_move(4, 2, CASTLING);
 
 void MoveList::merge(MoveList list) {
-    
+
     unsigned int lcount;
     for (lcount = 0; lcount < (list.size-list.index); lcount++) {
         moves[size + lcount] = list.moves[list.index + lcount];
@@ -62,395 +62,379 @@ unsigned int MoveList::find(const Move move) {
 }
 
 void MoveList::swap(const unsigned int index1, const unsigned int index2) {
-    
+
     Move move1 = moves[index1];
     Move move2 = moves[index2];
-    
+
     int score1 = scores[index1];
     int score2 = scores[index2];
-    
+
     moves[index1] = move2;
     moves[index2] = move1;
-    
+
     scores[index1] = score2;
     scores[index2] = score1;
 
 }
 
 const Move MoveList::pick() {
-    
+
     if (size == 0) return NOMOVE;
 
     int bestscore = scores[index];
     unsigned int bestindex = index;
-    
+
     for (unsigned int mcount = index; mcount < size; mcount++) {
         if (scores[mcount] > bestscore) {
             bestscore = scores[mcount];
             bestindex = mcount;
         }
     }
-    
+
     swap(index, bestindex);
     return moves[index];
-    
+
 }
 
 void MoveList::print() {
-    
+
     for (unsigned int mcount = 0; mcount < size; mcount++) {
         print_move(moves[mcount]);
     }
-    
+
 }
 
 static void gen_quietproms(const Board& board, MoveList& moveList, const Side side, const uint64_t targets) {
-    
-    uint64_t pawns = board.pieces(PAWN, side) & ((side == WHITE) ? RANK_2 : RANK_7);    
-    
+
+    uint64_t pawns = board.pieces(PAWN, side) & ((side == WHITE) ? RANK_2 : RANK_7);
+
     while (pawns) {
-        
+
         const unsigned int fromsq = pop_lsb(pawns);
         const unsigned int tosq = fromsq + DIRECTIONS[side][UP];
-        
+
         if (SQUARES[tosq] & targets) {
             moveList.append(make_move(fromsq, tosq, QUEENPROM));
             moveList.append(make_move(fromsq, tosq, ROOKPROM));
             moveList.append(make_move(fromsq, tosq, BISHOPPROM));
             moveList.append(make_move(fromsq, tosq, KNIGHTPROM));
         }
-        
+
     }
-    
+
 }
 
 static void gen_capproms(const Board& board, MoveList& moveList, const Side side, const uint64_t targets) {
-    
-    uint64_t pawns = board.pieces(PAWN, side) & ((side == WHITE) ? RANK_2 : RANK_7);    
-    
+
+    uint64_t pawns = board.pieces(PAWN, side) & ((side == WHITE) ? RANK_2 : RANK_7);
+
     while (pawns) {
-        
+
         const unsigned int fromsq = pop_lsb(pawns);
-        
+
         uint64_t caps = generatePawnCaptures(fromsq, board.pieces(!side), side) & targets;
-        
+
         while (caps) {
-            
+
             const unsigned int tosq = pop_lsb(caps);
-        
+
             moveList.append(make_move(fromsq, tosq, QUEENPROM));
             moveList.append(make_move(fromsq, tosq, ROOKPROM));
             moveList.append(make_move(fromsq, tosq, BISHOPPROM));
             moveList.append(make_move(fromsq, tosq, KNIGHTPROM));
-            
+
         }
-        
+
     }
-    
+
 }
 
-static void gen_ep(const Board& board, MoveList& moveList, const Side side, const uint64_t targets) {       
-    
+static void gen_ep(const Board& board, MoveList& moveList, const Side side, const uint64_t targets) {
+
     const unsigned int epsq = board.enPassant();
-    
+
     if (epsq != NOSQ && (SQUARES[epsq] & targets)) {
-        
+
         uint64_t pawns = attackingPawns[side][epsq] & board.pieces(PAWN, side);
-        
+
         while (pawns) {
-            
+
             moveList.append(make_move(pop_lsb(pawns), epsq, ENPASSANT));
-            
+
         }
-        
+
     }
 
 }
 
-static void gen_piece_caps(const Board& board, MoveList& moveList, const Side side, uint64_t targets) {          
-    
+static void gen_piece_caps(const Board& board, MoveList& moveList, const Side side, uint64_t targets) {
+
     const uint64_t pawns = board.pieces(PAWN, side) & ~((side == WHITE) ? RANK_2 : RANK_7);
     uint64_t pawnsLCaps  = (((side == WHITE) ? ((pawns & ~FILE_A) << 9) : ((pawns & ~FILE_A) >> 7)) & targets);
     uint64_t pawnsRCaps  = (((side == WHITE) ? ((pawns & ~FILE_H) << 7) : ((pawns & ~FILE_H) >> 9)) & targets);
-    
+
     const unsigned int sq = lsb_index(board.pieces(KING, side));
     uint64_t moves = AttackBitboards[KING][sq] & board.pieces(!side);
-    
+
     while (moves) {
-    
+
         moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
-    
+
     }
-    
+
     while (pawnsLCaps) {
-        
+
         const unsigned int tosq = pop_lsb(pawnsLCaps);
         const unsigned int fromsq = lsb_index((side == WHITE) ? (SQUARES[tosq] >> 9) : (SQUARES[tosq] << 7));
         moveList.append(make_move(fromsq, tosq, NORMAL));
-        
+
     }
-    
+
     while (pawnsRCaps) {
-        
+
         const unsigned int tosq = pop_lsb(pawnsRCaps);
         const unsigned int fromsq = lsb_index((side == WHITE) ? (SQUARES[tosq] >> 7) : (SQUARES[tosq] << 9));
         moveList.append(make_move(fromsq, tosq, NORMAL));
-        
+
     }
-    
+
     uint64_t knights = board.pieces(KNIGHT, side);
     while (knights) {
-        
+
         const unsigned int sq = pop_lsb(knights);
         uint64_t moves = AttackBitboards[KNIGHT][sq] & targets;
 
         while (moves) {
-            
+
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
-        
+
         }
-        
+
     }
-    
+
     uint64_t bishops = board.pieces(BISHOP, side);
     while (bishops) {
-        
+
         const unsigned int sq = pop_lsb(bishops);
-        uint64_t moves = generateBishopMoves(sq, board.pieces(ALLPIECES), board.pieces(side)) & targets;        
-        
-        while (moves) {              
-            
+        uint64_t moves = generateBishopMoves(sq, board.pieces(ALLPIECES), board.pieces(side)) & targets;
+
+        while (moves) {
+
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
-        
-        }              
-        
+
+        }
+
     }
-    
+
     uint64_t rooks = board.pieces(ROOK, side);
     while (rooks) {
-        
+
         const unsigned int sq = pop_lsb(rooks);
-        uint64_t moves = generateRookMoves(sq, board.pieces(ALLPIECES), board.pieces(side)) & targets;        
-        
+        uint64_t moves = generateRookMoves(sq, board.pieces(ALLPIECES), board.pieces(side)) & targets;
+
         while (moves) {
-            
+
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
-        
+
         }
     }
-    
+
     uint64_t queens = board.pieces(QUEEN, side);
     while (queens) {
-        
+
         const unsigned int sq = pop_lsb(queens);
-        uint64_t moves = generateQueenMoves(sq, board.pieces(ALLPIECES), board.pieces(side)) & targets;                            
-        
+        uint64_t moves = generateQueenMoves(sq, board.pieces(ALLPIECES), board.pieces(side)) & targets;
+
         while (moves) {
-            
+
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
-        
+
         }
-        
-    }        
-    
+
+    }
+
 }
 
-static void gen_piece_quiets(const Board& board, MoveList& moveList, const Side side, const uint64_t targets) {        
-    
+static void gen_piece_quiets(const Board& board, MoveList& moveList, const Side side, const uint64_t targets) {
+
     const uint64_t pawns       = board.pieces(PAWN, side) & ~ ((side == WHITE) ? RANK_2 : RANK_7);
     const uint64_t pawnPushes  = ((side == WHITE) ? (pawns << 8) : (pawns >> 8)) & ~board.pieces(ALLPIECES);
     uint64_t singlePushes      = pawnPushes & targets;
     uint64_t doublePushes      = ((side == WHITE) ? ((pawnPushes & RANK_6) << 8) : ((pawnPushes & RANK_3) >> 8)) & targets;
-    
+
     uint64_t knights = board.pieces(KNIGHT, side);
     while (knights) {
-        
+
         const unsigned int sq = pop_lsb(knights);
-        uint64_t moves = AttackBitboards[KNIGHT][sq] & targets;        
+        uint64_t moves = AttackBitboards[KNIGHT][sq] & targets;
 
         while (moves) {
-            
+
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
-        
+
         }
-        
+
     }
-    
+
     uint64_t bishops = board.pieces(BISHOP, side);
     while (bishops) {
-        
+
         const unsigned int sq = pop_lsb(bishops);
         uint64_t moves = generateBishopMoves(sq, board.pieces(ALLPIECES), board.pieces(side)) & targets;
-        
-        while (moves) {                        
-            
+
+        while (moves) {
+
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
-        
+
         }
-        
+
     }
-    
+
     uint64_t rooks = board.pieces(ROOK, side);
     while (rooks) {
-        
+
         const unsigned int sq = pop_lsb(rooks);
         uint64_t moves = generateRookMoves(sq, board.pieces(ALLPIECES), board.pieces(side)) & targets;
-        
+
         while (moves) {
-            
+
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
-        
+
         }
     }
-    
+
     uint64_t queens = board.pieces(QUEEN, side);
     while (queens) {
-        
+
         const unsigned int sq = pop_lsb(queens);
         uint64_t moves = generateQueenMoves(sq, board.pieces(ALLPIECES), board.pieces(side)) & targets;
-        
-        while (moves) {                        
-            
+
+        while (moves) {
+
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
-        
+
         }
-        
-    }        
-    
+
+    }
+
     while (singlePushes) {
-        
+
         const unsigned int tosq = pop_lsb(singlePushes);
         const unsigned int fromsq = lsb_index((side == WHITE) ? (SQUARES[tosq] >> 8) : (SQUARES[tosq] << 8));
         moveList.append(make_move(fromsq, tosq, NORMAL));
-        
+
     }
-    
+
     while (doublePushes) {
-        
+
         const unsigned int tosq = pop_lsb(doublePushes);
         const unsigned int fromsq = lsb_index((side == WHITE) ? (SQUARES[tosq] >> 16) : (SQUARES[tosq] << 16));
         moveList.append(make_move(fromsq, tosq, NORMAL));
-        
+
     }
-    
+
     const unsigned int sq = lsb_index(board.pieces(KING, side));
     uint64_t moves = AttackBitboards[KING][sq] & ~board.pieces(ALLPIECES);
-    
+
     while (moves) {
-    
+
         moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
-    
+
     }
-    
+
 }
 
 bool Board::is_castling_valid(const unsigned int flag) const {
-    
-    if (!checkers()) {            
-        
+
+    if (!checkers()) {
+
         switch (flag) {
-        
+
             case WKCASFLAG:
             {
-                if ((state.castling & WKCASFLAG)             
-                 && (bitboards[WHITE_KING] & SQUARES[E1])
-                 && (bitboards[WHITE_ROOK] & SQUARES[H1])
-                 && (!getAllOccupancy(WKCAS_BLOCKERS))) {
-                    if (!singleSquareAttacked(WKCAS_CHECKERS, BLACK)) {
-                        return true;
-                    }
-                }
-                return false;
+                return (   state.castling & WKCASFLAG
+                        && bitboards[WHITE_KING] & SQUARES[E1]
+                        && bitboards[WHITE_ROOK] & SQUARES[H1]
+                        && !getAllOccupancy(WKCAS_BLOCKERS));
+
             }
             case WQCASFLAG:
             {
-                if ((state.castling & WQCASFLAG)
-                 && (bitboards[WHITE_KING] & SQUARES[E1])
-                 && (bitboards[WHITE_ROOK] & SQUARES[A1])
-                 && (!getAllOccupancy(WQCAS_BLOCKERS))) {                 
-                    if (!singleSquareAttacked(WQCAS_CHECKERS, BLACK)) {
-                        return true;
-                    }
-                }
-                return false;
+                return (   state.castling & WQCASFLAG
+                        && bitboards[WHITE_KING] & SQUARES[E1]
+                        && bitboards[WHITE_ROOK] & SQUARES[A1]
+                        && !getAllOccupancy(WQCAS_BLOCKERS));
+
+
             }
             case BKCASFLAG:
-            {            
-                if ((state.castling & BKCASFLAG)
-                 && (bitboards[BLACK_KING] & SQUARES[E8])
-                 && (bitboards[BLACK_ROOK] & SQUARES[H8])
-                 && (!getAllOccupancy(BKCAS_BLOCKERS))) {
-                    if (!singleSquareAttacked(BKCAS_CHECKERS, WHITE)) {
-                        return true;
-                    }
-                }
-                return false;
+            {
+                return (   state.castling & BKCASFLAG
+                        && bitboards[BLACK_KING] & SQUARES[E8]
+                        && bitboards[BLACK_ROOK] & SQUARES[H8]
+                        && !getAllOccupancy(BKCAS_BLOCKERS));
+
             }
             case BQCASFLAG:
             {
-                if ((state.castling & BQCASFLAG)
-                 && (bitboards[BLACK_KING] & SQUARES[E8])
-                 && (bitboards[BLACK_ROOK] & SQUARES[A8])
-                 && (!getAllOccupancy(BQCAS_BLOCKERS))) {
-                    if (!singleSquareAttacked(BQCAS_CHECKERS, WHITE)) {
-                        return true;
-                    }
-                }
-                return false;
+                return (   state.castling & BQCASFLAG
+                        && bitboards[BLACK_KING] & SQUARES[E8]
+                        && bitboards[BLACK_ROOK] & SQUARES[A8]
+                        && !getAllOccupancy(BQCAS_BLOCKERS));
             }
         }
     }
-    
+
     return false;
-    
+
 }
 
 static void gen_castlings(const Board& board, MoveList& moveList, const Side side) {
-    
+
     if (side == WHITE) {
-        
+
         if (board.is_castling_valid(WKCASFLAG)) {
             moveList.append(WKCAS_MOVE);
-        }     
-        
-        if (board.is_castling_valid(WQCASFLAG)) {
-            moveList.append(WQCAS_MOVE);            
         }
-        
+
+        if (board.is_castling_valid(WQCASFLAG)) {
+            moveList.append(WQCAS_MOVE);
+        }
+
     } else {
-        
+
         if (board.is_castling_valid(BKCASFLAG)) {
             moveList.append(BKCAS_MOVE);
-        }     
-        
-        if (board.is_castling_valid(BQCASFLAG)) {
-            moveList.append(BQCAS_MOVE);            
         }
-        
+
+        if (board.is_castling_valid(BQCASFLAG)) {
+            moveList.append(BQCAS_MOVE);
+        }
+
     }
 
 }
 
 static void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& moveList, const Side side) {
-    
+
     const unsigned int ksq  = lsb_index(board.pieces(KING, side));
     const uint64_t checkers = board.checkers();
-    const uint64_t sliders  = checkers & ~(board.pieces(KNIGHT, side) | board.pieces(PAWN, side));        
-    
-    if (popcount(checkers) >= 2) {               
-        
+    const uint64_t sliders  = checkers & ~(board.pieces(KNIGHT, side) | board.pieces(PAWN, side));
+
+    if (popcount(checkers) >= 2) {
+
         uint64_t kingMoves = AttackBitboards[KING][ksq] & ((mtype == QUIETS) ? ~board.pieces(ALLPIECES) : board.pieces(!side));
         while (kingMoves) {
             moveList.append(make_move(ksq, pop_lsb(kingMoves), NORMAL));
         }
         return;
-        
+
     }
-    
+
     switch(mtype) {
-        
+
         case QUIETS:
-        {   
+        {
             const uint64_t targets = (sliders ? (RayTable[lsb_index(sliders)][ksq] & ~board.pieces(ALLPIECES)) : ~board.pieces(ALLPIECES));
             gen_quietproms(board, moveList, side, targets);
             gen_piece_quiets(board, moveList, side, targets);
@@ -462,32 +446,32 @@ static void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& 
             gen_piece_caps(board, moveList, side, checkers);
             if (checkers & board.pieces(PAWN, !side)) {
                 gen_ep(board, moveList, side, SQUARES[board.enPassant()]);
-            }            
+            }
             break;
         }
         default:
             assert(false);
-            
+
     }
-    
+
 }
 
-static MoveList gen_legals(const Board& board, const MoveList& moves, const Side side) {
-    
-    MoveList legals;       
-    
+MoveList gen_legals(const Board& board, const MoveList& moves) {
+
+    MoveList legals;
+
     for (unsigned int m = 0; m < moves.size; m++) {
-        
+
         const Move move = moves.moves[m];
-        
-        if (board.is_legal(move, side)) {
+
+        if (board.is_legal(move)) {
             legals.append(move);
         }
-        
+
     }
-    
+
     return legals;
-    
+
 }
 
 MoveList gen_quiets(const Board& board, const Side side) {
@@ -502,13 +486,13 @@ MoveList gen_quiets(const Board& board, const Side side) {
         gen_castlings(board, moveList, side);
         gen_piece_quiets(board, moveList, side, targets);
     }
-    
+
     return moveList;
-    
+
 }
 
-MoveList gen_caps(const Board& board, const Side side) {       
-    
+MoveList gen_caps(const Board& board, const Side side) {
+
     MoveList moveList;
 
     if (board.checkers()) {
@@ -519,76 +503,76 @@ MoveList gen_caps(const Board& board, const Side side) {
         gen_piece_caps(board, moveList, side, targets);
         gen_ep(board, moveList, side, SQUARES[board.enPassant()]);
     }
-    
+
     return moveList;
-    
+
 }
 
 MoveList gen_all(const Board& board, const Side side) {
-    
+
     MoveList moveList;
-    
+
     moveList.merge(gen_quiets(board, side));
     moveList.merge(gen_caps(board, side));
-    
+
     return moveList;
-    
+
 }
 
 // Check if move is giving check
 bool Board::gives_check(const Move move) {
-    
+
     const unsigned int ksq    = lsb_index(bitboards[King(!stm)]);
     const unsigned int fromsq = from_sq(move);
     const unsigned int tosq   = to_sq(move);
-    
+
     uint64_t attacks = 0;
-    
+
     switch(type(piecetypes[fromsq])) {
-        
+
         case PAWN:
-            
+
             attacks = AttackBitboards[Pawn(stm)][tosq];
             break;
-            
+
         case KNIGHT:
-        
+
             attacks = AttackBitboards[KNIGHT][tosq];
             break;
-            
+
         case BISHOP:
-        
+
             attacks = generateBishopMoves(tosq, bitboards[ALLPIECES], bitboards[stm]);
             break;
-            
+
         case ROOK:
-        
+
             attacks = generateRookMoves(tosq, bitboards[ALLPIECES], bitboards[stm]);
             break;
-            
+
         case QUEEN:
-        
+
             attacks = generateQueenMoves(tosq, bitboards[ALLPIECES], bitboards[stm]);
             break;
-            
+
         case KING:
-        
+
             break;
-            
+
         default:
-        
+
             assert(false);
-        
+
     }
-    
+
     if (attacks & SQUARES[ksq]) {
         return true;
     }
-    
+
     if (side_slider_attackers(stm, ksq, SQUARES[fromsq], SQUARES[tosq])) {
         return true;
     }
-    
+
     return false;
-    
+
 }

@@ -34,11 +34,11 @@ uint64_t PassedPawnMask[2][64];
 uint64_t BackwardPawnMask[2][64];
 
 void initBitboards() {
-    
+
     for (unsigned int sq = 0; sq < 64; sq++) {
-        
+
         uint64_t pawnsFrontW = 0, pawnsFrontB = 0, kingsFrontW = SQUARES[sq], kingsFrontB = SQUARES[sq];
-        
+
         for (int i = 1; i < 6; i++) {
             pawnsFrontW |= SQUARES[sq] << (i * 8);
             pawnsFrontB |= SQUARES[sq] >> (i * 8);
@@ -50,7 +50,7 @@ void initBitboards() {
         PawnAttacksSpan[BLACK][sq] = ((pawnsFrontB & ~FILE_A) << 1) | ((pawnsFrontB & ~FILE_H) >> 1);
         KingShelterSpan[WHITE][sq] = ((kingsFrontW & ~FILE_A) << 1) | ((kingsFrontW & ~FILE_H) >> 1) | kingsFrontW;
         KingShelterSpan[BLACK][sq] = ((kingsFrontB & ~FILE_A) << 1) | ((kingsFrontB & ~FILE_H) >> 1) | kingsFrontB;
-        
+
         AttackBitboards[WHITE_PAWN][sq]   = ((SQUARES[sq] & ~FILE_A) << 9) | ((SQUARES[sq] & ~FILE_H) << 7);
         AttackBitboards[BLACK_PAWN][sq]   = ((SQUARES[sq] & ~FILE_A) >> 7) | ((SQUARES[sq] & ~FILE_H) >> 9);
 
@@ -75,12 +75,12 @@ void initBitboards() {
         }
 
     }
-    
-    for (unsigned int sq1 = 0; sq1 < 64; sq1++) {               
-        
+
+    for (unsigned int sq1 = 0; sq1 < 64; sq1++) {
+
         const uint64_t bishopPseudoBB = AttackBitboards[BISHOP][sq1];
         const uint64_t rookPseudoBB   = AttackBitboards[ROOK][sq1];
-        
+
         for (unsigned int sq2 = 0; sq2 < 64; sq2++) {
 
             if (bishopPseudoBB & SQUARES[sq2]) {
@@ -90,17 +90,17 @@ void initBitboards() {
                 RayTable[sq1][sq2]  = (generateRookMoves(sq1, SQUARES[sq2], SQUARES[sq2]) & generateRookMoves(sq2, SQUARES[sq1], SQUARES[sq1])) | SQUARES[sq2];
                 LineTable[sq1][sq2] = (generateRookMoves(sq1, 0, 0) & generateRookMoves(sq2, 0, 0)) | SQUARES[sq1] | SQUARES[sq2];
             }
-            
+
         }
 
         int f = file(sq1);
         int r = rank(sq1);
         PassedPawnMask[WHITE][sq1] = FrontFileMask[WHITE][sq1] | (f != 0 ? FrontFileMask[WHITE][sq1-1] : 0) | (f != 7 ? FrontFileMask[WHITE][sq1+1] : 0);
         PassedPawnMask[BLACK][sq1] = FrontFileMask[BLACK][sq1] | (f != 0 ? FrontFileMask[BLACK][sq1-1] : 0) | (f != 7 ? FrontFileMask[BLACK][sq1+1] : 0);
-        
+
         BackwardPawnMask[WHITE][sq1] = (r != 0 ? (f != 0 ? FrontFileMask[BLACK][sq1-9] : 0) | (f != 7 ? FrontFileMask[BLACK][sq1-7] : 0) : 0);
         BackwardPawnMask[BLACK][sq1] = (r != 7 ? (f != 0 ? FrontFileMask[WHITE][sq1+7] : 0) | (f != 7 ? FrontFileMask[WHITE][sq1+9] : 0) : 0);
 
     }
-    
+
 }

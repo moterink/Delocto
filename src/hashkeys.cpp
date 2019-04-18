@@ -25,46 +25,46 @@
 
 // Set hash table to size(in MB)
 void TranspositionTable::setSize(const int hashsize) {
-    
+
     //delete[] table;
     size = (MB * hashsize) / sizeof(TTEntry);
     table = new TTEntry [size];
-    
+
 }
 
 void MaterialTable::clear() {
-    
+
     MaterialEntry * entry;
-    
+
     for (entry = table; entry < table + size; entry++) {
         entry->key = 0;
-        entry->score = S( 0, 0 );        
+        entry->score = S( 0, 0 );
     }
-    
+
 }
 
 MaterialEntry * MaterialTable::probe(const uint64_t key) {
-    
+
     MaterialEntry * entry = &(table[key % size]);
-    
+
     if (entry->key == key) {
         return entry;
     }
-    
+
     return NULL;
-    
+
 }
 
 void MaterialTable::store(const uint64_t key, const Score score) {
-    
+
     table[key % size] = { key, score };
-    
+
 }
 
 void PawnTable::clear() {
-    
+
     PawnEntry * entry;
-    
+
     for (entry = table; entry < table + size; entry++) {
         entry->key = 0;
         entry->score = S( 0, 0 );
@@ -73,31 +73,31 @@ void PawnTable::clear() {
         entry->pawnWAttacksSpan = 0;
         entry->pawnBAttacksSpan = 0;
     }
-    
+
 }
 
 PawnEntry * PawnTable::probe(const uint64_t key) {
-    
+
     PawnEntry * entry = &(table[key % size]);
-    
+
     if (entry->key == key) {
         return entry;
     }
-    
+
     return NULL;
-    
+
 }
 
 void PawnTable::store(const uint64_t key, const Score score, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t weakPawns, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan) {
-    
+
     table[key % size] = { key, score, pawnWAttacks, pawnBAttacks, weakPawns, passedPawns, pawnWAttacksSpan, pawnBAttacksSpan };
-    
+
 }
 
 void TranspositionTable::clear() {
-    
+
     TTEntry * entry;
-    
+
     for (entry = table; entry < table + size; entry++) {
         entry->key = 0;
         entry->depth = 0;
@@ -105,25 +105,25 @@ void TranspositionTable::clear() {
         entry->score = UNKNOWNVALUE;
         entry->bestmove = NOMOVE;
     }
-    
+
 }
 
 // Check if hashkey in table, and if so, return the saved score for the position
-TTEntry * TranspositionTable::probe(const uint64_t key) {            
-    
+TTEntry * TranspositionTable::probe(const uint64_t key) {
+
     TTEntry * entry = &(table[key % size]);
-    
+
     if (entry->key == key) {
         return entry;
     }
-    
-    return NULL;        
-    
+
+    return NULL;
+
 }
 
 // Get a hashentry from zobrist key, depth, score and bestmove and save it into the hashtable
-void TranspositionTable::store(const uint64_t key, const int depth, const int score, const Move bestmove, const int flag) {        
-    
+void TranspositionTable::store(const uint64_t key, const int depth, const int score, const Move bestmove, const int flag) {
+
     table[key % size] = { key, depth, flag, score, bestmove };
-    
+
 }

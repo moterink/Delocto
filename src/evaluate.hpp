@@ -59,14 +59,14 @@
 static const int pieceValues[14] = { 0, 0, PawnValue, PawnValue, KnightValue, KnightValue, BishopValue, BishopValue, RookValue, RookValue, QueenValue, QueenValue, KingValue, KingValue };
 
 typedef struct {
-    
+
     uint64_t mobilityArea[2] = { 0 };
     uint64_t attackedSquares[14] = { 0 };
     uint64_t multiAttackedSquares[2] = { 0 };
     uint64_t kingRing[2] = { 0 };
-    uint64_t kingZone[2] = { 0 };    
+    uint64_t kingZone[2] = { 0 };
     int kingAttackWeight[2] = { 0 };
-    int kingAttackersNum[2] = { 0 };  
+    int kingAttackersNum[2] = { 0 };
     int kingRingAttackWeight[2] = { 0 };
     uint64_t kingZoneAttacks[2] = { 0 };
     int kingRingDefense[2] = { 0 };
@@ -75,13 +75,13 @@ typedef struct {
     uint64_t passedPawns = 0;
     uint64_t pawnAttacksSpan[2] = { 0 };
     Score mobility[2] = { S(0, 0), S(0, 0) };
-    
+
 } EvalInfo;
 
 inline const int scaled_eval(const int scale, const Score score) {
 
     return ((score.mg * (256 - scale)) + (score.eg * scale)) / 256;
-    
+
 }
 
 extern const Score Material[14];

@@ -28,12 +28,12 @@
 #include "board.hpp"
 
 typedef struct {
-    
+
     uint64_t caps = 0;
     uint64_t enpas = 0;
     uint64_t castles = 0;
     uint64_t proms = 0;
-    
+
 } PerftInfo;
 
 extern void perftTest(const int depth, Board& board);

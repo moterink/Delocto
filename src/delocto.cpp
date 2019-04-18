@@ -31,32 +31,32 @@
 #define VERSION 0.6
 
 int main() {
-    
+
     std::string input;
-    
+
     // Generate occupancy variations and magic bitboards for fast
     // generation of bishop and rook moves
     generateOccupancyVariations(true);
     generateMoveDatabase(true);
     generateOccupancyVariations(false);
     generateMoveDatabase(false);
-    
+
     // Init Bitboard Lookup Tables
     initBitboards();
-    
+
     // Initialize king distance array
     initKingDistance();
-    
+
     // Initialize Piece Square Tables
     initPSQT();
-    
+
     // Initialize Eval
     initEval();
-    
+
     std::cout << "Delocto " << VERSION << " by Moritz Terink" << std::endl << std::endl;
-    
+
     uciloop();
-    
+
     return 0;
-    
+
 }

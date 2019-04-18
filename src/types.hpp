@@ -94,9 +94,9 @@ typedef uint16_t Move;
 typedef uint16_t MoveType;
 
 enum MoveGenType : unsigned int {
-    
+
     QUIETS, CAPTURES
-    
+
 };
 
 class Board;
@@ -110,17 +110,17 @@ class MoveList;
 #define DRAWVALUE         0
 
 typedef struct {
-    
+
     int mg = 0;
     int eg = 0;
-    
+
 }Score;
 
 // Directions
 enum {
-    
+
     LEFT, UP, RIGHT, DOWN, LEFTUP, LEFTDOWN, RIGHTUP, RIGHTDOWN
-    
+
 };
 
 // Sides
@@ -157,7 +157,7 @@ enum {
 
 // Lookup table for debruijn-index
 static const int bitIndex64[64] = {
-    
+
     0,  1, 48,  2, 57, 49, 28,  3,
    61, 58, 50, 42, 38, 29, 17,  4,
    62, 55, 59, 36, 53, 51, 43, 22,
@@ -166,13 +166,13 @@ static const int bitIndex64[64] = {
    54, 35, 52, 21, 44, 32, 23, 11,
    46, 26, 40, 15, 34, 20, 31, 10,
    25, 14, 19,  9, 13,  8,  7,  6
-   
+
 };
 
 static const uint64_t debruijn64 = 0x03f79d71b4cb0a89;
 
 static const uint64_t ADJ_FILES[8] = {
-    
+
     FILE_B,
     FILE_A | FILE_C,
     FILE_B | FILE_D,
@@ -181,12 +181,12 @@ static const uint64_t ADJ_FILES[8] = {
     FILE_E | FILE_G,
     FILE_F | FILE_H,
     FILE_G
-    
+
 };
 
 // 64bit integers for each square
 static const uint64_t SQUARES[65] = {
-    
+
     9223372036854775808U, 4611686018427387904, 2305843009213693952, 1152921504606846976, 576460752303423488, 288230376151711744, 144115188075855872, 72057594037927936,
     36028797018963968, 18014398509481984, 9007199254740992, 4503599627370496, 2251799813685248, 1125899906842624, 562949953421312, 281474976710656,
     140737488355328, 70368744177664, 35184372088832, 17592186044416, 8796093022208, 4398046511104, 2199023255552, 1099511627776,
@@ -200,7 +200,7 @@ static const uint64_t SQUARES[65] = {
 
 // Square names
 enum {
-    
+
     A8, B8, C8, D8, E8, F8, G8, H8,
     A7, B7, C7, D7, E7, F7, G7, H7,
     A6, B6, C6, D6, E6, F6, G6, H6,
@@ -208,21 +208,21 @@ enum {
     A4, B4, C4, D4, E4, F4, G4, H4,
     A3, B3, C3, D3, E3, F3, G3, H3,
     A2, B2, C2, D2, E2, F2, G2, H2,
-    A1, B1, C1, D1, E1, F1, G1, H1    
-    
+    A1, B1, C1, D1, E1, F1, G1, H1
+
 };
 
 static const int DIRECTIONS[2][8] = {
-    
+
     { -1, -8, 1, 8, -9, 7, -7, 9 },
-    { 1, 8, -1, -8, 9, -7, 7, -9 }    
-    
+    { 1, 8, -1, -8, 9, -7, 7, -9 }
+
 };
 
 static const uint64_t PAWN_STARTRANK[2] = {
-    
+
     RANK_7, RANK_2
-    
+
 };
 
 static std::map<unsigned int, unsigned int> castleByKingpos = { {62, WKCASFLAG}, {58, WQCASFLAG}, {6, BKCASFLAG}, {2, BQCASFLAG} };
@@ -231,47 +231,47 @@ static std::map<unsigned int, unsigned int> castleByKingpos = { {62, WKCASFLAG},
 inline unsigned int lsb_index(const uint64_t bit) {
 
     return (63 - bitIndex64[((bit & -bit) * debruijn64) >> 58]);
-    
+
 }
 
 inline unsigned int msb_index(const uint64_t bit) {
-    
+
     // __builtin_clzll returns undefined behaviour if bit is 0!
-    
+
     return __builtin_clzll(bit);
-    
+
 }
 
 // Get least significant set bit in unsigned 64bit integer
 inline uint64_t lsb(const uint64_t bit) {
-    
+
     return bit & -bit;
-    
+
 }
 
 // Get most significant set bit in unsigned 64bit integer
 inline uint64_t msb(const uint64_t bit) {
-    
+
     // __builtin_clzll returns undefined behaviour if bit is 0!
-    
+
     return SQUARES[__builtin_clzll(bit)];
-    
+
 }
 
 // Remove least significant set bit in unsigned 64bit integer
 inline unsigned int pop_lsb(uint64_t& bit) {
-   
+
    const unsigned int index = lsb_index(bit);
    bit ^= (1ULL << (63 - index));
    return index;
-    
+
 }
 
 // Count set bits in unsigned 64bit integer
 inline int popcount(const uint64_t bit) {
-    
+
     return __builtin_popcountll(bit);
-    
+
 }
 
 // Get rank index (0-7) of given square index
@@ -290,84 +290,84 @@ inline unsigned int file(const unsigned int sq) {
 
 // Get relative rank index for given side of given square index
 inline unsigned int relative_rank(const Side side, const unsigned int sq) {
-    
+
     return (side == WHITE) ? 7 - rank(sq) : rank(sq);
-    
+
 }
 
 inline unsigned int relative_sq(const Side side, const unsigned int sq) {
-    
+
     return (side == WHITE) ? 63 - sq : sq;
-    
+
 }
 
 // Get absolute piecetype without side
 inline const PieceType type(const PieceType pt) {
-    
+
     return (pt & 14);
-    
+
 }
 
 // Get most forward piece on bitboard for the given side
 inline uint64_t most_forward(const Side side, const uint64_t bitboard) {
-    
+
     return (side == WHITE) ? msb(bitboard) : lsb(bitboard);
-    
+
 }
 
 // Get most backward piece on file for the given side
 inline uint64_t most_backward(const Side side, const uint64_t bitboard) {
-    
+
     return (side == WHITE) ? lsb(bitboard) : msb(bitboard);
-    
+
 }
 
 inline unsigned int getKingStartSq(const Side side) {
-    
+
     return (side == WHITE) ? 60 : 4;
-    
+
 }
 
 inline unsigned int getRelativeRank(const Side side, const unsigned int rank) {
-    
+
     return (side == WHITE) ? 7 - rank : rank;
-    
+
 }
 
 inline PieceType Pawn(const Side side) {
-    
+
     return (PAWN | side);
-    
+
 }
 
 inline PieceType Knight(const Side side) {
-    
+
     return (KNIGHT | side);
-    
+
 }
 
 inline PieceType Bishop(const Side side) {
-    
+
     return (BISHOP | side);
-    
+
 }
 
 inline PieceType Rook(const Side side) {
-    
+
     return (ROOK | side);
-    
+
 }
 
 inline PieceType Queen(const Side side) {
-    
+
     return (QUEEN | side);
-    
+
 }
 
 inline PieceType King(const Side side) {
-    
+
     return (KING | side);
-    
+
 }
 
 inline PieceType pt_index(const PieceType pt) {
@@ -377,63 +377,63 @@ inline PieceType pt_index(const PieceType pt) {
 }
 
 inline Score S(const int mg, const int eg) {
-    
+
     Score score;
-    
+
     score.mg = mg;
     score.eg = eg;
-    
+
     return score;
-    
+
 }
 
 inline Score operator+=(Score& score, const Score score2) {
-    
+
     score.mg += score2.mg;
     score.eg += score2.eg;
     return score;
-    
+
 }
 
 inline Score operator-=(Score& score, const Score score2) {
-    
+
     score.mg -= score2.mg;
     score.eg -= score2.eg;
     return score;
-    
+
 }
 
 inline Score operator+(const Score score1, const Score score2) {
-    
+
     Score score;
     score.mg = score1.mg + score2.mg;
     score.eg = score1.eg + score2.eg;
     return score;
-    
+
 }
 
 inline Score operator-(const Score score1, const Score score2) {
-    
+
     Score score;
     score.mg = score1.mg - score2.mg;
     score.eg = score1.eg - score2.eg;
     return score;
-    
+
 }
 
 inline Score operator*(const Score score1, const int multiply) {
-    
+
     Score score;
     score.mg = score1.mg * multiply;
     score.eg = score1.eg * multiply;
     return score;
-    
+
 }
 
 inline unsigned int square(const unsigned int file, const unsigned int rank) {
-    
+
     return file + (rank * 8);
-    
+
 }
 
 #endif

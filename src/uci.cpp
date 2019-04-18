@@ -37,47 +37,47 @@ static void playSequence(Board& board, std::string fen, std::string input, std::
 static std::map<MoveType, char> promChars = { { QUEENPROM, 'q' }, { ROOKPROM, 'r' }, { BISHOPPROM, 'b' }, { KNIGHTPROM, 'n' } };
 
 std::string move_to_string(const Move raw) {
-    
-    std::string move = std::string() + SQUARE_NAMES[from_sq(raw)] + SQUARE_NAMES[to_sq(raw)];        
-    
+
+    std::string move = std::string() + SQUARE_NAMES[from_sq(raw)] + SQUARE_NAMES[to_sq(raw)];
+
     if (is_promotion(raw)) {
         move += promChars[move_type(raw)];
     }
-    
+
     return move;
-    
+
 }
 
 void showInformation() {
-    
+
     std::cout << "id name Delocto" << std::endl;
-    std::cout << "id author Moritz Terink" << std::endl << std::endl;    
+    std::cout << "id author Moritz Terink" << std::endl << std::endl;
     std::cout << "option name Hash type spin default " << DEFAULTHASHSIZE << " max " << MAXHASHSIZE << " min " << MINHASHSIZE << std::endl;
-    std::cout << "option name Threads type spin default " << DEFAULTTHREADS << " max " << MAXTHREADS << " min " << MINTHREADS << std::endl;    
-    std::cout << "uciok" << std::endl << std::endl;    
-    
+    std::cout << "option name Threads type spin default " << DEFAULTTHREADS << " max " << MAXTHREADS << " min " << MINTHREADS << std::endl;
+    std::cout << "uciok" << std::endl << std::endl;
+
 }
 
-void uciloop() {                
-    
-    std::string input;      
-    
+void uciloop() {
+
+    std::string input;
+
     Board board;
-    
-    board.set_fen(STARTFEN);    
-    
+
+    board.set_fen(STARTFEN);
+
     tTable.setSize(DEFAULTHASHSIZE);
-    
+
     tTable.clear();
     pawnTable.clear();
-    materialTable.clear();               
-    
+    materialTable.clear();
+
     while (true) {
-        
+
         std::getline(std::cin, input);
-        
-        std::cout << std::flush;              
-      
+
+        std::cout << std::flush;
+
         if (input.compare("uci") == 0) {
             showInformation();
         } else if (input.compare("isready") == 0) {
@@ -91,7 +91,7 @@ void uciloop() {
             board.set_fen(STARTFEN);
         } else if (input.find("position startpos moves ") == 0) {
             playSequence(board, STARTFEN, input, 24);
-        } else if (input.find("position fen ") == 0) {            
+        } else if (input.find("position fen ") == 0) {
             const std::string::size_type end = input.find("moves ");
             if (end != std::string::npos) {
                 const std::string fen = input.substr(13, end - 13);
@@ -105,12 +105,12 @@ void uciloop() {
                 tTable.clear();
             }
         } else if (input.find("go") == 0) {
-            
+
             long long time = 1000;
             long long increment = 0;
             unsigned int depth = MAXDEPTH;
             unsigned int limit = TIME_LIMIT;
-            
+
             std::string::size_type wtimestr, btimestr, wincstr, bincstr, movetimestr, infinitestr, depthstr;
             wtimestr = input.find("wtime");
             btimestr = input.find("btime");
@@ -119,8 +119,8 @@ void uciloop() {
             movetimestr = input.find("movetime");
             infinitestr = input.find("infinite");
             depthstr = input.find("depth");
-            
-            if (wtimestr != std::string::npos && board.turn() == WHITE) {                
+
+            if (wtimestr != std::string::npos && board.turn() == WHITE) {
                 time = std::stoll(input.substr(wtimestr + 6));
                 limit = TIME_LIMIT;
             } else if (btimestr != std::string::npos && board.turn() == BLACK) {
@@ -137,58 +137,58 @@ void uciloop() {
                 increment = std::stoll(input.substr(bincstr + 5));
                 limit = TIME_LIMIT;
             }
-            if (infinitestr != std::string::npos) {                
+            if (infinitestr != std::string::npos) {
                 limit = INFINITE_LIMIT;
             } else if (depthstr != std::string::npos) {
-                depth = std::stoi(input.substr(depthstr + 6)) + 1;                               
+                depth = std::stoi(input.substr(depthstr + 6)) + 1;
                 limit = INFINITE_LIMIT;
             }
-            
+
             const Move move = bestmove(board, limit, depth, time, increment, true);
             if (move != NOMOVE)
                 std::cout << "bestmove " << move_to_string(move) << std::endl;
-        
+
         } else if (input.compare("eval") == 0) {
             evaluateInfo(board);
         } else if (input.compare("perft") == 0) {
-            perftTest(10, board);        
-        } else if (input.compare("quit") == 0) {            
+            perftTest(10, board);
+        } else if (input.compare("quit") == 0) {
             break;
         }
     }
-    
+
 }
 
-static void playSequence(Board& board, std::string fen, std::string input, std::string::size_type ccount) {        
-    
+static void playSequence(Board& board, std::string fen, std::string input, std::string::size_type ccount) {
+
     input.append(" ");
     board.set_fen(fen);
     while (ccount < input.size()) {
-        
-        if (input[ccount] != ' ') {                        
-        
+
+        if (input[ccount] != ' ') {
+
             const unsigned int fromsq    = square(input[ccount]     - 'a', 8 - (input[ccount + 1] - '0'));
             const unsigned int tosq      = square(input[ccount + 2] - 'a', 8 - (input[ccount + 3] - '0'));
-            
+
             ccount += 4;
-            
-            MoveType type = (input[ccount] != ' ') ? CharToProm[input[ccount]] : 0;    
-            
+
+            MoveType type = (input[ccount] != ' ') ? CharToProm[input[ccount]] : 0;
+
             if (type == 0) {
-                
+
                 if ((SQUARES[fromsq] & (board.pieces(KING, board.turn()) & KING_START_SQ[board.turn()])) && (SQUARES[tosq] & KING_CASTLE_SQUARES[board.turn()])) {
                     type = CASTLING;
                 } else if (tosq == board.enPassant() && SQUARES[fromsq] & board.pieces(PAWN, board.turn())) {
-                    type = ENPASSANT;                    
+                    type = ENPASSANT;
                 } else {
                     type = NORMAL;
                 }
-                
-            }                        
-            
-            board.do_move(make_move(fromsq, tosq, type));                        
+
+            }
+
+            board.do_move(make_move(fromsq, tosq, type));
         }
         ccount++;
-    }    
-    
+    }
+
 }

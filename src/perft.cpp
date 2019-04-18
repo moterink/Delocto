@@ -25,28 +25,28 @@
 #include "movegen.hpp"
 
 static uint64_t perft(int depth, PerftInfo& info, Board& board) {
-    
+
     if (depth == 0) return 1;
-    
+
     uint64_t nodes = 0;
-    
-    MoveList moves = gen_all(board, board.turn());
-    
+
+    MoveList moves = gen_legals(board, gen_all(board, board.turn()));
+
     for (unsigned int mcount = 0; mcount < moves.size; mcount++) {
         board.do_move(moves.moves[mcount]);
-        
+
         nodes += perft(depth - 1, info, board);
         board.undo_move();
     }
-    
+
     return nodes;
-    
+
 }
 
 void perftTest(const int depth, Board& board) {
-    
+
     std::cout << "Starting Perft test..." << std::endl;
-    
+
     for (int dcount = 1; dcount <= depth; dcount++) {
         PerftInfo info;
         clock_t start = std::clock();
@@ -55,9 +55,9 @@ void perftTest(const int depth, Board& board) {
         clock_t end = std::clock();
         long long duration = end - start;
         long long nps = (nodes * 1000) / ((duration > 0) ? duration : 1);
-        std::cout << "NPS: " << nps << std::endl;        
+        std::cout << "NPS: " << nps << std::endl;
     }
-    
+
     std::cout << "Perft test finished." << std::endl;
-    
+
 }

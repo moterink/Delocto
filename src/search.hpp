@@ -40,82 +40,82 @@
 #define DELTA_MARGIN  125
 
 enum NodeType {
-    
+
     PvNode, CutNode, AllNode
-    
+
 };
 
 enum MovePickPhase : unsigned int {
-    
+
     HashMove, GenCaps, GoodCaps, FirstKiller, SecondKiller, CounterMove, GenQuiets, Quiets, LoosingCaps, GenCapsQS, CapsQS
-    
+
 };
 
 class PvLine {
-    
+
     public:
-        
+
         unsigned int size = 0;
         std::array<Move, MAXDEPTH> line;
-        
+
         void merge(PvLine pv);
         void append(const Move move);
         bool compare(const PvLine& pv) const;
         void clear();
-    
+
 };
 
 typedef struct {
-    
+
     unsigned int limit = TIME_LIMIT;
     bool stopped = false;
     uint64_t nodes = 0;
-    
+
     PvLine lastPv;
     Move killers[MAXDEPTH][2];
     Move history[14][64];
     Move countermove[14][64];
 
     Move currentmove[MAXDEPTH] = { NOMOVE };
-    
+
     float fhf;
     float fh;
 
     clock_t start;
     long long timeLeft;
-    
+
     int hashTableHits = 0;
     unsigned int curdepth = 0;
-    
+
 } SearchInfo;
 
 class MovePicker {
-    
+
     public:
-    
+
         Move killers[2];
         Move hashmove = NOMOVE;
         Move countermove = NOMOVE;
         unsigned int phase = HashMove;
-        
+
         const Board& board;
         const SearchInfo * info;
-        
+
         MovePicker(const Board& b, SearchInfo * i, unsigned int p) : board(b), info(i) {
-            
+
             killers[0] = info->killers[p][0];
             killers[1] = info->killers[p][1];
-			
+
         }
-        
+
         void scoreCaptures();
         void scoreQuiets();
         void scoreQsCaptures();
-        
+
         Move pick();
-        
+
     private:
-        
+
         Move pvmove = NOMOVE;
         MoveList caps;
         MoveList gcaps;
@@ -123,7 +123,7 @@ class MovePicker {
         MoveList lcaps;
         MoveList moves;
         MoveList qscaps;
-    
+
 };
 
 // Piece Values for Delta Pruning in Quiescence search - 100 at end for enpassant capture, where tosq == NOPIECE

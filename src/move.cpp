@@ -25,46 +25,47 @@
 #include "bitboards.hpp"
 #include "board.hpp"
 
-bool Board::is_legal(const Move move, const Side side) const {
-    
+bool Board::is_legal(const Move move) const {
+
     const unsigned int tosq   = to_sq(move);
     const unsigned int fromsq = from_sq(move);
-    
-    if (SQUARES[fromsq] & bitboards[King(side)]) {
-        if (!sq_attacked_noking(tosq, !side)) {
-            return true;
-        }
-    } else {
-        const unsigned int ksq = lsb_index(bitboards[King(side)]);        
-        if (move_type(move) == ENPASSANT) {
-            const unsigned int capsq = tosq + DIRECTIONS[side][DOWN];
-            uint64_t occupied = (bitboards[ALLPIECES] ^ SQUARES[fromsq] ^ SQUARES[capsq]) | SQUARES[tosq];
-            return side_slider_attackers(ksq, occupied, !side) == 0;
-        }
-        if ((SQUARES[fromsq] & state.pinned) && !(SQUARES[tosq] & LineTable[ksq][fromsq])) {
-            return false;
-        }
-        return true;
+    const unsigned int ksq = lsb_index(bitboards[King(stm)]);
+
+    if (move_type(move) == ENPASSANT) {
+        const unsigned int capsq = tosq + DIRECTIONS[stm][DOWN];
+        uint64_t occupied = (bitboards[ALLPIECES] ^ SQUARES[fromsq] ^ SQUARES[capsq]) | SQUARES[tosq];
+        return !side_slider_attackers(ksq, occupied, !stm);
     }
-    
-    return false;
-    
+
+    if (move_type(move) == CASTLING) {
+        int step = tosq > fromsq ? -1 : 1;
+        for (int sq = tosq; sq != fromsq; sq += step) {
+            if (sq_attacked(sq, !stm))
+                return false;
+        }
+    }
+
+    if (fromsq == ksq)
+        return !sq_attacked_noking(tosq, !stm);
+
+    return !((SQUARES[fromsq] & state.pinned) && !(SQUARES[tosq] & LineTable[ksq][fromsq]));
+
 }
 
 // Print move to stdout
 void print_move(const Move move) {
-    
+
     std::cout << "From:" << SQUARE_NAMES[from_sq(move)] << " To:" << SQUARE_NAMES[to_sq(move)] << " Type:" << move_type(move) << std::endl;
-    
+
 }
 
 // Print bitboard to stdout
 void print_bitboard(const uint64_t bitboard) {
-    
+
     int lcount, bcount;
-    
+
     lcount = 0;
-    
+
     for (bcount = 0; bcount < 64; bcount++) {
         lcount++;
         if (bitboard & SQUARES[bcount]) {
@@ -75,9 +76,9 @@ void print_bitboard(const uint64_t bitboard) {
         if (lcount == 8) {
             std::cout << std::endl;
             lcount = 0;
-        }        
+        }
     }
-    
+
     std::cout << std::endl;
-     
+
 }
