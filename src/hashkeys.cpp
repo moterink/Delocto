@@ -23,6 +23,44 @@
 
 #include "hashkeys.hpp"
 
+uint64_t pieceHashKeys[16][64];
+uint64_t pawnHashKeys[2][64];
+uint64_t materialHashKeys[14][64];
+uint64_t turnHashKeys[2];
+uint64_t castlingHashKeys[16];
+uint64_t enPassantHashKeys[9];
+
+void init_hashkeys() {
+
+    for (int i = 0; i < 16; i++) {
+        for (int j = 0; j < 64; j++) {
+            pieceHashKeys[i][j] = rand64();
+        }
+        castlingHashKeys[i] = rand64();
+    }
+
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 64; j++) {
+            pawnHashKeys[i][j] = rand64();
+        }
+    }
+
+    for (int i = 0; i < 14; i++) {
+        for (int j = 0; j < 64; j++) {
+            materialHashKeys[i][j] = rand64();
+        }
+    }
+
+    for (int i = 0; i < 9; i++) {
+        enPassantHashKeys[i] = rand64();
+    }
+
+    turnHashKeys[0] = rand64();
+    turnHashKeys[1] = rand64();
+
+
+}
+
 // Set hash table to size(in MB)
 void TranspositionTable::setSize(const int hashsize) {
 

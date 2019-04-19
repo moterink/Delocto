@@ -104,7 +104,7 @@ class MoveList;
 
 // Scores for mate, draw, infinte, unknown
 #define MATEVALUE     50000
-#define MINMATE       49000
+#define MATE_MAX_PLY  49800
 #define INFINITE     100000
 #define UNKNOWNVALUE 100001
 #define DRAWVALUE         0
@@ -114,7 +114,7 @@ typedef struct {
     int mg = 0;
     int eg = 0;
 
-}Score;
+} Score;
 
 // Directions
 enum {

@@ -22,7 +22,6 @@
 */
 
 #include "types.hpp"
-#include "movegen.hpp"
 #include "evaluate.hpp"
 #include "uci.hpp"
 #include "magic.hpp"
@@ -30,9 +29,7 @@
 
 #define VERSION 0.6
 
-int main() {
-
-    std::string input;
+int main(int argc, char* argv[]) {
 
     // Generate occupancy variations and magic bitboards for fast
     // generation of bishop and rook moves
@@ -40,6 +37,9 @@ int main() {
     generateMoveDatabase(true);
     generateOccupancyVariations(false);
     generateMoveDatabase(false);
+
+    // Init Zobrist Hash Keys
+    init_hashkeys();
 
     // Init Bitboard Lookup Tables
     initBitboards();
@@ -55,7 +55,7 @@ int main() {
 
     std::cout << "Delocto " << VERSION << " by Moritz Terink" << std::endl << std::endl;
 
-    uciloop();
+    uciloop(argc, argv);
 
     return 0;
 

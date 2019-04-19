@@ -30,7 +30,8 @@
 #include "move.hpp"
 #include "movegen.hpp"
 
-#define MAXDEPTH 100
+// Maximum Depth for search
+#define MAX_DEPTH 100
 
 #define TIME_LIMIT      0
 #define MOVETIME_LIMIT  1
@@ -56,7 +57,7 @@ class PvLine {
     public:
 
         unsigned int size = 0;
-        std::array<Move, MAXDEPTH> line;
+        Move line[MAX_DEPTH];
 
         void merge(PvLine pv);
         void append(const Move move);
@@ -67,22 +68,43 @@ class PvLine {
 
 typedef struct {
 
-    unsigned int limit = TIME_LIMIT;
+    long long moveTime = -1;
+
+    long long whiteTime = -1;
+    long long blackTime = -1;
+    long long whiteIncrement = -1;
+    long long blackIncrement = -1;
+
+    bool infinite = false;
+    unsigned int depth = MAX_DEPTH;
+
+
+} SearchLimits;
+
+typedef struct {
+
+    uint64_t totalNodes;
+
+} SearchStats;
+
+typedef struct {
+
     bool stopped = false;
     uint64_t nodes = 0;
 
     PvLine lastPv;
-    Move killers[MAXDEPTH][2];
+    Move killers[MAX_DEPTH][2];
     Move history[14][64];
     Move countermove[14][64];
 
-    Move currentmove[MAXDEPTH] = { NOMOVE };
+    Move currentmove[MAX_DEPTH] = { NOMOVE };
 
     float fhf;
     float fh;
 
+    bool limitTime = true;
     clock_t start;
-    long long timeLeft;
+    long long timeLeft = 5000;
 
     int hashTableHits = 0;
     unsigned int curdepth = 0;
@@ -133,6 +155,6 @@ static const int SeeMaterial[15]   = { 0, 0, 100, 100, 320, 320, 330, 330, 500, 
 static const int FutilityMargin[6] = { 0, 100, 200, 320, 450, 590 };
 static const int RazorMargin[5]    = { 0, 300, 350, 430, 520 };
 
-extern const Move bestmove(Board& board, const unsigned int limit, const unsigned int depth, const long long timeleft, const long long increment, bool uci);
+extern const SearchStats go(Board& board, const SearchLimits limits);
 
 #endif

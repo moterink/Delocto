@@ -58,12 +58,7 @@ bool PvLine::compare(const PvLine& pv) const {
 
 void PvLine::clear() {
 
-    int pcount;
-    for (pcount = 0; pcount < MAXDEPTH; pcount++) {
-        line[pcount] = NOMOVE;
-    }
-
-    size = 0;
+    std::fill(line, line + MAX_DEPTH, NOMOVE);
 
 }
 
@@ -80,16 +75,16 @@ void clearHistory(SearchInfo * info) {
 
 void clearKillers(SearchInfo * info) {
 
-    for (unsigned int kcount = 0; kcount < MAXDEPTH; kcount++) {
-        info->killers[kcount][0] = NOMOVE;
-        info->killers[kcount][1] = NOMOVE;
+    for (int i = 0; i < MAX_DEPTH; i++) {
+        info->killers[i][0] = NOMOVE;
+        info->killers[i][1] = NOMOVE;
     }
 
 }
 
 static void checkUp(SearchInfo * info) {
 
-    if (info->limit == TIME_LIMIT || info->limit == MOVETIME_LIMIT) {
+    if (info->limitTime) {
 
         clock_t now = std::clock();
 
@@ -98,22 +93,6 @@ static void checkUp(SearchInfo * info) {
         }
 
     }
-
-}
-
-static bool checkUCI() {
-
-    std::string input;
-
-    std::cin >> input;
-
-    if (input.compare("stop") == 0) {
-        return true;
-    } else if (input.compare("isready") == 0) {
-        std::cout << "readyok" << std::endl;
-    }
-
-    return false;
 
 }
 
@@ -541,7 +520,7 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutnode, Bo
                 score = -alphabeta(-beta, -beta + 1, depth - (2 + (32 * depth + std::min(eval - beta, 512)) / 128), plies, !cutnode, board, info, newpv, false);
                 board.undo_nullmove();
 
-                if (score >= beta && std::abs(score) < (MATEVALUE - MAXDEPTH)) {
+                if (score >= beta && std::abs(score) < (MATEVALUE - MAX_DEPTH)) {
                     return beta;
                 }
 
@@ -725,27 +704,26 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutnode, Bo
 }
 
 // Find a bestmove for the given board in time/depth
-const Move bestmove(Board& board, const unsigned int limit, const unsigned int depth, const long long timeleft, const long long increment, bool uci) {
+const SearchStats go(Board& board, const SearchLimits limits) {
 
+    SearchStats stats;
     SearchInfo info;
-    if (limit == TIME_LIMIT) {
-        // Reduce increment because of possible delays between gui and engine
-        info.timeLeft = (timeleft / 20) + increment;
-    } else if (limit == MOVETIME_LIMIT) {
-        info.timeLeft = timeleft;
-    }
-
-    info.limit = limit;
-
-    int score = 0;
-
-    clock_t start, end, iterend;
-    long long duration, iterduration;
-    std::string pvstring;
-
     Move bestmove = NOMOVE;
+    clock_t start, end, iterend;
+    uint64_t duration, iterduration;
+    std::string pvstring;
+    int score = 0;
+    int depth;
 
-    int dcount;
+    if (limits.moveTime != -1) {
+        info.timeLeft = limits.moveTime;
+    } else if (board.turn() == WHITE && (limits.whiteTime != -1 || limits.whiteIncrement != -1)) {
+        info.timeLeft = (limits.whiteTime / 20) + limits.whiteIncrement;
+    } else if (board.turn() == BLACK && (limits.blackTime != -1 || limits.blackIncrement != -1)) {
+        info.timeLeft = (limits.blackTime / 20) + limits.blackIncrement;
+    } else {
+        info.limitTime = false;
+    }
 
     start = std::clock();
     info.start = start;
@@ -753,12 +731,11 @@ const Move bestmove(Board& board, const unsigned int limit, const unsigned int d
     PvLine pv;
     pv.clear();
 
-    info.nodes = 0;
     info.lastPv.clear();
     clearHistory(&info);
     clearKillers(&info);
 
-    for (dcount = 1; dcount < depth; dcount++) {
+    for (int depth = 1; depth < limits.depth; depth++) {
 
         #ifdef INFO_OUTPUT
             info.fhf = 0;
@@ -770,19 +747,19 @@ const Move bestmove(Board& board, const unsigned int limit, const unsigned int d
 
         board.reset_plies();
 
-        info.curdepth = dcount;
+        info.curdepth = depth;
 
         clock_t iterstart = std::clock();
 
-        if (dcount > 5 && std::abs(score) < MINMATE) {
+        if (depth > 5) {
 
-            int window = 25 - std::min(dcount / 3, 10) + std::abs(score) / 25;
+            int window = 25 - std::min(depth / 3, 10) + std::abs(score) / 25;
             int alpha = score - window;
             int beta = score + window;
 
             while (true) {
 
-                score = alphabeta(alpha, beta, dcount, 0, false, board, &info, pv, true);
+                score = alphabeta(alpha, beta, depth, 0, false, board, &info, pv, true);
 
                 if (score <= alpha) {
                     beta = (alpha + beta) / 2;
@@ -801,7 +778,7 @@ const Move bestmove(Board& board, const unsigned int limit, const unsigned int d
 
         } else {
 
-            score = alphabeta(-INFINITE, INFINITE, dcount, 0, false, board, &info, pv, true);
+            score = alphabeta(-INFINITE, INFINITE, depth, 0, false, board, &info, pv, true);
 
         }
 
@@ -811,11 +788,9 @@ const Move bestmove(Board& board, const unsigned int limit, const unsigned int d
 
                 iterend = std::clock();
 
-                if (info.limit == TIME_LIMIT || info.limit == MOVETIME_LIMIT) {
-
+                if (info.limitTime) {
                     iterduration = (iterend - iterstart) / (CLOCKS_PER_SEC / 1000);
                     info.timeLeft -= iterduration;
-
                 }
 
                 // Drawn/mate positions return an empty pv
@@ -827,57 +802,53 @@ const Move bestmove(Board& board, const unsigned int limit, const unsigned int d
 
                     bestmove = pv.line[0];
 
-                    if (uci) {
+                    duration = (end - start) / (CLOCKS_PER_SEC / 1000);
 
-                        duration = (end - start) / (CLOCKS_PER_SEC / 1000);
+                    pvstring.clear();
 
-                        pvstring.clear();
-
-                        for (unsigned int pcount = 0; pcount < pv.size; pcount++) {
-
-                            pvstring += std::string() + move_to_string(pv.line[pcount]) + ' ';
-
-                        }
-
-                        #ifdef INFO_OUTPUT
-                            std::cout << "Ordering: " << std::setprecision(2) << info.fhf/info.fh << std::endl;
-                            std::cout << "Hash Table Hits: " << info.hashTableHits << std::endl;
-                        #endif
-
-                        std::cout << "info depth " << dcount;
-
-                        if (score >= (MATEVALUE - MAXDEPTH)) { std::cout << " score mate " << (((MATEVALUE - score) / 2) + 1); }
-                        else if (score <= (-MATEVALUE + MAXDEPTH)) { std::cout << " score mate " << -(((MATEVALUE + score) / 2) + 1); }
-                        else { std::cout << " score cp " << score; }
-
-                        std::cout << " nodes " << info.nodes << " time " << duration << " nps " << ((duration != 0) ? ((info.nodes * 1000) / duration) : info.nodes * 1000) << " pv " << pvstring << std::endl;
-
+                    for (int pcount = 0; pcount < pv.size; pcount++) {
+                        pvstring += std::string() + move_to_string(pv.line[pcount]) + ' ';
                     }
 
-                    if (limit == TIME_LIMIT && info.timeLeft < iterduration * (1 + (dcount / 50))) {
-                        break;
-                    } else if (limit == MOVETIME_LIMIT && info.timeLeft <= 0) {
-                        break;
+                    #ifdef INFO_OUTPUT
+                        std::cout << "Ordering: " << std::setprecision(2) << info.fhf/info.fh << std::endl;
+                        std::cout << "Hash Table Hits: " << info.hashTableHits << std::endl;
+                    #endif
+
+                    std::cout << "info depth " << depth;
+
+                    if (std::abs(score) >= MATEVALUE - MAX_DEPTH) {
+                        std::cout << " score mate " << ((score > 0 ? MATEVALUE - score + 1 : -MATEVALUE - score) / 2);
+                    } else {
+                        std::cout << " score cp " << score;
                     }
+
+                    std::cout << " nodes " << info.nodes << " time " << duration << " nps " << ((duration != 0) ? ((info.nodes * 1000) / duration) : info.nodes * 1000) << " pv " << pvstring << std::endl;
+
+                    if (info.limitTime && (info.timeLeft <= 0 || info.timeLeft <= iterduration * (1 + depth / 50)))
+                        break;
 
                 }  else {
-                    if (uci) {
-                        std::cout << "info string No legal moves available" << std::endl;
-                    } else {
-                        std::cout << "error: No legal moves available" << std::endl;
-                    }
 
+                    std::cout << "info string No legal moves available" << std::endl;
                     break;
+
                 }
 
             } else {
 
-                return bestmove;
+                break;
 
             }
 
     }
 
-    return bestmove;
+    stats.totalNodes = info.nodes;
+
+    if (bestmove != NOMOVE) {
+        std::cout << "bestmove " << move_to_string(bestmove) << std::endl;
+    }
+
+    return stats;
 
 }
