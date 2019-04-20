@@ -26,6 +26,7 @@
 #include "uci.hpp"
 #include "magic.hpp"
 #include "bitboards.hpp"
+#include "search.hpp"
 
 #define VERSION 0.6
 
@@ -52,6 +53,9 @@ int main(int argc, char* argv[]) {
 
     // Initialize Eval
     initEval();
+
+    // Initialize Search
+    init_search();
 
     std::cout << "Delocto " << VERSION << " by Moritz Terink" << std::endl << std::endl;
 

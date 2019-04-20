@@ -27,7 +27,7 @@
 #include <cstdint>
 #include "types.hpp"
 
-#define NOMOVE 0
+#define MOVE_NONE 0
 
 // Ordered this way for easy detection of promotion types(all proms have a 1 at first place in binary)
 #define NORMAL     0x2000

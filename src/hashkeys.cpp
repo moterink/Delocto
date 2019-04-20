@@ -138,30 +138,33 @@ void TranspositionTable::clear() {
 
     for (entry = table; entry < table + size; entry++) {
         entry->key = 0;
-        entry->depth = 0;
-        entry->flag = NOHASH;
-        entry->score = UNKNOWNVALUE;
-        entry->bestmove = NOMOVE;
+        entry->depth = DEPTH_NONE;
+        entry->flag = HASH_NONE;
+        entry->score = VALUE_NONE;
+        entry->eval = VALUE_NONE;
+        entry->bestmove = MOVE_NONE;
     }
 
 }
 
 // Check if hashkey in table, and if so, return the saved score for the position
-TTEntry * TranspositionTable::probe(const uint64_t key) {
+TTEntry * TranspositionTable::probe(const uint64_t key, bool& tthit) {
 
     TTEntry * entry = &(table[key % size]);
 
     if (entry->key == key) {
+        tthit = true;
         return entry;
     }
 
+    tthit = false;
     return NULL;
 
 }
 
 // Get a hashentry from zobrist key, depth, score and bestmove and save it into the hashtable
-void TranspositionTable::store(const uint64_t key, const int depth, const int score, const Move bestmove, const int flag) {
+void TranspositionTable::store(const uint64_t key, const int depth, const int score, const int eval, const Move bestmove, const int flag) {
 
-    table[key % size] = { key, depth, flag, score, bestmove };
+    table[key % size] = { key, depth, flag, score, eval, bestmove };
 
 }

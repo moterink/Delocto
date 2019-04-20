@@ -106,8 +106,10 @@ class MoveList;
 #define MATEVALUE     50000
 #define MATE_MAX_PLY  49800
 #define INFINITE     100000
-#define UNKNOWNVALUE 100001
+#define VALUE_NONE   100001
 #define DRAWVALUE         0
+
+#define DEPTH_NONE -36
 
 typedef struct {
 

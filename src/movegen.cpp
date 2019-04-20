@@ -79,7 +79,7 @@ void MoveList::swap(const unsigned int index1, const unsigned int index2) {
 
 const Move MoveList::pick() {
 
-    if (size == 0) return NOMOVE;
+    if (size == 0) return MOVE_NONE;
 
     int bestscore = scores[index];
     unsigned int bestindex = index;

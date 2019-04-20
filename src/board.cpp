@@ -288,7 +288,7 @@ void Board::print() const {
 
 bool Board::do_move(const Move move) {
 
-    assert(move != NOMOVE);
+    assert(move != MOVE_NONE);
 
     const int fromsq      = from_sq(move);
     const int tosq        = to_sq(move);
@@ -477,7 +477,7 @@ bool Board::do_move(const Move move) {
 
 void Board::undo_move() {
 
-    assert(move != NOMOVE);
+    assert(move != MOVE_NONE);
 
     const Move move = moves.back();
 

@@ -33,6 +33,8 @@
 // Maximum Depth for search
 #define MAX_DEPTH 100
 
+#define MAX_MOVES 256
+
 #define TIME_LIMIT      0
 #define MOVETIME_LIMIT  1
 #define DEPTH_LIMIT     2
@@ -97,7 +99,8 @@ typedef struct {
     Move history[14][64];
     Move countermove[14][64];
 
-    Move currentmove[MAX_DEPTH] = { NOMOVE };
+    Move currentmove[MAX_DEPTH] = { MOVE_NONE };
+    int eval[MAX_DEPTH];
 
     float fhf;
     float fh;
@@ -116,17 +119,18 @@ class MovePicker {
     public:
 
         Move killers[2];
-        Move hashmove = NOMOVE;
-        Move countermove = NOMOVE;
+        Move hashmove = MOVE_NONE;
+        Move countermove = MOVE_NONE;
         unsigned int phase = HashMove;
 
         const Board& board;
         const SearchInfo * info;
 
-        MovePicker(const Board& b, SearchInfo * i, unsigned int p) : board(b), info(i) {
+        MovePicker(const Board& b, SearchInfo * i, unsigned int p, Move c=MOVE_NONE) : board(b), info(i) {
 
             killers[0] = info->killers[p][0];
             killers[1] = info->killers[p][1];
+            countermove = c;
 
         }
 
@@ -138,7 +142,7 @@ class MovePicker {
 
     private:
 
-        Move pvmove = NOMOVE;
+        Move pvmove = MOVE_NONE;
         MoveList caps;
         MoveList gcaps;
         MoveList quiets;
@@ -155,6 +159,19 @@ static const int SeeMaterial[15]   = { 0, 0, 100, 100, 320, 320, 330, 330, 500, 
 static const int FutilityMargin[6] = { 0, 100, 200, 320, 450, 590 };
 static const int RazorMargin[5]    = { 0, 300, 350, 430, 520 };
 
+inline int value_to_tt(int value, int plies) {
+
+    return value >= MATE_MAX_PLY ? value + plies : value <= MATE_MAX_PLY ? value - plies : value;
+
+}
+
+inline int value_from_tt(int value, int plies) {
+
+    return value == VALUE_NONE ? VALUE_NONE : value >= MATE_MAX_PLY ? value - plies : value <= MATE_MAX_PLY ? value + plies : value;
+
+}
+
+extern void init_search();
 extern const SearchStats go(Board& board, const SearchLimits limits);
 
 #endif
