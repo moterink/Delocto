@@ -144,7 +144,7 @@ void uciloop(int argc, char* argv[]) {
 
     newgame(board);
 
-    while (true) {
+    do {
 
         if (argc == 1)
             std::getline(std::cin, input);
@@ -219,6 +219,6 @@ void uciloop(int argc, char* argv[]) {
 
         input.clear();
 
-    }
+    } while (argc == 1);
 
 }

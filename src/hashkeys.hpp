@@ -33,7 +33,7 @@
 // Hash flags
 enum HashFlag {
 
-    HASH_NONE, EXACTHASH, ALPHAHASH, BETAHASH
+    BOUND_NONE, BOUND_EXACT, BOUND_UPPER, BOUND_LOWER
 
 };
 
@@ -43,9 +43,9 @@ typedef struct {
     uint64_t key;
     int depth;
     int flag;
-    int score;
+    int value;
     int eval;
-    Move bestmove;
+    Move bestMove;
 
 } TTEntry;
 
@@ -81,7 +81,7 @@ class TranspositionTable {
         void setSize(const int hashsize);
         void clear();
         TTEntry * probe(const uint64_t key, bool& tthit);
-        void store(const uint64_t key, const int depth, const int score, const int eval, const Move bestmove, const int flag);
+        void store(const uint64_t key, const int depth, const int value, const int eval, const Move bestMove, const int flag);
 
         ~TranspositionTable() {
             delete[] table;

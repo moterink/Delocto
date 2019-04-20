@@ -102,12 +102,17 @@ enum MoveGenType : unsigned int {
 class Board;
 class MoveList;
 
+// Maximum Depth and Moves for search
+#define MAX_DEPTH 100
+#define MAX_MOVES 256
+
 // Scores for mate, draw, infinte, unknown
-#define MATEVALUE     50000
-#define MATE_MAX_PLY  49800
-#define INFINITE     100000
-#define VALUE_NONE   100001
-#define DRAWVALUE         0
+#define VALUE_MATE       50000
+#define VALUE_MATE_MAX  (VALUE_MATE - MAX_DEPTH)
+#define VALUE_MATED_MAX (MAX_DEPTH - VALUE_MATE)
+#define VALUE_INFINITE        100000
+#define VALUE_NONE      100001
+#define VALUE_DRAW       0
 
 #define DEPTH_NONE -36
 

@@ -30,16 +30,6 @@
 #include "move.hpp"
 #include "movegen.hpp"
 
-// Maximum Depth for search
-#define MAX_DEPTH 100
-
-#define MAX_MOVES 256
-
-#define TIME_LIMIT      0
-#define MOVETIME_LIMIT  1
-#define DEPTH_LIMIT     2
-#define INFINITE_LIMIT  3
-
 #define DELTA_MARGIN  125
 
 enum NodeType {
@@ -95,7 +85,7 @@ typedef struct {
     uint64_t nodes = 0;
 
     PvLine lastPv;
-    Move killers[MAX_DEPTH][2];
+    Move killers[MAX_DEPTH + 1][2];
     Move history[14][64];
     Move countermove[14][64];
 
@@ -119,7 +109,7 @@ class MovePicker {
     public:
 
         Move killers[2];
-        Move hashmove = MOVE_NONE;
+        Move ttMove = MOVE_NONE;
         Move countermove = MOVE_NONE;
         unsigned int phase = HashMove;
 
@@ -154,20 +144,19 @@ class MovePicker {
 
 // Piece Values for Delta Pruning in Quiescence search - 100 at end for enpassant capture, where tosq == NOPIECE
 static const int DeltaMaterial[15] = { 0, 0, 100, 100, 320, 320, 330, 330, 500, 500, 950, 950, 999999, 999999, 100 };
-
-static const int SeeMaterial[15]   = { 0, 0, 100, 100, 320, 320, 330, 330, 500, 500, 950, 950, 999999, 999999, 0 };
 static const int FutilityMargin[6] = { 0, 100, 200, 320, 450, 590 };
+static const int SeeMaterial[15]   = { 0, 0, 100, 100, 320, 320, 330, 330, 500, 500, 950, 950, 999999, 999999, 0 };
 static const int RazorMargin[5]    = { 0, 300, 350, 430, 520 };
 
 inline int value_to_tt(int value, int plies) {
 
-    return value >= MATE_MAX_PLY ? value + plies : value <= MATE_MAX_PLY ? value - plies : value;
+    return value >= VALUE_MATE_MAX ? value + plies : value <= VALUE_MATED_MAX ? value - plies : value;
 
 }
 
 inline int value_from_tt(int value, int plies) {
 
-    return value == VALUE_NONE ? VALUE_NONE : value >= MATE_MAX_PLY ? value - plies : value <= MATE_MAX_PLY ? value + plies : value;
+    return value == VALUE_NONE ? VALUE_NONE : value >= VALUE_MATE_MAX ? value - plies : value <= VALUE_MATED_MAX ? value + plies : value;
 
 }
 
