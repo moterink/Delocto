@@ -77,7 +77,7 @@ static std::string BENCHMARK_FENS[42] = {
     "r3k2r/8/8/1B6/8/8/8/R3K2R b KQkq - 0 1",
     "r3k2r/8/8/8/1b6/8/8/R3K2R w KQkq - 0 1",
     "r3k2r/8/8/8/5b2/5n2/8/R3K2R w KQkq - 0 1",
-    "r3k2r/8/5N2/5B2/8/8/8/R3K2R w KQkq - 0 1",
+    "r3k2r/8/5N2/5B2/8/8/8/R3K2R b KQkq - 0 1",
     "rnbqkbnr/p3pp1p/2p5/1p3Pp1/3P4/2N5/PPP3PP/R1BQKBNR w KQkq g6 0 5",
     "rnbqkbnr/p1pp1ppp/4p3/8/1pP1P3/5N2/PP1PBPPP/RNBQK2R b KQkq c3 0 3"
 
