@@ -91,9 +91,11 @@ static void benchmark() {
 
     for (int i = 0; i < 42; i++) {
 
+        std::cout << "Position: " << i << std::endl;
         board.set_fen(BENCHMARK_FENS[i]);
         SearchStats stats = go(board, limits);
         nodes += stats.totalNodes;
+        tTable.clear();
 
     }
 

@@ -26,6 +26,7 @@
 
 uint64_t PawnAttacksSpan[2][64];
 uint64_t KingShelterSpan[2][64];
+uint64_t KingRing[2][64];
 uint64_t RayTable[64][64];
 uint64_t LineTable[64][64];
 uint64_t AttackBitboards[14][64];
@@ -53,12 +54,28 @@ void initBitboards() {
 
         AttackBitboards[WHITE_PAWN][sq]   = ((SQUARES[sq] & ~FILE_A) << 9) | ((SQUARES[sq] & ~FILE_H) << 7);
         AttackBitboards[BLACK_PAWN][sq]   = ((SQUARES[sq] & ~FILE_A) >> 7) | ((SQUARES[sq] & ~FILE_H) >> 9);
-
         AttackBitboards[WHITE_KNIGHT][sq] = AttackBitboards[BLACK_KNIGHT][sq] = ((SQUARES[sq] & ~(FILE_A | RANK_1 | RANK_2)) << 17) | ((SQUARES[sq] & ~(FILE_H | RANK_1 | RANK_2)) << 15) | ((SQUARES[sq] & ~(FILE_A | FILE_B | RANK_1)) << 10) | ((SQUARES[sq] & ~(FILE_H | FILE_G | RANK_1)) << 6) | ((SQUARES[sq] & ~(FILE_A | FILE_B | RANK_8)) >> 6) | ((SQUARES[sq] & ~(FILE_H | FILE_G | RANK_8)) >> 10) | ((SQUARES[sq] & ~(FILE_A | RANK_8 | RANK_7)) >> 15) | ((SQUARES[sq] & ~(FILE_H | RANK_8 | RANK_7)) >> 17);
         AttackBitboards[WHITE_BISHOP][sq] = AttackBitboards[BLACK_BISHOP][sq] = generateBishopMoves(sq, 0, 0);
         AttackBitboards[WHITE_ROOK][sq]   = AttackBitboards[BLACK_ROOK][sq]   = generateRookMoves(sq, 0, 0);
         AttackBitboards[WHITE_QUEEN][sq]  = AttackBitboards[BLACK_QUEEN][sq]  = AttackBitboards[WHITE_ROOK][sq] | AttackBitboards[WHITE_BISHOP][sq];
         AttackBitboards[WHITE_KING][sq]   = AttackBitboards[BLACK_KING][sq]   = ((SQUARES[sq] & ~(FILE_A | RANK_1)) << 9) | ((SQUARES[sq] & ~RANK_1) << 8) | ((SQUARES[sq] & ~(FILE_H | RANK_1)) << 7) | ((SQUARES[sq] & ~FILE_A) << 1) | ((SQUARES[sq] & ~FILE_H) >> 1) | ((SQUARES[sq] & ~(FILE_A | RANK_8)) >> 7) | ((SQUARES[sq] & ~RANK_8) >> 8) | ((SQUARES[sq] & ~(FILE_H | RANK_8)) >> 9);
+
+        KingRing[WHITE][sq] = AttackBitboards[WHITE_KING][sq];
+        KingRing[BLACK][sq] = AttackBitboards[BLACK_KING][sq];
+        if (relative_rank(WHITE, sq) == 0) {
+            KingRing[WHITE][sq] |= shift_up(KingRing[WHITE][sq], WHITE);
+        }
+        if (relative_rank(BLACK, sq) == 0) {
+            KingRing[BLACK][sq] |= shift_up(KingRing[BLACK][sq], BLACK);
+        }
+        if (file(sq) == 0) {
+            KingRing[WHITE][sq] |= shift_right(KingRing[WHITE][sq], WHITE);
+            KingRing[BLACK][sq] |= shift_left(KingRing[BLACK][sq], BLACK);
+        }
+        if (file(sq) == 7) {
+            KingRing[WHITE][sq] |= shift_left(KingRing[WHITE][sq], WHITE);
+            KingRing[BLACK][sq] |= shift_right(KingRing[BLACK][sq], BLACK);
+        }
 
         for (int i = 1; i < 8; i++) {
             uint64_t nsq = (SQUARES[sq] << (8 * i));

@@ -83,6 +83,15 @@ void clearHistory(SearchInfo * info) {
 
 }
 
+void clearKillers(SearchInfo * info) {
+
+    for (int i = 0; i < MAX_DEPTH; i++) {
+        info->killers[i][0] = MOVE_NONE;
+        info->killers[i][1] = MOVE_NONE;
+    }
+
+}
+
 static void checkUp(SearchInfo * info) {
 
     if (info->limitTime) {
@@ -758,6 +767,7 @@ const SearchStats go(Board& board, const SearchLimits limits) {
 
     info.lastPv.clear();
     clearHistory(&info);
+    clearKillers(&info);
 
     for (int depth = 1; depth < limits.depth; depth++) {
 

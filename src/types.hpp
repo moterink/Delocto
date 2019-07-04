@@ -191,6 +191,25 @@ static const uint64_t ADJ_FILES[8] = {
 
 };
 
+static const uint64_t KING_FLANK[8] = {
+
+    FILE_A | FILE_B | FILE_C | FILE_D,
+    FILE_A | FILE_B | FILE_C | FILE_D,
+    FILE_A | FILE_B | FILE_C | FILE_D,
+    FILE_A | FILE_B | FILE_C | FILE_D,
+    FILE_E | FILE_F | FILE_G | FILE_H,
+    FILE_E | FILE_F | FILE_G | FILE_H,
+    FILE_E | FILE_F | FILE_G | FILE_H,
+    FILE_E | FILE_F | FILE_G | FILE_H
+
+};
+
+static const uint64_t COLOUR_BASE_SQUARES[2] = {
+
+    RANK_8 | RANK_7 | RANK_6, RANK_1 | RANK_2 | RANK_3
+
+};
+
 // 64bit integers for each square
 static const uint64_t SQUARES[65] = {
 
@@ -229,6 +248,12 @@ static const int DIRECTIONS[2][8] = {
 static const uint64_t PAWN_STARTRANK[2] = {
 
     RANK_7, RANK_2
+
+};
+
+static const uint64_t PAWN_FIRST_PUSH_RANK[2] = {
+
+    RANK_6, RANK_3
 
 };
 
@@ -292,6 +317,12 @@ inline unsigned int rank(const unsigned int sq) {
 inline unsigned int file(const unsigned int sq) {
 
     return (sq & 7);
+
+}
+
+inline unsigned int square(const unsigned int file, const unsigned int rank) {
+
+    return file + (rank * 8);
 
 }
 
@@ -383,6 +414,30 @@ inline PieceType pt_index(const PieceType pt) {
 
 }
 
+inline uint64_t shift_up(const uint64_t b, const Side side) {
+
+    return (side == WHITE) ? b << 8 : b >> 8;
+
+}
+
+inline uint64_t shift_down(const uint64_t b, const Side side) {
+
+    return (side == WHITE) ? b >> 8 : b << 8;
+
+}
+
+inline uint64_t shift_left(const uint64_t b, const Side side) {
+
+    return (side == WHITE) ? b << 1 : b >> 1;
+
+}
+
+inline uint64_t shift_right(const uint64_t b, const Side side) {
+
+    return (side == WHITE) ? b >> 1 : b << 1;
+
+}
+
 inline Score S(const int mg, const int eg) {
 
     Score score;
@@ -437,9 +492,26 @@ inline Score operator*(const Score score1, const int multiply) {
 
 }
 
-inline unsigned int square(const unsigned int file, const unsigned int rank) {
+inline Score operator*=(Score& score, const int multiply) {
 
-    return file + (rank * 8);
+    score.mg *= multiply;
+    score.eg *= multiply;
+    return score;
+
+}
+
+inline Score operator/(const Score score1, const int divisor) {
+
+    Score score;
+    score.mg = score1.mg / divisor;
+    score.eg = score1.eg / divisor;
+    return score;
+
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Score& score) {
+
+    return os << "MG: " << score.mg << " | EG: " << score.eg;
 
 }
 
