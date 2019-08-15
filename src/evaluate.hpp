@@ -63,11 +63,11 @@ typedef struct {
     uint64_t mobilityArea[2] = { 0 };
     uint64_t attackedSquares[14] = { 0 };
     uint64_t multiAttackedSquares[2] = { 0 };
+    uint64_t blockedPawns[2] = { 0 };
     uint64_t kingRing[2] = { 0 };
     int kingAttackersWeight[2] = { 0 };
     int kingAttackersNum[2] = { 0 };
     int kingRingAttacks[2] = { 0 };
-    Score kingDefense[2] = { S(0, 0), S(0, 0) };
     unsigned int kingSq[2] = { 0 };
     uint64_t weakPawns = 0;
     uint64_t passedPawns = 0;

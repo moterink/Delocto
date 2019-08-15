@@ -126,6 +126,12 @@ void Board::calc_keys() {
 
 }
 
+void Board::update_check_info() {
+
+    state.checkers = side_attackers(lsb_index(bitboards[King(stm)]), bitboards[ALLPIECES], !stm);
+
+}
+
 uint64_t Board::get_pinned(const Side side) {
 
     const unsigned int ksq = lsb_index(bitboards[King(side)]);
@@ -145,6 +151,27 @@ uint64_t Board::get_pinned(const Side side) {
     }
 
     return pinnedPieces;
+
+}
+
+uint64_t Board::get_king_blockers(const Side side) const {
+
+    uint64_t blockers = 0;
+    const unsigned int ksq = lsb_index(bitboards[King(side)]);
+    uint64_t possiblePinners = (AttackBitboards[BISHOP][ksq] & (bitboards[Bishop(!side)] | bitboards[Queen(!side)])) | (AttackBitboards[ROOK][ksq] & (bitboards[Rook(!side)] | bitboards[Queen(!side)]));
+
+    while (possiblePinners) {
+
+        const unsigned int sq = pop_lsb(possiblePinners);
+        const uint64_t pinned = RayTable[sq][ksq] & ~SQUARES[ksq] & ~SQUARES[sq];
+
+        if (pinned && popcount(pinned) <= 1) {
+            blockers |= pinned;
+        }
+
+    }
+
+    return blockers;
 
 }
 
@@ -258,7 +285,6 @@ void Board::set_fen(std::string fen) {
     updateSideBitboards();
 
     state.pinned   = get_pinned(stm);
-    state.checkers = side_attackers(lsb_index(bitboards[King(stm)]), bitboards[ALLPIECES], !stm);
 
     calc_keys();
 
@@ -467,7 +493,7 @@ bool Board::do_move(const Move move) {
     bitboards[ALLPIECES] = bitboards[WHITE] | bitboards[BLACK];
 
     state.pinned   = get_pinned(stm);
-    state.checkers = side_attackers(lsb_index(bitboards[King(stm)]), bitboards[ALLPIECES], !stm);
+    update_check_info();
 
     ply++;
 
@@ -583,7 +609,7 @@ void Board::do_nullmove() {
     hash_turn();
 
     state.pinned   = get_pinned(stm);
-    state.checkers = side_attackers(lsb_index(bitboards[King(stm)]), bitboards[ALLPIECES], !stm);
+    update_check_info();
 
     ply++;
 
@@ -669,7 +695,7 @@ bool Board::is_valid(const Move move) const {
         }
     }
 
-    if (checkers()) {        
+    if (checkers()) {
         if (SQUARES[fromsq] != bitboards[King(stm)]) {
 
             const unsigned int ksq = lsb_index(bitboards[King(stm)]);

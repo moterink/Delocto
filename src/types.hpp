@@ -178,6 +178,8 @@ static const int bitIndex64[64] = {
 
 static const uint64_t debruijn64 = 0x03f79d71b4cb0a89;
 
+static const uint64_t CENTRAL_FILES = FILE_D | FILE_E;
+
 static const uint64_t ADJ_FILES[8] = {
 
     FILE_B,
@@ -237,6 +239,8 @@ enum {
     A1, B1, C1, D1, E1, F1, G1, H1
 
 };
+
+static const uint64_t CENTRAL_SQUARES = SQUARES[D4] | SQUARES[D5] | SQUARES[E4] | SQUARES[E5];
 
 static const int DIRECTIONS[2][8] = {
 

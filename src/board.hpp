@@ -110,10 +110,12 @@ class Board {
         inline bool isDangerousPawnPush(const Move move, const Side side);
         inline uint64_t getAllOccupancy(const uint64_t squares) const;
         inline uint64_t getPieceOccupancy(const uint64_t squares, const PieceType type);
+        uint64_t get_king_blockers(const Side side) const;
 
         inline uint64_t gen_wpawns_attacks() const;
         inline uint64_t gen_bpawns_attacks() const;
         inline uint64_t gen_pawns_attacks(const Side side) const;
+        inline uint64_t get_same_colored_squares(const unsigned int sq) const;
 
     private:
 
@@ -168,6 +170,8 @@ class Board {
 
         uint64_t getLeastValuablePiece(uint64_t attackers, const Side side, PieceType& pt) const;
 
+        void update_check_info();
+
 };
 
 inline uint64_t Board::minors_or_majors(const Side side) const {
@@ -197,6 +201,12 @@ inline uint64_t Board::getAllOccupancy(const uint64_t squares) const {
 inline uint64_t Board::getPieceOccupancy(const uint64_t squares, const PieceType type) {
 
     return bitboards[type] & squares;
+
+}
+
+inline uint64_t Board::get_same_colored_squares(const unsigned int sq) const {
+
+    return (SQUARES[sq] & WHITE_SQUARES) ? WHITE_SQUARES : BLACK_SQUARES;
 
 }
 
