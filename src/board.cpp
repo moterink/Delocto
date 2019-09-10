@@ -284,7 +284,8 @@ void Board::set_fen(std::string fen) {
 
     updateSideBitboards();
 
-    state.pinned   = get_pinned(stm);
+    state.pinned = get_pinned(stm);
+    update_check_info();
 
     calc_keys();
 
@@ -381,7 +382,7 @@ bool Board::do_move(const Move move) {
                     hash_pawn(stm, fromsq);
                     hash_pawn(stm, tosq);
                     if (std::abs(fromsq - tosq) == 16) {
-                        if (attackingPawns[!stm][fromsq + DIRECTIONS[stm][UP]] & bitboards[Pawn(!stm)]) {
+                        if (AttackBitboards[Pawn(stm)][fromsq + DIRECTIONS[stm][UP]] & bitboards[Pawn(!stm)]) {
                             state.enPassant = fromsq + DIRECTIONS[stm][UP];
                             hash_enPassant();
                         }
@@ -683,7 +684,7 @@ bool Board::is_valid(const Move move) const {
         }
 
         if (is_promotion(move)) {
-            if (!(SQUARES[fromsq] & bitboards[Pawn(stm)]) || (!(SQUARES[tosq] & ((stm == WHITE) ? RANK_1 : RANK_8))) || !(SQUARES[tosq] & generatePawnMoves(stm, fromsq, bitboards[ALLPIECES], bitboards[!stm]))) {
+            if (!(SQUARES[fromsq] & bitboards[Pawn(stm)]) || !(SQUARES[tosq] & PAWN_FINALRANK[stm]) || !(SQUARES[tosq] & generatePawnMoves(stm, fromsq, bitboards[ALLPIECES], bitboards[!stm]))) {
                 return false;
             }
         }

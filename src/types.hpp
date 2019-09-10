@@ -47,14 +47,14 @@
 #include <cmath>
 
 // Ranks
-static const uint64_t RANK_8 = 0xFF;
-static const uint64_t RANK_7 = RANK_8 << 8;
-static const uint64_t RANK_6 = RANK_8 << 16;
-static const uint64_t RANK_5 = RANK_8 << 24;
-static const uint64_t RANK_4 = RANK_8 << 32;
-static const uint64_t RANK_3 = RANK_8 << 40;
-static const uint64_t RANK_2 = RANK_8 << 48;
-static const uint64_t RANK_1 = RANK_8 << 56;
+static const uint64_t RANK_1 = 0xFF;
+static const uint64_t RANK_2 = RANK_1 << 8;
+static const uint64_t RANK_3 = RANK_1 << 16;
+static const uint64_t RANK_4 = RANK_1 << 24;
+static const uint64_t RANK_5 = RANK_1 << 32;
+static const uint64_t RANK_6 = RANK_1 << 40;
+static const uint64_t RANK_7 = RANK_1 << 48;
+static const uint64_t RANK_8 = RANK_1 << 56;
 
 // Files
 static const uint64_t FILE_H = 0x101010101010101;
@@ -70,7 +70,7 @@ static const uint64_t WHITE_SQUARES = 0xaa55aa55aa55aa55;
 static const uint64_t BLACK_SQUARES = 0x55aa55aa55aa55aa;
 static const uint64_t ALL_SQUARES   = WHITE_SQUARES | BLACK_SQUARES;
 
-static const uint64_t RANKS[8] = { RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8 };
+static const uint64_t RANKS[8] = { RANK_8, RANK_7, RANK_6, RANK_5, RANK_4, RANK_3, RANK_2, RANK_1 };
 static const uint64_t FILES[8] = { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
 
 #define NOSQ 64
@@ -208,7 +208,7 @@ static const uint64_t KING_FLANK[8] = {
 
 static const uint64_t COLOUR_BASE_SQUARES[2] = {
 
-    RANK_8 | RANK_7 | RANK_6, RANK_1 | RANK_2 | RANK_3
+    RANK_1 | RANK_2 | RANK_3, RANK_8 | RANK_7 | RANK_6
 
 };
 
@@ -251,13 +251,19 @@ static const int DIRECTIONS[2][8] = {
 
 static const uint64_t PAWN_STARTRANK[2] = {
 
-    RANK_7, RANK_2
+    RANK_2, RANK_7
 
 };
 
 static const uint64_t PAWN_FIRST_PUSH_RANK[2] = {
 
-    RANK_6, RANK_3
+    RANK_3, RANK_6
+
+};
+
+static const uint64_t PAWN_FINALRANK[2] = {
+
+    RANK_8, RANK_1
 
 };
 

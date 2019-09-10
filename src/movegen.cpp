@@ -106,7 +106,7 @@ void MoveList::print() {
 
 static void gen_quietproms(const Board& board, MoveList& moveList, const Side side, const uint64_t targets) {
 
-    uint64_t pawns = board.pieces(PAWN, side) & ((side == WHITE) ? RANK_2 : RANK_7);
+    uint64_t pawns = board.pieces(PAWN, side) & PAWN_STARTRANK[!side];
 
     while (pawns) {
 
@@ -126,13 +126,12 @@ static void gen_quietproms(const Board& board, MoveList& moveList, const Side si
 
 static void gen_capproms(const Board& board, MoveList& moveList, const Side side, const uint64_t targets) {
 
-    uint64_t pawns = board.pieces(PAWN, side) & ((side == WHITE) ? RANK_2 : RANK_7);
+    uint64_t pawns = board.pieces(PAWN, side) & PAWN_STARTRANK[!side];
 
     while (pawns) {
 
         const unsigned int fromsq = pop_lsb(pawns);
-
-        uint64_t caps = generatePawnCaptures(fromsq, board.pieces(!side), side) & targets;
+        uint64_t caps = AttackBitboards[Pawn(side)][fromsq] & targets;
 
         while (caps) {
 
@@ -155,7 +154,7 @@ static void gen_ep(const Board& board, MoveList& moveList, const Side side, cons
 
     if (epsq != NOSQ && (SQUARES[epsq] & targets)) {
 
-        uint64_t pawns = attackingPawns[side][epsq] & board.pieces(PAWN, side);
+        uint64_t pawns = AttackBitboards[Pawn(!side)][epsq] & board.pieces(PAWN, side);
 
         while (pawns) {
 
@@ -169,10 +168,6 @@ static void gen_ep(const Board& board, MoveList& moveList, const Side side, cons
 
 static void gen_piece_caps(const Board& board, MoveList& moveList, const Side side, uint64_t targets) {
 
-    const uint64_t pawns = board.pieces(PAWN, side) & ~((side == WHITE) ? RANK_2 : RANK_7);
-    uint64_t pawnsLCaps  = (((side == WHITE) ? ((pawns & ~FILE_A) << 9) : ((pawns & ~FILE_A) >> 7)) & targets);
-    uint64_t pawnsRCaps  = (((side == WHITE) ? ((pawns & ~FILE_H) << 7) : ((pawns & ~FILE_H) >> 9)) & targets);
-
     const unsigned int sq = lsb_index(board.pieces(KING, side));
     uint64_t moves = AttackBitboards[KING][sq] & board.pieces(!side);
 
@@ -182,19 +177,17 @@ static void gen_piece_caps(const Board& board, MoveList& moveList, const Side si
 
     }
 
-    while (pawnsLCaps) {
+    uint64_t pawns = board.pieces(PAWN, side) & ~PAWN_STARTRANK[!side];
+    while (pawns) {
 
-        const unsigned int tosq = pop_lsb(pawnsLCaps);
-        const unsigned int fromsq = lsb_index((side == WHITE) ? (SQUARES[tosq] >> 9) : (SQUARES[tosq] << 7));
-        moveList.append(make_move(fromsq, tosq, NORMAL));
+        const unsigned int sq = pop_lsb(pawns);
+        uint64_t moves = AttackBitboards[Pawn(side)][sq] & targets;
 
-    }
+        while (moves) {
 
-    while (pawnsRCaps) {
+            moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
 
-        const unsigned int tosq = pop_lsb(pawnsRCaps);
-        const unsigned int fromsq = lsb_index((side == WHITE) ? (SQUARES[tosq] >> 7) : (SQUARES[tosq] << 9));
-        moveList.append(make_move(fromsq, tosq, NORMAL));
+        }
 
     }
 
@@ -257,10 +250,10 @@ static void gen_piece_caps(const Board& board, MoveList& moveList, const Side si
 
 static void gen_piece_quiets(const Board& board, MoveList& moveList, const Side side, const uint64_t targets) {
 
-    const uint64_t pawns       = board.pieces(PAWN, side) & ~ ((side == WHITE) ? RANK_2 : RANK_7);
-    const uint64_t pawnPushes  = ((side == WHITE) ? (pawns << 8) : (pawns >> 8)) & ~board.pieces(ALLPIECES);
-    uint64_t singlePushes      = pawnPushes & targets;
-    uint64_t doublePushes      = ((side == WHITE) ? ((pawnPushes & RANK_6) << 8) : ((pawnPushes & RANK_3) >> 8)) & targets;
+    const uint64_t pawns      = board.pieces(PAWN, side) & ~PAWN_STARTRANK[!side];
+    const uint64_t pawnPushes = shift_up(pawns, side) & ~board.pieces(ALLPIECES);
+    uint64_t singlePushes     = pawnPushes & targets;
+    uint64_t doublePushes     = shift_up(pawnPushes & PAWN_FIRST_PUSH_RANK[side], side) & targets;
 
     uint64_t knights = board.pieces(KNIGHT, side);
     while (knights) {

@@ -21,9 +21,15 @@ CC = g++
 
 TARGET = delocto
 
-CFLAGS = -std=c++11 -mtune=native -march=native -O3
+CCSTD = -std=c++11
+
+OPTIMIZEFLAGS = -mtune=native -march=native -O3
+DEBUGFLAGS = -g
 
 SRC = *.cpp
 
 all:
-	$(CC) $(CFLAGS) $(SRC) -o $(TARGET)
+	$(CC) $(CCSTD) $(OPTIMIZEFLAGS) $(SRC) -o $(TARGET)
+
+debug:
+	$(CC) $(CCSTD) $(DEBUGFLAGS) $(SRC) -o $(TARGET)

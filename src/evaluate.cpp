@@ -141,7 +141,7 @@ static const int Imbalance[2][5][5] = {
 
 };
 
-static const uint64_t OutpostSquares[2] = { RANK_4 | RANK_5 | RANK_6, RANK_5 | RANK_4 | RANK_3 };
+static const uint64_t OutpostSquares[2]     = { RANK_5 | RANK_4 | RANK_3, RANK_4 | RANK_5 | RANK_6 };
 static const Score OutpostBonus[2]          = { S(34, 11), S(17, 6) };
 static const Score OutpostReachableBonus[2] = { S(17,  6), S( 8, 3) };
 
