@@ -161,6 +161,6 @@ inline int value_from_tt(int value, int plies) {
 }
 
 extern void init_search();
-extern const SearchStats go(Board& board, const SearchLimits limits);
+extern const SearchStats go(Board& board, const SearchLimits& limits);
 
 #endif

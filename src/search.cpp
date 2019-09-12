@@ -411,12 +411,12 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
 
     bestValue = eval = (ttHit && entry->eval != VALUE_NONE ? entry->eval : evaluate(board));
 
-    if (eval >= beta) {
-        return beta;
+    if (bestValue >= beta) {
+        return bestValue;
     }
 
-    if (eval > alpha) {
-        alpha = value;
+    if (bestValue > alpha) {
+        alpha = bestValue;
     }
 
     int movecount = 0;
@@ -738,7 +738,7 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
 }
 
 // Find a best move for the given board in time/depth
-const SearchStats go(Board& board, const SearchLimits limits) {
+const SearchStats go(Board& board, const SearchLimits& limits) {
 
     SearchStats stats;
     SearchInfo info;
@@ -810,59 +810,57 @@ const SearchStats go(Board& board, const SearchLimits limits) {
 
         }
 
-        end:
+        if (!info.stopped) {
 
-            if (!info.stopped) {
+            iterend = std::clock();
 
-                iterend = std::clock();
+            if (info.limitTime) {
+                iterduration = (iterend - iterstart) / (CLOCKS_PER_SEC / 1000);
+                info.timeLeft -= iterduration;
+            }
 
-                if (info.limitTime) {
-                    iterduration = (iterend - iterstart) / (CLOCKS_PER_SEC / 1000);
-                    info.timeLeft -= iterduration;
+            // Drawn/mate positions return an empty pv
+            if (pv.size > 0) {
+
+                info.lastPv = pv;
+
+                end = std::clock();
+
+                bestMove = pv.line[0];
+
+                duration = (end - start) / (CLOCKS_PER_SEC / 1000);
+
+                pvstring.clear();
+
+                for (int pcount = 0; pcount < pv.size; pcount++) {
+                    pvstring += std::string() + move_to_string(pv.line[pcount]) + ' ';
                 }
 
-                // Drawn/mate positions return an empty pv
-                if (pv.size > 0) {
+                std::cout << "info depth " << depth;
 
-                    info.lastPv = pv;
+                if (std::abs(value) >= VALUE_MATE - MAX_DEPTH) {
+                    std::cout << " score mate " << ((value > 0 ? VALUE_MATE - value + 1 : -VALUE_MATE - value) / 2);
+                } else {
+                    std::cout << " score cp " << value;
+                }
 
-                    end = std::clock();
+                std::cout << " nodes " << info.nodes << " time " << duration << " nps " << ((duration != 0) ? ((info.nodes * 1000) / duration) : info.nodes * 1000) << " pv " << pvstring << std::endl;
 
-                    bestMove = pv.line[0];
-
-                    duration = (end - start) / (CLOCKS_PER_SEC / 1000);
-
-                    pvstring.clear();
-
-                    for (int pcount = 0; pcount < pv.size; pcount++) {
-                        pvstring += std::string() + move_to_string(pv.line[pcount]) + ' ';
-                    }
-
-                    std::cout << "info depth " << depth;
-
-                    if (std::abs(value) >= VALUE_MATE - MAX_DEPTH) {
-                        std::cout << " score mate " << ((value > 0 ? VALUE_MATE - value + 1 : -VALUE_MATE - value) / 2);
-                    } else {
-                        std::cout << " score cp " << value;
-                    }
-
-                    std::cout << " nodes " << info.nodes << " time " << duration << " nps " << ((duration != 0) ? ((info.nodes * 1000) / duration) : info.nodes * 1000) << " pv " << pvstring << std::endl;
-
-                    if (info.limitTime && (info.timeLeft <= 0 || info.timeLeft <= iterduration * (1 + depth / 50)))
-                        break;
-
-                }  else {
-
-                    std::cout << "info string No legal moves available" << std::endl;
+                if (info.limitTime && (info.timeLeft <= 0 || info.timeLeft <= iterduration * (1 + depth / 50)))
                     break;
 
-                }
+            }  else {
 
-            } else {
-
+                std::cout << "info string No legal moves available" << std::endl;
                 break;
 
             }
+
+        } else {
+
+            break;
+
+        }
 
     }
 
