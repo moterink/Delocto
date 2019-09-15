@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,6 @@ extern uint64_t FrontFileMask[2][64];
 extern uint64_t PassedPawnMask[2][64];
 extern uint64_t BackwardPawnMask[2][64];
 
-extern void initBitboards();
+extern void init_bitboards();
 
 #endif

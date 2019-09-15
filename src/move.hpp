@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -77,9 +77,9 @@ inline const Move make_move(const unsigned int fromsq, const unsigned int tosq, 
 
 }
 
-inline PieceType prom_piecetype(const MoveType type, const Side side) {
+inline PieceType prom_piecetype(const MoveType type, const Color color) {
 
-    return (promPieceTypes[type] | side);
+    return (promPieceTypes[type] | color);
 
 }
 

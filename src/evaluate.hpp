@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -30,21 +30,19 @@
 #include "move.hpp"
 #include <complex> // for std::abs
 
-// Scores for pieces
-#define PawnValueMg     80
-#define PawnValueEg    105
-#define KnightValueMg  320
-#define KnightValueEg  350
-#define BishopValueMg  345
-#define BishopValueEg  370
-#define RookValueMg    530
-#define RookValueEg    570
-#define QueenValueMg  1050
-#define QueenValueEg  1100
-#define KingValueMg      0
-#define KingValueEg      0
+// Values for pieces
+static const Value Material[6] = {
 
-// Scores for pieces for mvvlva/see
+    V(  60,  100),
+    V( 365,  405),
+    V( 390,  430),
+    V( 605,  645),
+    V(1185, 1260),
+    V(   0,    0)
+
+};
+
+// Values for pieces for mvvlva/see
 #define PawnValue      100
 #define KnightValue    320
 #define BishopValue    330
@@ -64,32 +62,31 @@ typedef struct {
     uint64_t attackedSquares[14] = { 0 };
     uint64_t multiAttackedSquares[2] = { 0 };
     uint64_t blockedPawns[2] = { 0 };
-    uint64_t kingRing[2] = { 0 };
     int kingAttackersWeight[2] = { 0 };
     int kingAttackersNum[2] = { 0 };
     int kingRingAttacks[2] = { 0 };
     unsigned int kingSq[2] = { 0 };
+    uint64_t kingRing[2] = { 0 };
     uint64_t weakPawns = 0;
     uint64_t passedPawns = 0;
     uint64_t pawnAttacksSpan[2] = { 0 };
-    Score mobility[2] = { S(0, 0), S(0, 0) };
+    Value mobility[2] = { V(0, 0), V(0, 0) };
 
 } EvalInfo;
 
-inline const int scaled_eval(const int scale, const Score score) {
+inline const int scaled_eval(const int scale, const Value value) {
 
-    return ((score.mg * (256 - scale)) + (score.eg * scale)) / 256;
+    return ((value.mg * (256 - scale)) + (value.eg * scale)) / 256;
 
 }
 
-extern const Score Material[14];
-extern Score Pst[14][64];
+extern Value Pst[14][64];
 
 extern int kingDistance[64][64];
 
-extern void initKingDistance();
-extern void initPSQT();
-extern void initEval();
+extern void init_king_distance();
+extern void init_psqt();
+extern void init_eval();
 extern const int evaluate(const Board& board);
 extern void evaluateInfo(const Board& board);
 

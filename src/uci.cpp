@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -42,8 +42,8 @@ static void play_sequence(Board& board, std::string fen, std::string input, std:
 
         if (input[ccount] != ' ') {
 
-            const unsigned int fromsq    = square(input[ccount]     - 'a', 8 - (input[ccount + 1] - '0'));
-            const unsigned int tosq      = square(input[ccount + 2] - 'a', 8 - (input[ccount + 3] - '0'));
+            const unsigned int fromsq = square(input[ccount]     - 'a', 8 - (input[ccount + 1] - '0'));
+            const unsigned int tosq   = square(input[ccount + 2] - 'a', 8 - (input[ccount + 3] - '0'));
 
             ccount += 4;
 
@@ -89,9 +89,9 @@ static void benchmark() {
 
     clock_t start = std::clock();
 
-    for (int i = 0; i < 42; i++) {
+    for (int i = 0; i < 43; i++) {
 
-        std::cout << "Position: " << i << std::endl;
+        std::cout << "Position: " << (i+1) << std::endl;
         board.set_fen(BENCHMARK_FENS[i]);
         SearchStats stats = go(board, limits);
         nodes += stats.totalNodes;
@@ -159,10 +159,10 @@ void uciloop(int argc, char* argv[]) {
             std::cout << "readyok" << std::endl;
         } else if (input.find("ucinewgame") == 0) {
             newgame(board);
+        }  else if (input.find("position startpos moves ") == 0) {
+            play_sequence(board, STARTFEN, input, 24);
         } else if (input.find("position startpos") == 0) {
             board.set_fen(STARTFEN);
-        } else if (input.find("position startpos moves ") == 0) {
-            play_sequence(board, STARTFEN, input, 24);
         } else if (input.find("position fen ") == 0) {
             const std::string::size_type end = input.find("moves ");
             if (end != std::string::npos) {

@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -40,7 +40,7 @@ static const unsigned int CastleMask[64] = {
 
 };
 
-void Board::updateSideBitboards() {
+void Board::update_bitboards() {
 
     bitboards[WHITE]     = bitboards[WHITE_PAWN] | bitboards[WHITE_KNIGHT] | bitboards[WHITE_BISHOP] | bitboards[WHITE_ROOK] | bitboards[WHITE_QUEEN] | bitboards[WHITE_KING];
     bitboards[BLACK]     = bitboards[BLACK_PAWN] | bitboards[BLACK_KNIGHT] | bitboards[BLACK_BISHOP] | bitboards[BLACK_ROOK] | bitboards[BLACK_QUEEN] | bitboards[BLACK_KING];
@@ -80,11 +80,13 @@ void Board::clear() {
     state.enPassant = NOSQ;
     state.castling = 0;
     state.fiftyMoves = 0;
-    state.material[WHITE] = S(0, 0);
-    state.material[BLACK] = S(0, 0);
+    state.material[WHITE] = V(0, 0);
+    state.material[BLACK] = V(0, 0);
     state.captured = NOPIECE;
-    state.pst[WHITE] = S(0, 0);
-    state.pst[BLACK] = S(0, 0);
+    state.pst[WHITE] = V(0, 0);
+    state.pst[BLACK] = V(0, 0);
+    state.kingBlockers[WHITE] = 0;
+    state.kingBlockers[BLACK] = 0;
     state.pinned = 0;
     state.checkers = 0;
 
@@ -128,15 +130,18 @@ void Board::calc_keys() {
 
 void Board::update_check_info() {
 
-    state.checkers = side_attackers(lsb_index(bitboards[King(stm)]), bitboards[ALLPIECES], !stm);
+    state.kingBlockers[WHITE] = get_slider_blockers(bitboards[BLACK], lsb_index(bitboards[WHITE_KING]));
+    state.kingBlockers[BLACK] = get_slider_blockers(bitboards[WHITE], lsb_index(bitboards[BLACK_KING]));
+
+    state.checkers = color_attackers(lsb_index(bitboards[King(stm)]), bitboards[ALLPIECES], !stm);
 
 }
 
-uint64_t Board::get_pinned(const Side side) {
+uint64_t Board::get_pinned(const Color color) {
 
-    const unsigned int ksq = lsb_index(bitboards[King(side)]);
+    const unsigned int ksq = lsb_index(bitboards[King(color)]);
     uint64_t pinnedPieces = 0;
-    uint64_t pinners = (AttackBitboards[BISHOP][ksq] & (bitboards[Bishop(!side)] | bitboards[Queen(!side)])) | (AttackBitboards[ROOK][ksq] & (bitboards[Rook(!side)] | bitboards[Queen(!side)]));
+    uint64_t pinners = (AttackBitboards[BISHOP][ksq] & (bitboards[Bishop(!color)] | bitboards[Queen(!color)])) | (AttackBitboards[ROOK][ksq] & (bitboards[Rook(!color)] | bitboards[Queen(!color)]));
 
     while (pinners) {
 
@@ -154,19 +159,19 @@ uint64_t Board::get_pinned(const Side side) {
 
 }
 
-uint64_t Board::get_king_blockers(const Side side) const {
+uint64_t Board::get_slider_blockers(const uint64_t sliders, const unsigned int sq) const {
 
     uint64_t blockers = 0;
-    const unsigned int ksq = lsb_index(bitboards[King(side)]);
-    uint64_t possiblePinners = (AttackBitboards[BISHOP][ksq] & (bitboards[Bishop(!side)] | bitboards[Queen(!side)])) | (AttackBitboards[ROOK][ksq] & (bitboards[Rook(!side)] | bitboards[Queen(!side)]));
+    uint64_t pinners = ((AttackBitboards[BISHOP][sq] & (bitboards[WHITE_BISHOP] | bitboards[BLACK_BISHOP] | bitboards[WHITE_QUEEN] | bitboards[BLACK_QUEEN])) | (AttackBitboards[ROOK][sq] & (bitboards[WHITE_ROOK] | bitboards[BLACK_ROOK] | bitboards[WHITE_QUEEN]| bitboards[BLACK_QUEEN]))) & sliders;
+    uint64_t occupied = bitboards[ALLPIECES] ^ sliders ^ SQUARES[sq];
 
-    while (possiblePinners) {
+    while (pinners) {
 
-        const unsigned int sq = pop_lsb(possiblePinners);
-        const uint64_t pinned = RayTable[sq][ksq] & ~SQUARES[ksq] & ~SQUARES[sq];
+        const unsigned int psq = pop_lsb(pinners);
+        const uint64_t pin     = RayTable[psq][sq] & occupied;
 
-        if (pinned && popcount(pinned) <= 1) {
-            blockers |= pinned;
+        if (popcount(pin) == 1) {
+            blockers |= pin;
         }
 
     }
@@ -207,23 +212,23 @@ void Board::set_fen(std::string fen) {
 
         index++;
 
-        Side side = WHITE;
+        Color color = WHITE;
         PieceType type = NOPIECE;
 
         switch (fen[findex]) {
 
-            case 'P': { side = WHITE; type = WHITE_PAWN; break; }
-            case 'N': { side = WHITE; type = WHITE_KNIGHT; break; }
-            case 'B': { side = WHITE; type = WHITE_BISHOP; break; }
-            case 'R': { side = WHITE; type = WHITE_ROOK; break; }
-            case 'Q': { side = WHITE; type = WHITE_QUEEN; break; }
-            case 'K': { side = WHITE; type = WHITE_KING; break; }
-            case 'p': { side = BLACK; type = BLACK_PAWN; break; }
-            case 'n': { side = BLACK; type = BLACK_KNIGHT; break; }
-            case 'b': { side = BLACK; type = BLACK_BISHOP; break; }
-            case 'r': { side = BLACK; type = BLACK_ROOK; break; }
-            case 'q': { side = BLACK; type = BLACK_QUEEN; break; }
-            case 'k': { side = BLACK; type = BLACK_KING; break; }
+            case 'P': { color = WHITE; type = WHITE_PAWN; break; }
+            case 'N': { color = WHITE; type = WHITE_KNIGHT; break; }
+            case 'B': { color = WHITE; type = WHITE_BISHOP; break; }
+            case 'R': { color = WHITE; type = WHITE_ROOK; break; }
+            case 'Q': { color = WHITE; type = WHITE_QUEEN; break; }
+            case 'K': { color = WHITE; type = WHITE_KING; break; }
+            case 'p': { color = BLACK; type = BLACK_PAWN; break; }
+            case 'n': { color = BLACK; type = BLACK_KNIGHT; break; }
+            case 'b': { color = BLACK; type = BLACK_BISHOP; break; }
+            case 'r': { color = BLACK; type = BLACK_ROOK; break; }
+            case 'q': { color = BLACK; type = BLACK_QUEEN; break; }
+            case 'k': { color = BLACK; type = BLACK_KING; break; }
 
         }
 
@@ -234,11 +239,11 @@ void Board::set_fen(std::string fen) {
             pad--;
             index += pad;
         } else {
-            bitboards[side] |= (1ULL << (63 - index));
+            bitboards[color] |= (1ULL << (63 - index));
             bitboards[type] |= (1ULL << (63 - index));
-            state.pst[side] += Pst[type][index];
+            state.pst[color] += Pst[type][index];
             piecetypes[index] = type;
-            state.material[side] += Material[type];
+            state.material[color] += Material[pt_index(type)];
             piececounts[type]++;
         }
 
@@ -282,7 +287,7 @@ void Board::set_fen(std::string fen) {
         state.fiftyMoves = 0;
     }
 
-    updateSideBitboards();
+    update_bitboards();
 
     state.pinned = get_pinned(stm);
     update_check_info();
@@ -355,7 +360,7 @@ bool Board::do_move(const Move move) {
         bitboards[ttype] ^= SQUARES[tosq];
         bitboards[!stm] ^= SQUARES[tosq];
 
-        state.material[!stm] -= Material[ttype];
+        state.material[!stm] -= Material[pt_index(ttype)];
         state.pst[!stm] -= Pst[ttype][tosq];
 
         hash_piece(ttype, tosq);
@@ -433,7 +438,7 @@ bool Board::do_move(const Move move) {
                 bitboards[pawn] ^= SQUARES[capsq];
                 bitboards[!stm] ^= SQUARES[capsq];
 
-                state.material[!stm] -= Material[pawn];
+                state.material[!stm] -= Material[pt_index(pawn)];
                 state.pst[!stm] -= Pst[pawn][capsq];
 
                 hash_pawn(stm, fromsq);
@@ -462,8 +467,8 @@ bool Board::do_move(const Move move) {
                 bitboards[ftype] ^= SQUARES[tosq];
                 bitboards[ptype] |= SQUARES[tosq];
 
-                state.material[stm] -= Material[ftype];
-                state.material[stm] += Material[ptype];
+                state.material[stm] -= Material[pt_index(ftype)];
+                state.material[stm] += Material[pt_index(ptype)];
 
                 state.pst[stm] -= Pst[ftype][tosq];
                 state.pst[stm] += Pst[ptype][tosq];
@@ -709,7 +714,7 @@ bool Board::is_valid(const Move move) const {
                 return false;
             }
 
-        } else if (side_attackers(tosq, (bitboards[ALLPIECES] ^ SQUARES[fromsq]), !stm) & bitboards[!stm]) {
+        } else if (color_attackers(tosq, (bitboards[ALLPIECES] ^ SQUARES[fromsq]), !stm) & bitboards[!stm]) {
             return false;
         }
     }

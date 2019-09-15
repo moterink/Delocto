@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -52,7 +52,7 @@ typedef struct {
 typedef struct {
 
     uint64_t key;
-    Score score;
+    Value value;
     uint64_t pawnWAttacks;
     uint64_t pawnBAttacks;
     uint64_t passedPawns;
@@ -64,7 +64,7 @@ typedef struct {
 typedef struct {
 
     uint64_t key;
-    Score score;
+    Value value;
 
 } MaterialEntry;
 
@@ -97,7 +97,7 @@ class PawnTable {
 
         void clear();
         PawnEntry * probe(const uint64_t key);
-        void store(const uint64_t key, const Score score, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan);
+        void store(const uint64_t key, const Value value, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan);
 
         PawnTable() {
             table = new PawnEntry [size];
@@ -119,7 +119,7 @@ class MaterialTable {
 
         void clear();
         MaterialEntry * probe(const uint64_t key);
-        void store(const uint64_t key, const Score score);
+        void store(const uint64_t key, const Value value);
 
         MaterialTable() {
             table = new MaterialEntry [size];

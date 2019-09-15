@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -106,9 +106,9 @@ static void checkUp(SearchInfo * info) {
 
 }
 
-uint64_t Board::getLeastValuablePiece(uint64_t attackers, const Side side, PieceType& pt) const {
+uint64_t Board::getLeastValuablePiece(uint64_t attackers, const Color color, PieceType& pt) const {
 
-    for (pt = Pawn(side); pt <= King(side); pt += 2) {
+    for (pt = Pawn(color); pt <= King(color); pt += 2) {
         uint64_t subset = attackers & bitboards[pt];
         if (subset) {
             return subset & -subset;
@@ -119,7 +119,7 @@ uint64_t Board::getLeastValuablePiece(uint64_t attackers, const Side side, Piece
 
 }
 
-int Board::see(const Move move, Side side) const {
+int Board::see(const Move move, Color color) const {
 
     int value[32];
     unsigned int d = 0;
@@ -143,7 +143,7 @@ int Board::see(const Move move, Side side) const {
 
     do {
 
-        side = !side;
+        color = !color;
         d++;
         value[d] = SeeMaterial[attacker] - value[d - 1];
 
@@ -158,7 +158,7 @@ int Board::see(const Move move, Side side) const {
             attackers |= all_slider_attackers(tosq, occupied) & occupied;
         }
 
-        fromset = getLeastValuablePiece(attackers, side, attacker);
+        fromset = getLeastValuablePiece(attackers, color, attacker);
 
     } while (fromset);
 
@@ -170,22 +170,22 @@ int Board::see(const Move move, Side side) const {
 
 }
 
-void MovePicker::scoreCaptures() {
+void MovePicker::valueCaptures() {
 
     for (unsigned int index = 0; index < caps.size; index++) {
-        caps.scores[index] = board.mvvlva(caps.moves[index]);
+        caps.values[index] = board.mvvlva(caps.moves[index]);
     }
 
 }
 
-void MovePicker::scoreQuiets() {
+void MovePicker::valueQuiets() {
 
 }
 
-void MovePicker::scoreQsCaptures() {
+void MovePicker::valueQsCaptures() {
 
     for (unsigned int index = 0; index < qscaps.size; index++) {
-        qscaps.scores[index] = board.mvvlva(qscaps.moves[index]);
+        qscaps.values[index] = board.mvvlva(qscaps.moves[index]);
     }
 
 }
@@ -213,7 +213,7 @@ Move MovePicker::pick() {
                 ++phase;
 
                 caps = gen_caps(board, board.turn());
-                scoreCaptures();
+                valueCaptures();
 
             }
 
@@ -227,7 +227,7 @@ Move MovePicker::pick() {
 
                     assert(best == MOVE_NONE);
 
-                    if (caps.scores[caps.index] < 0) {
+                    if (caps.values[caps.index] < 0) {
                         break;
                     }
 
@@ -276,7 +276,7 @@ Move MovePicker::pick() {
                 quiets = gen_quiets(board, board.turn());
 
                 for (unsigned int index = 0; index < quiets.size; index++) {
-                    quiets.scores[index] = info->history[board.piecetype(from_sq(quiets.moves[index]))][to_sq(quiets.moves[index])];
+                    quiets.values[index] = info->history[board.piecetype(from_sq(quiets.moves[index]))][to_sq(quiets.moves[index])];
                 }
 
             }
@@ -332,7 +332,7 @@ Move MovePicker::pick() {
                 ++phase;
 
                 qscaps = gen_caps(board, board.turn());
-                scoreQsCaptures();
+                valueQsCaptures();
 
             }
 

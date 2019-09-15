@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -66,14 +66,42 @@ static const uint64_t FILE_C = FILE_H << 5;
 static const uint64_t FILE_B = FILE_H << 6;
 static const uint64_t FILE_A = FILE_H << 7;
 
-static const uint64_t WHITE_SQUARES = 0xaa55aa55aa55aa55;
-static const uint64_t BLACK_SQUARES = 0x55aa55aa55aa55aa;
-static const uint64_t ALL_SQUARES   = WHITE_SQUARES | BLACK_SQUARES;
-
 static const uint64_t RANKS[8] = { RANK_8, RANK_7, RANK_6, RANK_5, RANK_4, RANK_3, RANK_2, RANK_1 };
 static const uint64_t FILES[8] = { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
 
+// 64bit integers for each square
+static const uint64_t SQUARES[65] = {
+
+    9223372036854775808U, 4611686018427387904, 2305843009213693952, 1152921504606846976, 576460752303423488, 288230376151711744, 144115188075855872, 72057594037927936,
+    36028797018963968, 18014398509481984, 9007199254740992, 4503599627370496, 2251799813685248, 1125899906842624, 562949953421312, 281474976710656,
+    140737488355328, 70368744177664, 35184372088832, 17592186044416, 8796093022208, 4398046511104, 2199023255552, 1099511627776,
+    549755813888, 274877906944, 137438953472, 68719476736, 34359738368, 17179869184, 8589934592, 4294967296,
+    2147483648, 1073741824, 536870912, 268435456, 134217728, 67108864, 33554432, 16777216,
+    8388608, 4194304, 2097152, 1048576, 524288, 262144, 131072, 65536,
+    32768, 16384, 8192, 4096, 2048, 1024, 512, 256,
+    128, 64, 32, 16, 8, 4, 2, 1, 0
+
+};
+
+// Square names
+enum {
+
+    A8, B8, C8, D8, E8, F8, G8, H8,
+    A7, B7, C7, D7, E7, F7, G7, H7,
+    A6, B6, C6, D6, E6, F6, G6, H6,
+    A5, B5, C5, D5, E5, F5, G5, H5,
+    A4, B4, C4, D4, E4, F4, G4, H4,
+    A3, B3, C3, D3, E3, F3, G3, H3,
+    A2, B2, C2, D2, E2, F2, G2, H2,
+    A1, B1, C1, D1, E1, F1, G1, H1
+
+};
+
 #define NOSQ 64
+
+static const uint64_t WHITE_SQUARES = 0xaa55aa55aa55aa55;
+static const uint64_t BLACK_SQUARES = 0x55aa55aa55aa55aa;
+static const uint64_t ALL_SQUARES   = WHITE_SQUARES | BLACK_SQUARES;
 
 #define WKCASFLAG 1
 #define WQCASFLAG 2
@@ -85,11 +113,12 @@ static const uint64_t FILES[8] = { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_
 #define ALL_CASTLE_MASK   15
 
 static const uint64_t CASTLE_MASKS[2] = { WHITE_CASTLE_MASK, BLACK_CASTLE_MASK };
+static const uint64_t CASTLE_SQUARES[4] = { G1, C1, G8, C8 };
+static const uint64_t CASTLE_FLAGS[4] = { WKCASFLAG, WQCASFLAG, BKCASFLAG, BQCASFLAG };
 
-typedef unsigned int Side;
+typedef unsigned int Color;
 typedef unsigned int PieceType;
 typedef unsigned int Direction;
-typedef unsigned int CastlePerm;
 typedef uint16_t Move;
 typedef uint16_t MoveType;
 
@@ -106,13 +135,13 @@ class MoveList;
 #define MAX_DEPTH 100
 #define MAX_MOVES 256
 
-// Scores for mate, draw, infinte, unknown
-#define VALUE_MATE       50000
+// Values for mate, draw, infinte, unknown
+#define VALUE_MATE      50000
 #define VALUE_MATE_MAX  (VALUE_MATE - MAX_DEPTH)
 #define VALUE_MATED_MAX (MAX_DEPTH - VALUE_MATE)
-#define VALUE_INFINITE        100000
+#define VALUE_INFINITE  100000
 #define VALUE_NONE      100001
-#define VALUE_DRAW       0
+#define VALUE_DRAW      0
 
 #define DEPTH_NONE -36
 
@@ -121,7 +150,7 @@ typedef struct {
     int mg = 0;
     int eg = 0;
 
-} Score;
+} Value;
 
 // Directions
 enum {
@@ -130,7 +159,7 @@ enum {
 
 };
 
-// Sides
+// Colors
 #define WHITE 0
 #define BLACK 1
 
@@ -144,7 +173,7 @@ enum {
 #define NOPIECE   14
 #define ALLPIECES 15
 
-// Piecetypes are defined such that a simple AND can show side and general type
+// Piecetypes are defined such that a simple AND can show color and general type
 
 // White piecetypes
 #define WHITE_PAWN    2
@@ -195,48 +224,20 @@ static const uint64_t ADJ_FILES[8] = {
 
 static const uint64_t KING_FLANK[8] = {
 
+    FILE_A | FILE_B | FILE_C,
     FILE_A | FILE_B | FILE_C | FILE_D,
     FILE_A | FILE_B | FILE_C | FILE_D,
-    FILE_A | FILE_B | FILE_C | FILE_D,
-    FILE_A | FILE_B | FILE_C | FILE_D,
+    FILE_C | FILE_D | FILE_E | FILE_F,
+    FILE_C | FILE_D | FILE_E | FILE_F,
     FILE_E | FILE_F | FILE_G | FILE_H,
     FILE_E | FILE_F | FILE_G | FILE_H,
-    FILE_E | FILE_F | FILE_G | FILE_H,
-    FILE_E | FILE_F | FILE_G | FILE_H
+    FILE_F | FILE_G | FILE_H
 
 };
 
 static const uint64_t COLOUR_BASE_SQUARES[2] = {
 
     RANK_1 | RANK_2 | RANK_3, RANK_8 | RANK_7 | RANK_6
-
-};
-
-// 64bit integers for each square
-static const uint64_t SQUARES[65] = {
-
-    9223372036854775808U, 4611686018427387904, 2305843009213693952, 1152921504606846976, 576460752303423488, 288230376151711744, 144115188075855872, 72057594037927936,
-    36028797018963968, 18014398509481984, 9007199254740992, 4503599627370496, 2251799813685248, 1125899906842624, 562949953421312, 281474976710656,
-    140737488355328, 70368744177664, 35184372088832, 17592186044416, 8796093022208, 4398046511104, 2199023255552, 1099511627776,
-    549755813888, 274877906944, 137438953472, 68719476736, 34359738368, 17179869184, 8589934592, 4294967296,
-    2147483648, 1073741824, 536870912, 268435456, 134217728, 67108864, 33554432, 16777216,
-    8388608, 4194304, 2097152, 1048576, 524288, 262144, 131072, 65536,
-    32768, 16384, 8192, 4096, 2048, 1024, 512, 256,
-    128, 64, 32, 16, 8, 4, 2, 1, 0
-
-};
-
-// Square names
-enum {
-
-    A8, B8, C8, D8, E8, F8, G8, H8,
-    A7, B7, C7, D7, E7, F7, G7, H7,
-    A6, B6, C6, D6, E6, F6, G6, H6,
-    A5, B5, C5, D5, E5, F5, G5, H5,
-    A4, B4, C4, D4, E4, F4, G4, H4,
-    A3, B3, C3, D3, E3, F3, G3, H3,
-    A2, B2, C2, D2, E2, F2, G2, H2,
-    A1, B1, C1, D1, E1, F1, G1, H1
 
 };
 
@@ -336,85 +337,73 @@ inline unsigned int square(const unsigned int file, const unsigned int rank) {
 
 }
 
-// Get relative rank index for given side of given square index
-inline unsigned int relative_rank(const Side side, const unsigned int sq) {
+// Get relative rank index for given color of given square index
+inline unsigned int relative_rank(const Color color, const unsigned int sq) {
 
-    return (side == WHITE) ? 7 - rank(sq) : rank(sq);
-
-}
-
-inline unsigned int relative_sq(const Side side, const unsigned int sq) {
-
-    return (side == WHITE) ? 63 - sq : sq;
+    return (color == WHITE) ? 7 - rank(sq) : rank(sq);
 
 }
 
-// Get absolute piecetype without side
+inline unsigned int relative_sq(const Color color, const unsigned int sq) {
+
+    return (color == WHITE) ? 63 - sq : sq;
+
+}
+
+// Get absolute piecetype without color
 inline const PieceType type(const PieceType pt) {
 
     return (pt & 14);
 
 }
 
-// Get most forward piece on bitboard for the given side
-inline uint64_t most_forward(const Side side, const uint64_t bitboard) {
+// Get most forward piece on bitboard for the given color
+inline uint64_t most_forward(const Color color, const uint64_t bitboard) {
 
-    return (side == WHITE) ? msb(bitboard) : lsb(bitboard);
-
-}
-
-// Get most backward piece on file for the given side
-inline uint64_t most_backward(const Side side, const uint64_t bitboard) {
-
-    return (side == WHITE) ? lsb(bitboard) : msb(bitboard);
+    return (color == WHITE) ? msb(bitboard) : lsb(bitboard);
 
 }
 
-inline unsigned int getKingStartSq(const Side side) {
+// Get most backward piece on file for the given color
+inline uint64_t most_backward(const Color color, const uint64_t bitboard) {
 
-    return (side == WHITE) ? 60 : 4;
-
-}
-
-inline unsigned int getRelativeRank(const Side side, const unsigned int rank) {
-
-    return (side == WHITE) ? 7 - rank : rank;
+    return (color == WHITE) ? lsb(bitboard) : msb(bitboard);
 
 }
 
-inline PieceType Pawn(const Side side) {
+inline PieceType Pawn(const Color color) {
 
-    return (PAWN | side);
-
-}
-
-inline PieceType Knight(const Side side) {
-
-    return (KNIGHT | side);
+    return (PAWN | color);
 
 }
 
-inline PieceType Bishop(const Side side) {
+inline PieceType Knight(const Color color) {
 
-    return (BISHOP | side);
-
-}
-
-inline PieceType Rook(const Side side) {
-
-    return (ROOK | side);
+    return (KNIGHT | color);
 
 }
 
-inline PieceType Queen(const Side side) {
+inline PieceType Bishop(const Color color) {
 
-    return (QUEEN | side);
+    return (BISHOP | color);
 
 }
 
-inline PieceType King(const Side side) {
+inline PieceType Rook(const Color color) {
 
-    return (KING | side);
+    return (ROOK | color);
+
+}
+
+inline PieceType Queen(const Color color) {
+
+    return (QUEEN | color);
+
+}
+
+inline PieceType King(const Color color) {
+
+    return (KING | color);
 
 }
 
@@ -424,104 +413,104 @@ inline PieceType pt_index(const PieceType pt) {
 
 }
 
-inline uint64_t shift_up(const uint64_t b, const Side side) {
+inline uint64_t shift_up(const uint64_t b, const Color color) {
 
-    return (side == WHITE) ? b << 8 : b >> 8;
-
-}
-
-inline uint64_t shift_down(const uint64_t b, const Side side) {
-
-    return (side == WHITE) ? b >> 8 : b << 8;
+    return (color == WHITE) ? b << 8 : b >> 8;
 
 }
 
-inline uint64_t shift_left(const uint64_t b, const Side side) {
+inline uint64_t shift_down(const uint64_t b, const Color color) {
 
-    return (side == WHITE) ? b << 1 : b >> 1;
-
-}
-
-inline uint64_t shift_right(const uint64_t b, const Side side) {
-
-    return (side == WHITE) ? b >> 1 : b << 1;
+    return (color == WHITE) ? b >> 8 : b << 8;
 
 }
 
-inline Score S(const int mg, const int eg) {
+inline uint64_t shift_left(const uint64_t b, const Color color) {
 
-    Score score;
-
-    score.mg = mg;
-    score.eg = eg;
-
-    return score;
+    return (color == WHITE) ? b << 1 : b >> 1;
 
 }
 
-inline Score operator+=(Score& score, const Score score2) {
+inline uint64_t shift_right(const uint64_t b, const Color color) {
 
-    score.mg += score2.mg;
-    score.eg += score2.eg;
-    return score;
+    return (color == WHITE) ? b >> 1 : b << 1;
 
 }
 
-inline Score operator-=(Score& score, const Score score2) {
+inline Value V(const int mg, const int eg) {
 
-    score.mg -= score2.mg;
-    score.eg -= score2.eg;
-    return score;
+    Value value;
 
-}
+    value.mg = mg;
+    value.eg = eg;
 
-inline Score operator+(const Score score1, const Score score2) {
-
-    Score score;
-    score.mg = score1.mg + score2.mg;
-    score.eg = score1.eg + score2.eg;
-    return score;
+    return value;
 
 }
 
-inline Score operator-(const Score score1, const Score score2) {
+inline Value operator+=(Value& value, const Value value2) {
 
-    Score score;
-    score.mg = score1.mg - score2.mg;
-    score.eg = score1.eg - score2.eg;
-    return score;
-
-}
-
-inline Score operator*(const Score score1, const int multiply) {
-
-    Score score;
-    score.mg = score1.mg * multiply;
-    score.eg = score1.eg * multiply;
-    return score;
+    value.mg += value2.mg;
+    value.eg += value2.eg;
+    return value;
 
 }
 
-inline Score operator*=(Score& score, const int multiply) {
+inline Value operator-=(Value& value, const Value value2) {
 
-    score.mg *= multiply;
-    score.eg *= multiply;
-    return score;
-
-}
-
-inline Score operator/(const Score score1, const int divisor) {
-
-    Score score;
-    score.mg = score1.mg / divisor;
-    score.eg = score1.eg / divisor;
-    return score;
+    value.mg -= value2.mg;
+    value.eg -= value2.eg;
+    return value;
 
 }
 
-inline std::ostream& operator<<(std::ostream& os, const Score& score) {
+inline Value operator+(const Value value1, const Value value2) {
 
-    return os << "MG: " << score.mg << " | EG: " << score.eg;
+    Value value;
+    value.mg = value1.mg + value2.mg;
+    value.eg = value1.eg + value2.eg;
+    return value;
+
+}
+
+inline Value operator-(const Value value1, const Value value2) {
+
+    Value value;
+    value.mg = value1.mg - value2.mg;
+    value.eg = value1.eg - value2.eg;
+    return value;
+
+}
+
+inline Value operator*(const Value value1, const int multiply) {
+
+    Value value;
+    value.mg = value1.mg * multiply;
+    value.eg = value1.eg * multiply;
+    return value;
+
+}
+
+inline Value operator*=(Value& value, const int multiply) {
+
+    value.mg *= multiply;
+    value.eg *= multiply;
+    return value;
+
+}
+
+inline Value operator/(const Value value1, const int divisor) {
+
+    Value value;
+    value.mg = value1.mg / divisor;
+    value.eg = value1.eg / divisor;
+    return value;
+
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Value& value) {
+
+    return os << "MG: " << value.mg << " | EG: " << value.eg;
 
 }
 

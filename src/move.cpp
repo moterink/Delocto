@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +34,7 @@ bool Board::is_legal(const Move move) const {
     if (move_type(move) == ENPASSANT) {
         const unsigned int capsq = tosq + DIRECTIONS[stm][DOWN];
         uint64_t occupied = (bitboards[ALLPIECES] ^ SQUARES[fromsq] ^ SQUARES[capsq]) | SQUARES[tosq];
-        return !side_slider_attackers(ksq, occupied, !stm);
+        return !color_slider_attackers(ksq, occupied, !stm);
     }
 
     if (move_type(move) == CASTLING) {

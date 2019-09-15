@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -43,16 +43,16 @@ int main(int argc, char* argv[]) {
     init_hashkeys();
 
     // Init Bitboard Lookup Tables
-    initBitboards();
+    init_bitboards();
 
     // Initialize king distance array
-    initKingDistance();
+    init_king_distance();
 
     // Initialize Piece Square Tables
-    initPSQT();
+    init_psqt();
 
     // Initialize Eval
-    initEval();
+    init_eval();
 
     // Initialize Search
     init_search();

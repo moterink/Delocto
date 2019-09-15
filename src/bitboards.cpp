@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -34,11 +34,11 @@ uint64_t FrontFileMask[2][64];
 uint64_t PassedPawnMask[2][64];
 uint64_t BackwardPawnMask[2][64];
 
-void initBitboards() {
+void init_bitboards() {
 
     for (unsigned int sq = 0; sq < 64; sq++) {
 
-        uint64_t pawnsFrontW = 0, pawnsFrontB = 0, kingsFrontW = SQUARES[sq], kingsFrontB = SQUARES[sq];
+        uint64_t pawnsFrontW = 0, pawnsFrontB = 0, kingsFrontW = 0, kingsFrontB = 0;
 
         for (int i = 1; i < 6; i++) {
             pawnsFrontW |= SQUARES[sq] << (i * 8);

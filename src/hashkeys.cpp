@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -76,7 +76,7 @@ void MaterialTable::clear() {
 
     for (entry = table; entry < table + size; entry++) {
         entry->key = 0;
-        entry->score = S( 0, 0 );
+        entry->value = V( 0, 0 );
     }
 
 }
@@ -93,9 +93,9 @@ MaterialEntry * MaterialTable::probe(const uint64_t key) {
 
 }
 
-void MaterialTable::store(const uint64_t key, const Score score) {
+void MaterialTable::store(const uint64_t key, const Value value) {
 
-    table[key % size] = { key, score };
+    table[key % size] = { key, value };
 
 }
 
@@ -105,7 +105,7 @@ void PawnTable::clear() {
 
     for (entry = table; entry < table + size; entry++) {
         entry->key = 0;
-        entry->score = S( 0, 0 );
+        entry->value = V( 0, 0 );
         entry->passedPawns = 0;
         entry->pawnWAttacksSpan = 0;
         entry->pawnBAttacksSpan = 0;
@@ -125,9 +125,9 @@ PawnEntry * PawnTable::probe(const uint64_t key) {
 
 }
 
-void PawnTable::store(const uint64_t key, const Score score, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan) {
+void PawnTable::store(const uint64_t key, const Value value, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan) {
 
-    table[key % size] = { key, score, pawnWAttacks, pawnBAttacks, passedPawns, pawnWAttacksSpan, pawnBAttacksSpan };
+    table[key % size] = { key, value, pawnWAttacks, pawnBAttacks, passedPawns, pawnWAttacksSpan, pawnBAttacksSpan };
 
 }
 
@@ -146,7 +146,7 @@ void TranspositionTable::clear() {
 
 }
 
-// Check if hashkey in table, and if so, return the saved score for the position
+// Check if hashkey in table, and if so, return the saved value for the position
 TTEntry * TranspositionTable::probe(const uint64_t key, bool& tthit) {
 
     TTEntry * entry = &(table[key % size]);

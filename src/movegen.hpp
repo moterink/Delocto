@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018 Moritz Terink
+  Copyright (c) 2018-2019 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +29,7 @@
 #include "magic.hpp"
 #include "bitboards.hpp"
 
-// TODO: make size, index, scores private!
+// TODO: make size, index, values private!
 
 class MoveList {
 
@@ -38,7 +38,7 @@ class MoveList {
         unsigned int size = 0;
         unsigned int index = 0;
         Move moves[250];
-        int scores[250];
+        int values[250];
 
         inline void append(Move move) {
             moves[size++] = move;
@@ -66,34 +66,34 @@ inline unsigned int getPawnPushSq(const unsigned int sqindex, const uint64_t all
 
 }
 
-inline unsigned int getPawnDoublePushSq(const unsigned int sqindex, const uint64_t allPieces, const int up, const Side side) {
+inline unsigned int getPawnDoublePushSq(const unsigned int sqindex, const uint64_t allPieces, const int up, const Color color) {
 
-    return (sqIsValid(sqindex + (2 * up)) && (SQUARES[sqindex] & PAWN_STARTRANK[side]) && (!((SQUARES[sqindex + (2 * up)]) & allPieces)) && (!(SQUARES[sqindex + up] & allPieces))) ? sqindex + (2 * up) : NOSQ;
+    return (sqIsValid(sqindex + (2 * up)) && (SQUARES[sqindex] & PAWN_STARTRANK[color]) && (!((SQUARES[sqindex + (2 * up)]) & allPieces)) && (!(SQUARES[sqindex + up] & allPieces))) ? sqindex + (2 * up) : NOSQ;
 
 }
 
-inline uint64_t generatePawnCaptures(const unsigned int sqindex, const uint64_t oppPieces, const Side side) {
+inline uint64_t generatePawnCaptures(const unsigned int sqindex, const uint64_t oppPieces, const Color color) {
 
-    return AttackBitboards[Pawn(side)][sqindex] & oppPieces;
+    return AttackBitboards[Pawn(color)][sqindex] & oppPieces;
 
 }
 
 // Pawns
-inline uint64_t generatePawnMoves(const Side side, const unsigned int sq, const uint64_t allPieces, const uint64_t oppPieces) {
+inline uint64_t generatePawnMoves(const Color color, const unsigned int sq, const uint64_t allPieces, const uint64_t oppPieces) {
 
-    return (SQUARES[getPawnPushSq(sq, allPieces, DIRECTIONS[side][UP])] | SQUARES[getPawnDoublePushSq(sq, allPieces, DIRECTIONS[side][UP], side)] | generatePawnCaptures(sq, oppPieces, side));
-
-}
-
-inline uint64_t generatePawnQuiets(const Side side, const unsigned int sq, const uint64_t allPieces) {
-
-    return SQUARES[getPawnPushSq(sq, allPieces, DIRECTIONS[side][UP])] | SQUARES[getPawnDoublePushSq(sq, allPieces, DIRECTIONS[side][UP], side)];
+    return (SQUARES[getPawnPushSq(sq, allPieces, DIRECTIONS[color][UP])] | SQUARES[getPawnDoublePushSq(sq, allPieces, DIRECTIONS[color][UP], color)] | generatePawnCaptures(sq, oppPieces, color));
 
 }
 
-inline uint64_t generate_pawns_attacks(const uint64_t pawns, const Side side) {
+inline uint64_t generatePawnQuiets(const Color color, const unsigned int sq, const uint64_t allPieces) {
 
-	return (side == WHITE) ? (((pawns & ~FILE_A) << 9) | ((pawns & ~FILE_H) << 7)) : (((pawns & ~FILE_A) >> 7) | ((pawns & ~FILE_H) >> 9));
+    return SQUARES[getPawnPushSq(sq, allPieces, DIRECTIONS[color][UP])] | SQUARES[getPawnDoublePushSq(sq, allPieces, DIRECTIONS[color][UP], color)];
+
+}
+
+inline uint64_t generate_pawns_attacks(const uint64_t pawns, const Color color) {
+
+	return (color == WHITE) ? (((pawns & ~FILE_A) << 9) | ((pawns & ~FILE_H) << 7)) : (((pawns & ~FILE_A) >> 7) | ((pawns & ~FILE_H) >> 9));
 
 }
 
@@ -129,9 +129,9 @@ inline uint64_t generateQueenMoves(const unsigned int sqindex, const uint64_t al
 
 }
 
-extern MoveList gen_quiets(const Board& board, const Side side);
-extern MoveList gen_caps(const Board& board, const Side side);
-extern MoveList gen_all(const Board& board, const Side side);
+extern MoveList gen_quiets(const Board& board, const Color color);
+extern MoveList gen_caps(const Board& board, const Color color);
+extern MoveList gen_all(const Board& board, const Color color);
 extern MoveList gen_legals(const Board& board, const MoveList& moves);
 
 #endif
