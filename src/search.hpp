@@ -100,7 +100,8 @@ typedef struct {
     long long timeLeft = 5000;
 
     int hashTableHits = 0;
-    unsigned int curdepth = 0;
+    int depth = 0;
+    int selectiveDepth = 0;
 
 } SearchInfo;
 

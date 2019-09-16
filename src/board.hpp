@@ -41,7 +41,6 @@ typedef struct {
     Value pst[2];
     Value material[2];
     uint64_t kingBlockers[2];
-    uint64_t pinned = 0;
     uint64_t checkers = 0;
     uint64_t hashKey = 0;
     uint64_t pawnKey = 0;
@@ -69,7 +68,6 @@ class Board {
         inline PieceType piecetype(const unsigned int sq) const { return piecetypes[sq]; }
 
         inline uint64_t checkers() const         { return state.checkers; }
-        inline uint64_t pinned()   const         { return state.pinned;   }
         inline unsigned int castleRights() const { return state.castling; }
 
         inline unsigned int enPassant() const { return state.enPassant; }
@@ -148,7 +146,6 @@ class Board {
 
         void clear();
         void update_bitboards();
-        uint64_t get_pinned(const Color color);
 
         inline void hash_pawn(const Color color, const unsigned int sq);
         inline void hash_piece(const PieceType pt, const unsigned int sq);

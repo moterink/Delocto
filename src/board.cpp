@@ -54,28 +54,9 @@ void Board::clear() {
     states.clear();
     moves.clear();
 
-    bitboards[WHITE] = 0;
-    bitboards[BLACK] = 0;
-
-    bitboards[WHITE_PAWN] = 0;
-    bitboards[WHITE_KNIGHT] = 0;
-    bitboards[WHITE_BISHOP] = 0;
-    bitboards[WHITE_ROOK] = 0;
-    bitboards[WHITE_QUEEN] = 0;
-    bitboards[WHITE_KING] = 0;
-
-    bitboards[BLACK_PAWN] = 0;
-    bitboards[BLACK_KNIGHT] = 0;
-    bitboards[BLACK_BISHOP] = 0;
-    bitboards[BLACK_ROOK] = 0;
-    bitboards[BLACK_QUEEN] = 0;
-    bitboards[BLACK_KING] = 0;
-
-    for (int pcount = 0; pcount < 64; pcount++) {
-        piecetypes[pcount] = NOPIECE;
-    }
-
-    std::fill(piececounts, piececounts+12, 0);
+    std::fill(bitboards, bitboards+16, 0);
+    std::fill(piecetypes, piecetypes+64, NOPIECE);
+    std::fill(piececounts, piececounts+14, 0);
 
     state.enPassant = NOSQ;
     state.castling = 0;
@@ -87,7 +68,6 @@ void Board::clear() {
     state.pst[BLACK] = V(0, 0);
     state.kingBlockers[WHITE] = 0;
     state.kingBlockers[BLACK] = 0;
-    state.pinned = 0;
     state.checkers = 0;
 
     ply = 0;
@@ -137,33 +117,11 @@ void Board::update_check_info() {
 
 }
 
-uint64_t Board::get_pinned(const Color color) {
-
-    const unsigned int ksq = lsb_index(bitboards[King(color)]);
-    uint64_t pinnedPieces = 0;
-    uint64_t pinners = (AttackBitboards[BISHOP][ksq] & (bitboards[Bishop(!color)] | bitboards[Queen(!color)])) | (AttackBitboards[ROOK][ksq] & (bitboards[Rook(!color)] | bitboards[Queen(!color)]));
-
-    while (pinners) {
-
-        const unsigned int sq = pop_lsb(pinners);
-        const uint64_t pin    = RayTable[sq][ksq];
-        const uint64_t pinned = pin & (bitboards[ALLPIECES] ^ SQUARES[ksq]);
-
-        if (popcount(pinned) == 1) {
-            pinnedPieces |= pinned;
-        }
-
-    }
-
-    return pinnedPieces;
-
-}
-
 uint64_t Board::get_slider_blockers(const uint64_t sliders, const unsigned int sq) const {
 
     uint64_t blockers = 0;
     uint64_t pinners = ((AttackBitboards[BISHOP][sq] & (bitboards[WHITE_BISHOP] | bitboards[BLACK_BISHOP] | bitboards[WHITE_QUEEN] | bitboards[BLACK_QUEEN])) | (AttackBitboards[ROOK][sq] & (bitboards[WHITE_ROOK] | bitboards[BLACK_ROOK] | bitboards[WHITE_QUEEN]| bitboards[BLACK_QUEEN]))) & sliders;
-    uint64_t occupied = bitboards[ALLPIECES] ^ sliders ^ SQUARES[sq];
+    uint64_t occupied = bitboards[ALLPIECES] ^ pinners ^ SQUARES[sq];
 
     while (pinners) {
 
@@ -289,7 +247,6 @@ void Board::set_fen(std::string fen) {
 
     update_bitboards();
 
-    state.pinned = get_pinned(stm);
     update_check_info();
 
     calc_keys();
@@ -498,7 +455,6 @@ bool Board::do_move(const Move move) {
 
     bitboards[ALLPIECES] = bitboards[WHITE] | bitboards[BLACK];
 
-    state.pinned   = get_pinned(stm);
     update_check_info();
 
     ply++;
@@ -614,7 +570,6 @@ void Board::do_nullmove() {
     stm = !stm;
     hash_turn();
 
-    state.pinned   = get_pinned(stm);
     update_check_info();
 
     ply++;

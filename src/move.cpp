@@ -48,7 +48,7 @@ bool Board::is_legal(const Move move) const {
     if (fromsq == ksq)
         return !sq_attacked_noking(tosq, !stm);
 
-    return !((SQUARES[fromsq] & state.pinned) && !(SQUARES[tosq] & LineTable[ksq][fromsq]));
+    return !((SQUARES[fromsq] & state.kingBlockers[stm]) && !(SQUARES[tosq] & LineTable[ksq][fromsq]));
 
 }
 

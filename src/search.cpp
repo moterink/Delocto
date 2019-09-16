@@ -379,6 +379,7 @@ static void update_quiet_stats(const Board& board, SearchInfo *info, const int p
 static int quiescence(int alpha, int beta, int depth, int plies, Board& board, SearchInfo *info) {
 
     info->nodes++;
+    info->selectiveDepth = std::max(info->selectiveDepth, plies);
 
     if (info->stopped) return VALUE_NONE;
 
@@ -391,14 +392,14 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
     }
 
     int bestValue, value, eval;
-    int ttValue = VALUE_NONE;
+    int oldAlpha = alpha;
     bool ttHit;
 
     TTEntry * entry = tTable.probe(board.hashkey(), ttHit);
 
     if (ttHit) {
 
-        ttValue = value_from_tt(entry->value, plies);
+        int ttValue = value_from_tt(entry->value, plies);
 
         if (   (entry->flag == BOUND_EXACT)
             || (entry->flag == BOUND_UPPER && ttValue <= alpha)
@@ -426,12 +427,10 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
 
     MovePicker picker(board, info, plies);
     picker.phase = GenCapsQS;
-    int hashtype = BOUND_UPPER;
 
     while ( (move = picker.pick() ) != MOVE_NONE )  {
 
-        if (eval + DeltaMaterial[board.piecetype(to_sq(move))] < alpha - DELTA_MARGIN)
-        {
+        if (eval + DeltaMaterial[board.piecetype(to_sq(move))] < alpha - DELTA_MARGIN) {
             continue;
         }
 
@@ -455,16 +454,14 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
             if (value >= beta) {
                 return beta;
             }
-
             if (value > alpha) {
                 alpha = value;
                 bestMove = move;
-                hashtype = BOUND_EXACT;
             }
         }
 
     }
-    //tTable.store(board.hashkey(), depth, bestValue, bestMove, hashtype);
+    //tTable.store(board.hashkey(), depth, value_to_tt(bestValue, plies), eval, bestMove, bestValue >= beta ? BOUND_LOWER : bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER);
     return bestValue;
 
 }
@@ -484,6 +481,7 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
     } else {
 
         info->nodes++;
+        info->selectiveDepth = std::max(info->selectiveDepth, plies);
 
         if (board.checkDraw()) {
             return VALUE_DRAW;
@@ -775,7 +773,8 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
 
         board.reset_plies();
 
-        info.curdepth = depth;
+        info.depth = depth;
+        info.selectiveDepth = 0;
 
         clock_t iterstart = std::clock();
 
@@ -836,7 +835,7 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
                     pvstring += std::string() + move_to_string(pv.line[pcount]) + ' ';
                 }
 
-                std::cout << "info depth " << depth;
+                std::cout << "info depth " << depth << " seldepth " << info.selectiveDepth;
 
                 if (std::abs(value) >= VALUE_MATE - MAX_DEPTH) {
                     std::cout << " score mate " << ((value > 0 ? VALUE_MATE - value + 1 : -VALUE_MATE - value) / 2);
