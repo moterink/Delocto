@@ -26,12 +26,6 @@
 
 #define NDEBUG
 
-#ifdef __APPLE__
-    #define TIME_DIVISOR (CLOCKS_PER_SEC / 1000)
-#else
-    #define TIME_DIVISOR (CLOCKS_PER_SEC * 1000)
-#endif
-
 #include <iostream>
 #include <map>
 #include <algorithm>
@@ -144,6 +138,9 @@ class MoveList;
 #define VALUE_DRAW      0
 
 #define DEPTH_NONE -36
+
+typedef std::chrono::high_resolution_clock Clock;
+typedef std::chrono::high_resolution_clock::time_point TimePoint;
 
 typedef struct {
 

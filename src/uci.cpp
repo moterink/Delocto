@@ -177,10 +177,9 @@ void uciloop(int argc, char* argv[]) {
                 tTable.clear();
             }
         } else if (input.find("go") == 0) {
-
             SearchLimits limits;
-
             std::string::size_type wtimestr, btimestr, wincstr, bincstr, movetimestr, infinitestr, depthstr;
+
             wtimestr = input.find("wtime");
             btimestr = input.find("btime");
             wincstr = input.find("winc");
@@ -189,26 +188,26 @@ void uciloop(int argc, char* argv[]) {
             infinitestr = input.find("infinite");
             depthstr = input.find("depth");
 
-            if (wtimestr != std::string::npos && board.turn() == WHITE) {
-                limits.whiteTime = std::stoll(input.substr(wtimestr + 6));
-            } else if (btimestr != std::string::npos && board.turn() == BLACK) {
-                limits.blackTime = std::stoll(input.substr(btimestr + 6));
-            } else if (movetimestr != std::string::npos) {
-                limits.moveTime = std::stoll(input.substr(movetimestr + 9));
-            }
-            if (wincstr != std::string::npos && board.turn() == WHITE) {
-                limits.whiteIncrement = std::stoll(input.substr(wincstr + 5));
-            } else if (bincstr != std::string::npos && board.turn() == BLACK) {
-                limits.blackIncrement = std::stoll(input.substr(bincstr + 5));
-            }
             if (infinitestr != std::string::npos) {
                 limits.infinite = true;
             } else if (depthstr != std::string::npos) {
                 limits.depth = std::stoi(input.substr(depthstr + 6)) + 1;
+            } else if (movetimestr != std::string::npos) {
+               limits.moveTime = std::stoll(input.substr(movetimestr + 9));
+            } else {
+                if (wtimestr != std::string::npos && board.turn() == WHITE) {
+                    limits.time = std::stoll(input.substr(wtimestr + 6));
+                } else if (btimestr != std::string::npos && board.turn() == BLACK) {
+                    limits.time = std::stoll(input.substr(btimestr + 6));
+                }
+                if (wincstr != std::string::npos && board.turn() == WHITE) {
+                    limits.increment = std::stoll(input.substr(wincstr + 5));
+                } else if (bincstr != std::string::npos && board.turn() == BLACK) {
+                    limits.increment = std::stoll(input.substr(bincstr + 5));
+                }
             }
 
             go(board, limits);
-
         } else if (input.find("eval") == 0) {
             evaluateInfo(board);
         } else if (input.find("perft") == 0) {

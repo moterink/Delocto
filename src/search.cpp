@@ -25,6 +25,7 @@
 #include "evaluate.hpp"
 #include "hashkeys.hpp"
 #include "uci.hpp"
+#include "timeman.hpp"
 
 static int LMRTable[MAX_DEPTH][MAX_MOVES];
 
@@ -72,7 +73,7 @@ void PvLine::clear() {
 
 }
 
-void clearHistory(SearchInfo * info) {
+void clearHistory(SearchInfo* info) {
 
     for (unsigned int pt = WHITE_PAWN; pt <= BLACK_KING; pt++) {
         for (unsigned int sq = 0; sq < 64; sq++) {
@@ -83,7 +84,7 @@ void clearHistory(SearchInfo * info) {
 
 }
 
-void clearKillers(SearchInfo * info) {
+void clearKillers(SearchInfo* info) {
 
     for (int i = 0; i < MAX_DEPTH; i++) {
         info->killers[i][0] = MOVE_NONE;
@@ -92,13 +93,11 @@ void clearKillers(SearchInfo * info) {
 
 }
 
-static void checkUp(SearchInfo * info) {
+static void checkUp(SearchInfo* info) {
 
     if (info->limitTime) {
 
-        clock_t now = std::clock();
-
-        if (((now - info->start) / (CLOCKS_PER_SEC / 1000)) > info->timeLeft) {
+        if (is_time_exceeded(info)) {
             info->stopped = true;
         }
 
@@ -740,30 +739,17 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
 
     SearchStats stats;
     SearchInfo info;
+
     Move bestMove = MOVE_NONE;
-    clock_t start, end, iterend;
-    uint64_t duration, iterduration;
     std::string pvstring;
     int value = 0;
-    int depth;
 
-    if (limits.moveTime != -1) {
-        info.timeLeft = limits.moveTime;
-    } else if (board.turn() == WHITE && (limits.whiteTime != -1 || limits.whiteIncrement != -1)) {
-        info.timeLeft = (limits.whiteTime / 20) + limits.whiteIncrement;
-    } else if (board.turn() == BLACK && (limits.blackTime != -1 || limits.blackIncrement != -1)) {
-        info.timeLeft = (limits.blackTime / 20) + limits.blackIncrement;
-    } else {
-        info.limitTime = false;
-    }
-
-    start = std::clock();
-    info.start = start;
+    info.start = Clock::now();
+    init_time_management(limits, &info);
 
     PvLine pv;
     pv.clear();
 
-    info.lastPv.clear();
     clearHistory(&info);
     clearKillers(&info);
 
@@ -775,8 +761,6 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
 
         info.depth = depth;
         info.selectiveDepth = 0;
-
-        clock_t iterstart = std::clock();
 
         if (depth > 5) {
 
@@ -809,25 +793,16 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
 
         }
 
+        info.value[depth] = value;
+        long long duration = get_time_elapsed(info.start);
+
         if (!info.stopped) {
-
-            iterend = std::clock();
-
-            if (info.limitTime) {
-                iterduration = (iterend - iterstart) / (CLOCKS_PER_SEC / 1000);
-                info.timeLeft -= iterduration;
-            }
 
             // Drawn/mate positions return an empty pv
             if (pv.size > 0) {
 
-                info.lastPv = pv;
-
-                end = std::clock();
-
                 bestMove = pv.line[0];
-
-                duration = (end - start) / (CLOCKS_PER_SEC / 1000);
+                info.bestmove[depth] = bestMove;
 
                 pvstring.clear();
 
@@ -845,20 +820,21 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
 
                 std::cout << " nodes " << info.nodes << " time " << duration << " nps " << ((duration != 0) ? ((info.nodes * 1000) / duration) : info.nodes * 1000) << " pv " << pvstring << std::endl;
 
-                if (info.limitTime && (info.timeLeft <= 0 || info.timeLeft <= iterduration * (1 + depth / 50)))
-                    break;
-
             }  else {
-
                 std::cout << "info string No legal moves available" << std::endl;
                 break;
+            }
 
+            update_time_managememnt(&info);
+
+            if (info.limitTime) {
+                if (duration >= limits.time || should_stop(info)) {
+                    break;
+                }
             }
 
         } else {
-
             break;
-
         }
 
     }

@@ -24,8 +24,8 @@
 #ifndef SEARCH_H
 #define SEARCH_H
 
+#include <chrono>
 #include "types.hpp"
-#include <ctime>
 #include "board.hpp"
 #include "move.hpp"
 #include "movegen.hpp"
@@ -61,15 +61,11 @@ class PvLine {
 typedef struct {
 
     long long moveTime = -1;
-
-    long long whiteTime = -1;
-    long long blackTime = -1;
-    long long whiteIncrement = -1;
-    long long blackIncrement = -1;
+    long long time = -1;
+    long long increment = 0;
 
     bool infinite = false;
     unsigned int depth = MAX_DEPTH;
-
 
 } SearchLimits;
 
@@ -84,24 +80,27 @@ typedef struct {
     bool stopped = false;
     uint64_t nodes = 0;
 
-    PvLine lastPv;
     Move killers[MAX_DEPTH + 1][2];
     Move history[14][64];
     Move countermove[14][64];
 
+    Move bestmove[MAX_DEPTH] = { MOVE_NONE };
     Move currentmove[MAX_DEPTH] = { MOVE_NONE };
     int eval[MAX_DEPTH];
+    int value[MAX_DEPTH];
 
-    float fhf;
-    float fh;
+    TimePoint start;
 
     bool limitTime = true;
-    clock_t start;
-    long long timeLeft = 5000;
+
+    long long idealTime = 0;
+    long long maxTime = 0;
 
     int hashTableHits = 0;
     int depth = 0;
     int selectiveDepth = 0;
+
+    int pvStability = 0;
 
 } SearchInfo;
 
