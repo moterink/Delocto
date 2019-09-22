@@ -325,6 +325,17 @@ Move MovePicker::pick() {
             }
             break;
 
+        case HashMoveQS:
+
+            {
+                ++phase;
+
+                // Hashmove validity tested before
+                if (ttMove != MOVE_NONE) {
+                    return ttMove;
+                }
+            }
+
         case GenCapsQS:
 
             {
@@ -390,19 +401,29 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
         return VALUE_DRAW;
     }
 
+    const bool pvNode = (beta - alpha != 1);
+    Move ttMove = MOVE_NONE;
+
     int bestValue, value, eval;
-    int oldAlpha = alpha;
     bool ttHit;
+
+    const int oldAlpha = alpha;
+    const bool inCheck = board.checkers();
+    const int ttDepth = (inCheck || depth >= 0) ? 0 : -1;
+
+    info->currentmove[plies] = MOVE_NONE;
 
     TTEntry * entry = tTable.probe(board.hashkey(), ttHit);
 
-    if (ttHit) {
+    if (!pvNode && ttHit && entry->depth >= ttDepth) {
 
-        int ttValue = value_from_tt(entry->value, plies);
+        const int ttValue = value_from_tt(entry->value, plies);
+        ttMove = board.is_valid(entry->bestMove) ? entry->bestMove : MOVE_NONE;
 
-        if (   (entry->flag == BOUND_EXACT)
-            || (entry->flag == BOUND_UPPER && ttValue <= alpha)
-            || (entry->flag == BOUND_LOWER && ttValue >= beta))
+        if (   ttValue != VALUE_NONE
+            && ((entry->flag == BOUND_EXACT)
+             || (entry->flag == BOUND_UPPER && ttValue <= alpha)
+             || (entry->flag == BOUND_LOWER && ttValue >= beta)))
         {
             return ttValue;
         }
@@ -422,10 +443,10 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
     int movecount = 0;
     Move bestMove = MOVE_NONE;
     Move move = MOVE_NONE;
-    plies++;
 
     MovePicker picker(board, info, plies);
-    picker.phase = GenCapsQS;
+    picker.phase = HashMoveQS;
+    picker.ttMove = ttMove;
 
     while ( (move = picker.pick() ) != MOVE_NONE )  {
 
@@ -444,23 +465,29 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
 
         info->currentmove[plies] = move;
 
-        value = -quiescence(-beta, -alpha, depth - 1, plies, board, info);
+        value = -quiescence(-beta, -alpha, depth - 1, plies + 1, board, info);
 
         board.undo_move();
 
         if (value > bestValue) {
             bestValue = value;
-            if (value >= beta) {
-                return beta;
-            }
             if (value > alpha) {
-                alpha = value;
                 bestMove = move;
+                if (pvNode && value < beta) {
+                    alpha = value;
+                } else {
+                    break;
+                }
             }
         }
 
     }
-    //tTable.store(board.hashkey(), depth, value_to_tt(bestValue, plies), eval, bestMove, bestValue >= beta ? BOUND_LOWER : bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER);
+
+    if (inCheck && movecount == 0) {
+        return -VALUE_MATE + plies;
+    }
+
+    tTable.store(board.hashkey(), ttDepth, value_to_tt(bestValue, plies), eval, bestMove, bestValue >= beta ? BOUND_LOWER : pvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER);
     return bestValue;
 
 }
@@ -488,8 +515,6 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
 
         const bool rootNode = (plies == 0);
         const bool pvNode   = (beta - alpha != 1);
-
-        plies++;
 
         PvLine newpv;
         bool ttHit = false;
@@ -546,22 +571,22 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
         if (pruning) {
 
             // Razoring
-            if (   !pvNode
-                && !incheck
-                && depth <= 4
+            if (   !rootNode
+                && depth < 2
                 && eval <= alpha - RazorMargin[depth])
             {
-                int ralpha = alpha - RazorMargin[depth];
+                return quiescence(alpha, beta, 0, plies, board, info);
+                /*int ralpha = alpha - RazorMargin[depth];
                 int value = quiescence(ralpha, ralpha + 1, 0, plies, board, info);
                 if (value <= ralpha)
-                    return value;
+                    return value;*/
             }
 
             // Null move pruning
             if (!pvNode && depth >= 2 && !incheck && board.minors_or_majors(board.turn()) && eval >= beta) {
 
                 board.do_nullmove();
-                value = -alphabeta(-beta, -beta + 1, depth - (2 + (32 * depth + std::min(eval - beta, 512)) / 128), plies, !cutNode, board, info, newpv, false);
+                value = -alphabeta(-beta, -beta + 1, depth - (2 + (32 * depth + std::min(eval - beta, 512)) / 128), plies + 1, !cutNode, board, info, newpv, false);
                 board.undo_nullmove();
 
                 if (value >= beta && std::abs(value) < (VALUE_MATE - MAX_DEPTH)) {
@@ -578,7 +603,7 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
         // Internal Iterative Deepening
         if (pvNode && !incheck && ttMove == MOVE_NONE && depth >= 6) {
 
-            value = alphabeta(alpha, beta, depth - 2, plies, cutNode, board, info, newpv, pruning);
+            value = alphabeta(alpha, beta, depth - 2, plies + 1, cutNode, board, info, newpv, pruning);
 
             entry = tTable.probe(board.hashkey(), ttHit);
 
@@ -635,7 +660,7 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
                 && board.is_legal(move))
             {
                 int rbeta = std::max(ttValue - 2 * depth, -VALUE_MATE);
-                value = alphabeta(rbeta - 1, rbeta, depth / 2, plies, cutNode, board, info, newpv, false, move);
+                value = alphabeta(rbeta - 1, rbeta, depth / 2, plies + 1, cutNode, board, info, newpv, false, move);
                 if (value < rbeta)
                     extensions = 1;
             } else {
@@ -680,17 +705,17 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
 
                 }
 
-                value = -alphabeta(-alpha - 1, -alpha, depth - 1 + extensions - reductions, plies, true, board, info, newpv, pruning);
+                value = -alphabeta(-alpha - 1, -alpha, depth - 1 + extensions - reductions, plies + 1, true, board, info, newpv, pruning);
                 if (value > alpha && reductions) {
-                    value = -alphabeta(-alpha - 1, -alpha, depth - 1 + extensions, plies, !cutNode, board, info, newpv, pruning);
+                    value = -alphabeta(-alpha - 1, -alpha, depth - 1 + extensions, plies + 1, !cutNode, board, info, newpv, pruning);
                 }
                 if (value > alpha && value < beta) {
-                    value = -alphabeta(-beta, -alpha, depth - 1 + extensions, plies, false, board, info, newpv, pruning);
+                    value = -alphabeta(-beta, -alpha, depth - 1 + extensions, plies + 1, false, board, info, newpv, pruning);
                 }
 
             } else {
 
-                value = -alphabeta(-beta, -alpha, depth - 1 + extensions, plies, (pvNode ? false : !cutNode), board, info, newpv, pruning);
+                value = -alphabeta(-beta, -alpha, depth - 1 + extensions, plies + 1, (pvNode ? false : !cutNode), board, info, newpv, pruning);
 
             }
 

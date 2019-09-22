@@ -40,7 +40,7 @@ enum NodeType {
 
 enum MovePickPhase : unsigned int {
 
-    HashMove, GenCaps, GoodCaps, FirstKiller, SecondKiller, CounterMove, GenQuiets, Quiets, LoosingCaps, GenCapsQS, CapsQS
+    HashMove, GenCaps, GoodCaps, FirstKiller, SecondKiller, CounterMove, GenQuiets, Quiets, LoosingCaps, HashMoveQS, GenCapsQS, CapsQS
 
 };
 
