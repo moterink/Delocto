@@ -24,29 +24,22 @@
 #include "types.hpp"
 #include "evaluate.hpp"
 #include "uci.hpp"
-#include "magic.hpp"
 #include "bitboards.hpp"
 #include "search.hpp"
+#include <limits>
 
 #define VERSION 0.6
 
 int main(int argc, char* argv[]) {
 
-    // Generate occupancy variations and magic bitboards for fast
-    // generation of bishop and rook moves
-    generateOccupancyVariations(true);
-    generateMoveDatabase(true);
-    generateOccupancyVariations(false);
-    generateMoveDatabase(false);
-
     // Init Zobrist Hash Keys
     init_hashkeys();
 
-    // Init Bitboard Lookup Tables
-    init_bitboards();
-
     // Initialize king distance array
     init_king_distance();
+
+    // Init Bitboard Lookup Tables
+    init_bitboards();
 
     // Initialize Piece Square Tables
     init_psqt();

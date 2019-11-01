@@ -135,7 +135,7 @@ class MaterialTable {
 // Source: http://vigna.di.unimi.it/ftp/papers/xorshift.pdf
 static uint64_t x = 88172645463325252ULL;
 
-static const uint64_t rand64() {
+static uint64_t rand64() {
 
     x ^= x >> 12;
     x ^= x << 25;

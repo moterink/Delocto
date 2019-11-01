@@ -27,18 +27,18 @@
 
 bool Board::is_legal(const Move move) const {
 
-    const unsigned int tosq   = to_sq(move);
-    const unsigned int fromsq = from_sq(move);
-    const unsigned int ksq = lsb_index(bitboards[King(stm)]);
+    const int tosq   = to_sq(move);
+    const int fromsq = from_sq(move);
+    const int ksq    = lsb_index(bitboards[King(stm)]);
 
     if (move_type(move) == ENPASSANT) {
-        const unsigned int capsq = tosq + DIRECTIONS[stm][DOWN];
+        const unsigned capsq = tosq + DIRECTIONS[stm][DOWN];
         uint64_t occupied = (bitboards[ALLPIECES] ^ SQUARES[fromsq] ^ SQUARES[capsq]) | SQUARES[tosq];
         return !color_slider_attackers(ksq, occupied, !stm);
     }
 
     if (move_type(move) == CASTLING) {
-        int step = tosq > fromsq ? -1 : 1;
+        const int step = tosq > fromsq ? -1 : 1;
         for (int sq = tosq; sq != fromsq; sq += step) {
             if (sq_attacked(sq, !stm))
                 return false;

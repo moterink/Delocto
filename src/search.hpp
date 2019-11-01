@@ -38,12 +38,6 @@ enum NodeType {
 
 };
 
-enum MovePickPhase : unsigned int {
-
-    HashMove, GenCaps, GoodCaps, FirstKiller, SecondKiller, CounterMove, GenQuiets, Quiets, LoosingCaps, HashMoveQS, GenCapsQS, CapsQS
-
-};
-
 class PvLine {
 
     public:
@@ -81,7 +75,7 @@ typedef struct {
     uint64_t nodes = 0;
 
     Move killers[MAX_DEPTH + 1][2];
-    Move history[14][64];
+    int history[14][64];
     Move countermove[14][64];
 
     Move bestmove[MAX_DEPTH] = { MOVE_NONE };
@@ -103,44 +97,6 @@ typedef struct {
     int pvStability = 0;
 
 } SearchInfo;
-
-class MovePicker {
-
-    public:
-
-        Move killers[2];
-        Move ttMove = MOVE_NONE;
-        Move countermove = MOVE_NONE;
-        unsigned int phase = HashMove;
-
-        const Board& board;
-        const SearchInfo * info;
-
-        MovePicker(const Board& b, SearchInfo * i, unsigned int p, Move c=MOVE_NONE) : board(b), info(i) {
-
-            killers[0] = info->killers[p][0];
-            killers[1] = info->killers[p][1];
-            countermove = c;
-
-        }
-
-        void valueCaptures();
-        void valueQuiets();
-        void valueQsCaptures();
-
-        Move pick();
-
-    private:
-
-        Move pvmove = MOVE_NONE;
-        MoveList caps;
-        MoveList gcaps;
-        MoveList quiets;
-        MoveList lcaps;
-        MoveList moves;
-        MoveList qscaps;
-
-};
 
 // Piece Values for Delta Pruning in Quiescence search - 100 at end for enpassant capture, where tosq == NOPIECE
 static const int DeltaMaterial[15] = { 0, 0, 100, 100, 320, 320, 330, 330, 500, 500, 950, 950, 999999, 999999, 100 };

@@ -23,47 +23,61 @@
 #include "uci.hpp"
 #include "search.hpp"
 #include "evaluate.hpp"
+#include "timeman.hpp"
 
 static const uint64_t KING_START_SQ[2]       = { SQUARES[E1], SQUARES[E8] };
 static const uint64_t KING_CASTLE_SQUARES[2] = { (SQUARES[G1] | SQUARES[C1]), (SQUARES[G8] | SQUARES[C8]) };
-static std::map<char, MoveType> CharToProm   = { { 'q', QUEENPROM }, { 'r', ROOKPROM }, { 'b', BISHOPPROM }, { 'n', KNIGHTPROM } };
 
 TranspositionTable tTable;
 PawnTable pawnTable;
 MaterialTable materialTable;
 
-static std::map<MoveType, char> promChars = { { QUEENPROM, 'q' }, { ROOKPROM, 'r' }, { BISHOPPROM, 'b' }, { KNIGHTPROM, 'n' } };
+static const std::string PromotionChar = "qrbn";
 
-static void play_sequence(Board& board, std::string fen, std::string input, std::string::size_type ccount) {
+inline MoveType char_to_promotion(const char c) {
+
+    return (PromotionChar.find(c) * 2 + 1) * QUEENPROM;
+
+}
+
+inline char promotion_to_char(const MoveType mt) {
+
+    return PromotionChar[(mt / QUEENPROM) / 2];
+
+}
+
+inline std::string move_to_string(const Move raw) {
+
+    return (std::string() + SQUARE_NAMES[from_sq(raw)] + SQUARE_NAMES[to_sq(raw)]) + (is_promotion(raw) ? std::string(1, promotion_to_char(move_type(raw))) : "");
+
+}
+
+static void play_sequence(Board& board, std::string fen, std::string input, std::string::size_type start) {
 
     input.append(" ");
     board.set_fen(fen);
-    while (ccount < input.size()) {
+    for (unsigned c = start; c < input.size(); c++) {
 
-        if (input[ccount] != ' ') {
+        if (input[c] != ' ') {
 
-            const unsigned int fromsq = square(input[ccount]     - 'a', 8 - (input[ccount + 1] - '0'));
-            const unsigned int tosq   = square(input[ccount + 2] - 'a', 8 - (input[ccount + 3] - '0'));
+            const unsigned fromsq = square(7 - (input[c]     - 'a'), input[c + 1] - '1');
+            const unsigned tosq   = square(7 - (input[c + 2] - 'a'), input[c + 3] - '1');
 
-            ccount += 4;
+            c += 4;
 
-            MoveType type = (input[ccount] != ' ') ? CharToProm[input[ccount]] : 0;
+            MoveType type = NORMAL;
 
-            if (type == 0) {
-
-                if ((SQUARES[fromsq] & (board.pieces(KING, board.turn()) & KING_START_SQ[board.turn()])) && (SQUARES[tosq] & KING_CASTLE_SQUARES[board.turn()])) {
-                    type = CASTLING;
-                } else if (tosq == board.enPassant() && SQUARES[fromsq] & board.pieces(PAWN, board.turn())) {
-                    type = ENPASSANT;
-                } else {
-                    type = NORMAL;
-                }
-
+            if (input[c] != ' ') {
+                type = char_to_promotion(input[c]);
+            } else if ((SQUARES[fromsq] & (board.pieces(KING, board.turn()) & KING_START_SQ[board.turn()])) && (SQUARES[tosq] & KING_CASTLE_SQUARES[board.turn()])) {
+                type = CASTLING;
+            } else if (tosq == board.enPassant() && SQUARES[fromsq] & board.pieces(PAWN, board.turn())) {
+                type = ENPASSANT;
             }
 
             board.do_move(make_move(fromsq, tosq, type));
         }
-        ccount++;
+
     }
 
 }
@@ -81,30 +95,29 @@ static void benchmark() {
 
     Board board;
     SearchLimits limits;
-    limits.depth = 12;
+    limits.depth = 6;
 
     uint64_t nodes = 0;
 
     newgame(board);
 
-    clock_t start = std::clock();
+    TimePoint start = Clock::now();
 
-    for (int i = 0; i < 43; i++) {
+    for (unsigned i = 0; i < 42; i++) {
 
         std::cout << "Position: " << (i+1) << std::endl;
         board.set_fen(BENCHMARK_FENS[i]);
+        tTable.clear();
         SearchStats stats = go(board, limits);
         nodes += stats.totalNodes;
-        tTable.clear();
 
     }
 
-    clock_t end = std::clock();
-    uint64_t time_elapsed = (end - start) / (CLOCKS_PER_SEC / 1000);
+    long long elapsed = get_time_elapsed(start);
 
-    std::cout << "\nTime elapsed: " << time_elapsed << std::endl;
+    std::cout << "\nTime elapsed: " << elapsed << std::endl;
     std::cout << "Nodes searched: " << nodes << std::endl;
-    std::cout << "Nodes/second: " << 1000 * nodes / time_elapsed << std::endl;
+    std::cout << "Nodes/second: " << 1000 * nodes / elapsed << std::endl;
 
 }
 
@@ -118,15 +131,30 @@ static void show_information() {
 
 }
 
-std::string move_to_string(const Move raw) {
+void send_info(const SearchInfo* info, const PvLine& pv, const long long duration) {
 
-    std::string move = std::string() + SQUARE_NAMES[from_sq(raw)] + SQUARE_NAMES[to_sq(raw)];
+    std::string pvString;
+    int value = info->value[info->depth];
 
-    if (is_promotion(raw)) {
-        move += promChars[move_type(raw)];
+    for (unsigned int p = 0; p < pv.size; p++) {
+        pvString += move_to_string(pv.line[p]) + " ";
     }
 
-    return move;
+    std::cout << "info depth " << info->depth << " seldepth " << info->selectiveDepth;
+
+    if (std::abs(value) >= VALUE_MATE - MAX_DEPTH) {
+        std::cout << " score mate " << ((value > 0 ? VALUE_MATE - value + 1 : -VALUE_MATE - value) / 2);
+    } else {
+        std::cout << " score cp " << value;
+    }
+
+    std::cout << " nodes " << info->nodes << " time " << duration << " nps " << (duration != 0 ? info->nodes * 1000 / duration : info->nodes) << " pv " << pvString << std::endl;
+
+}
+
+void send_bestmove(const Move bestMove) {
+
+    std::cout << "bestmove " << (bestMove != MOVE_NONE ? move_to_string(bestMove) : "none") << std::endl;
 
 }
 
@@ -153,12 +181,12 @@ void uciloop(int argc, char* argv[]) {
 
         std::cout << std::flush;
 
-        if (input.find("uci") == 0) {
-            show_information();
+        if (input.find("ucinewgame") == 0) {
+            newgame(board);
         } else if (input.find("isready") == 0) {
             std::cout << "readyok" << std::endl;
-        } else if (input.find("ucinewgame") == 0) {
-            newgame(board);
+        } else if (input.find("uci") == 0) {
+            show_information();
         }  else if (input.find("position startpos moves ") == 0) {
             play_sequence(board, STARTFEN, input, 24);
         } else if (input.find("position startpos") == 0) {

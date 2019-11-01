@@ -26,6 +26,18 @@
 
 #include "types.hpp"
 
+typedef struct {
+
+    uint64_t magic;
+    uint64_t mask;
+    uint64_t shift;
+    uint64_t *attacks;
+
+} Magic;
+
+extern Magic BishopMagics[64];
+extern Magic RookMagics[64];
+
 extern uint64_t PawnAttacksSpan[2][64];
 extern uint64_t KingShelterSpan[2][64];
 extern uint64_t KingRing[2][64];
@@ -36,6 +48,8 @@ extern uint64_t FrontFileMask[2][64];
 extern uint64_t PassedPawnMask[2][64];
 extern uint64_t BackwardPawnMask[2][64];
 
+extern uint64_t get_slider_attacks(const unsigned sq, const uint64_t occupied, const int directions[4]);
+extern int get_magic_index(const uint64_t occupied, Magic *table);
 extern void init_bitboards();
 
 #endif

@@ -24,7 +24,6 @@
 #ifndef MOVE_H
 #define MOVE_H
 
-#include <cstdint>
 #include "types.hpp"
 
 #define MOVE_NONE 0
@@ -40,52 +39,52 @@
 
 static const std::string SQUARE_NAMES[64] = {
 
-    "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
-    "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
-    "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
-    "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
-    "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4",
-    "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
-    "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
-    "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1"
+    "h1", "g1", "f1", "e1", "d1", "c1", "b1", "a1",
+    "h2", "g2", "f2", "e2", "d2", "c2", "b2", "a2",
+    "h3", "g3", "f3", "e3", "d3", "c3", "b3", "a3",
+    "h4", "g4", "f4", "e4", "d4", "c4", "b4", "a4",
+    "h5", "g5", "f5", "e5", "d5", "c5", "b5", "a5",
+    "h6", "g6", "f6", "e6", "d6", "c6", "b6", "a6",
+    "h7", "g7", "f7", "e7", "d7", "c7", "b7", "a7",
+    "h8", "g8", "f8", "e8", "d8", "c8", "b8", "a8"
 
 };
 
-static std::map<unsigned int, PieceType> promPieceTypes = { { QUEENPROM, QUEEN }, {ROOKPROM, ROOK}, { BISHOPPROM, BISHOP }, { KNIGHTPROM, KNIGHT } };
+inline MoveType move_type(const Move move) {
 
-inline const MoveType move_type(const Move move) {
-
-    return (move & 0x7000);
+    return move & 0x7000;
 
 }
 
-inline const unsigned int from_sq(const Move move) {
+inline unsigned int from_sq(const Move move) {
 
-    return (move & 0x3f);
-
-}
-
-inline const unsigned int to_sq(const Move move) {
-
-    return ((move & 0xfc0) >> 6);
+    assert(sq_valid(move & 0x3f));
+    return move & 0x3f;
 
 }
 
-inline const Move make_move(const unsigned int fromsq, const unsigned int tosq, const MoveType type) {
+inline unsigned int to_sq(const Move move) {
 
-    return (fromsq | (tosq << 6) | type);
+    assert(sq_valid((move & 0xfc0) >> 6));
+    return (move & 0xfc0) >> 6;
 
 }
 
-inline PieceType prom_piecetype(const MoveType type, const Color color) {
+inline Move make_move(const unsigned int fromsq, const unsigned int tosq, const MoveType type) {
 
-    return (promPieceTypes[type] | color);
+    return fromsq | (tosq << 6) | type;
+
+}
+
+inline Piecetype prom_piecetype(const MoveType mt, const Color color) {
+
+    return (QUEEN + 1 - mt / QUEENPROM) | color;
 
 }
 
 inline bool is_promotion(const Move move) {
 
-    return (move & 0x1000);
+    return move & 0x1000;
 
 }
 

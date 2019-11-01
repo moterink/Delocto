@@ -37,7 +37,7 @@ typedef struct {
     unsigned int castling = 0;
     unsigned int enPassant = NOSQ;
     unsigned int fiftyMoves = 0;
-    PieceType captured = NOPIECE;
+    Piecetype captured = NOPIECE;
     Value pst[2];
     Value material[2];
     uint64_t kingBlockers[2];
@@ -62,28 +62,28 @@ class Board {
         inline Color turn() const { return stm; }
 
         inline uint64_t pieces(const unsigned int type) const             { return bitboards[type]; }
-        inline uint64_t pieces(const PieceType pt, const Color color) const { return bitboards[(pt | color)]; }
+        inline uint64_t pieces(const Piecetype pt, const Color color) const { return bitboards[(pt | color)]; }
 
         inline Color owner(const unsigned int sq) const          { return (piecetypes[sq] & 1); }
-        inline PieceType piecetype(const unsigned int sq) const { return piecetypes[sq]; }
+        inline Piecetype piecetype(const unsigned int sq) const { return piecetypes[sq]; }
 
         inline uint64_t checkers() const         { return state.checkers; }
-        inline unsigned int castleRights() const { return state.castling; }
+        inline unsigned castleRights() const { return state.castling; }
 
-        inline unsigned int enPassant() const { return state.enPassant; }
+        inline unsigned enPassant() const { return state.enPassant; }
 
         inline uint64_t hashkey() const     { return state.hashKey; }
         inline uint64_t materialkey() const { return state.materialKey; }
         inline uint64_t pawnkey() const     { return state.pawnKey; }
 
-        inline unsigned int plies() const { return ply; }
+        inline unsigned plies() const { return ply; }
         inline void reset_plies() { ply = 0; }
 
         inline Value material(const Color color) const { return state.material[color]; }
         inline Value pst     (const Color color) const { return state.pst[color];      }
 
-        inline const unsigned int piececount(const PieceType pt) const { return piececounts[pt]; }
-        inline const unsigned int scale() const { return std::max(((24 - 4 * (piececounts[WHITE_QUEEN] + piececounts[BLACK_QUEEN]) - 2 * (piececounts[WHITE_ROOK] + piececounts[BLACK_QUEEN]) - (piececounts[WHITE_BISHOP] + piececounts[BLACK_BISHOP]) - (piececounts[WHITE_KNIGHT] + piececounts[BLACK_KNIGHT])) * 256 + 12) / 24, 0); }
+        inline unsigned piececount(const Piecetype pt) const { return piececounts[pt]; }
+        inline unsigned scale() const { return std::max(((24 - 4 * (piececounts[WHITE_QUEEN] + piececounts[BLACK_QUEEN]) - 2 * (piececounts[WHITE_ROOK] + piececounts[BLACK_QUEEN]) - (piececounts[WHITE_BISHOP] + piececounts[BLACK_BISHOP]) - (piececounts[WHITE_KNIGHT] + piececounts[BLACK_KNIGHT])) * 256 + 12) / 24, 0); }
 
         void set_fen(std::string fen);
         void print() const;
@@ -110,7 +110,7 @@ class Board {
         inline bool is_capture(const Move move) const;
         inline bool isDangerousPawnPush(const Move move, const Color color);
         inline uint64_t getAllOccupancy(const uint64_t squares) const;
-        inline uint64_t getPieceOccupancy(const uint64_t squares, const PieceType type);
+        inline uint64_t getPieceOccupancy(const uint64_t squares, const Piecetype type);
         uint64_t get_king_blockers(const Color color) const;
         uint64_t get_slider_blockers(const uint64_t sliders, const unsigned int sq) const;
 
@@ -137,7 +137,7 @@ class Board {
         unsigned int ply = 0;
 
         // Piecetypes
-        PieceType piecetypes[64];
+        Piecetype piecetypes[64];
 
         std::vector<StateInfo> states;
 
@@ -148,15 +148,15 @@ class Board {
         void update_bitboards();
 
         inline void hash_pawn(const Color color, const unsigned int sq);
-        inline void hash_piece(const PieceType pt, const unsigned int sq);
+        inline void hash_piece(const Piecetype pt, const unsigned int sq);
         inline void hash_castling();
         inline void hash_turn();
         inline void hash_enPassant();
-        inline void hash_material(const PieceType pt);
+        inline void hash_material(const Piecetype pt);
 
         void calc_keys();
 
-        inline uint64_t pseudo_bb(const PieceType pt, const Color color, const unsigned int sq) const;
+        inline uint64_t pseudo_bb(const Piecetype pt, const Color color, const unsigned int sq) const;
 
         inline bool singleSquareAttacked(uint64_t squares, const Color color) const;
 
@@ -169,7 +169,7 @@ class Board {
         inline bool sq_attacked(const unsigned int sq, const Color color) const;
         inline bool sq_attacked_noking(const unsigned int sq, const Color color) const;
 
-        uint64_t getLeastValuablePiece(uint64_t attackers, const Color color, PieceType& pt) const;
+        uint64_t getLeastValuablePiece(uint64_t attackers, const Color color, Piecetype& pt) const;
 
         void update_check_info();
 
@@ -211,7 +211,7 @@ inline uint64_t Board::getAllOccupancy(const uint64_t squares) const {
 
 }
 
-inline uint64_t Board::getPieceOccupancy(const uint64_t squares, const PieceType type) {
+inline uint64_t Board::getPieceOccupancy(const uint64_t squares, const Piecetype type) {
 
     return bitboards[type] & squares;
 
@@ -251,7 +251,7 @@ inline void Board::hash_pawn(const Color color, const unsigned int sq) {
 }
 
 // Hash piece in/out zobrist key
-inline void Board::hash_piece(const PieceType pt, const unsigned int sq) {
+inline void Board::hash_piece(const Piecetype pt, const unsigned int sq) {
 
     state.hashKey ^= pieceHashKeys[pt][sq];
 
@@ -279,7 +279,7 @@ inline void Board::hash_enPassant() {
 }
 
 // Hash material
-inline void Board::hash_material(const PieceType pt) {
+inline void Board::hash_material(const Piecetype pt) {
 
     state.materialKey ^= materialHashKeys[pt][piececounts[pt]];
 
@@ -291,8 +291,8 @@ inline uint64_t Board::all_attackers(const unsigned int sq, const uint64_t occup
     return  (AttackBitboards[WHITE_PAWN][sq]      & bitboards[BLACK_PAWN])
           | (AttackBitboards[BLACK_PAWN][sq]      & bitboards[WHITE_PAWN])
           | (AttackBitboards[KNIGHT][sq]          & (bitboards[WHITE_KNIGHT] | bitboards[BLACK_KNIGHT]))
-          | (generateBishopMoves(sq, occupied, 0) & (bitboards[WHITE_BISHOP] | bitboards[BLACK_BISHOP] | bitboards[WHITE_QUEEN] | bitboards[BLACK_QUEEN]))
-          | (generateRookMoves(sq, occupied, 0)   & (bitboards[WHITE_ROOK]   | bitboards[BLACK_ROOK]   | bitboards[WHITE_QUEEN] | bitboards[BLACK_QUEEN]))
+          | (gen_bishop_moves(sq, occupied, 0) & (bitboards[WHITE_BISHOP] | bitboards[BLACK_BISHOP] | bitboards[WHITE_QUEEN] | bitboards[BLACK_QUEEN]))
+          | (gen_rook_moves(sq, occupied, 0)   & (bitboards[WHITE_ROOK]   | bitboards[BLACK_ROOK]   | bitboards[WHITE_QUEEN] | bitboards[BLACK_QUEEN]))
           | (AttackBitboards[KING][sq]            & (bitboards[WHITE_KING]   | bitboards[BLACK_KING]));
 
 }
@@ -301,23 +301,23 @@ inline uint64_t Board::color_attackers(const unsigned int sq, const uint64_t occ
 
     return ((AttackBitboards[Pawn(!color)][sq]     & bitboards[Pawn(color)])
           | (AttackBitboards[KNIGHT][sq]          & bitboards[Knight(color)])
-          | (generateBishopMoves(sq, occupied, 0) & (bitboards[Bishop(color)] | bitboards[Queen(color)]))
-          | (generateRookMoves  (sq, occupied, 0) & (bitboards[Rook(color)]   | bitboards[Queen(color)]))
+          | (gen_bishop_moves(sq, occupied, 0) & (bitboards[Bishop(color)] | bitboards[Queen(color)]))
+          | (gen_rook_moves  (sq, occupied, 0) & (bitboards[Rook(color)]   | bitboards[Queen(color)]))
           | (AttackBitboards[KING][sq]            & bitboards[King(color)]));
 
 }
 
 inline uint64_t Board::all_slider_attackers(const unsigned int sq, const uint64_t occupied) const {
 
-    return (generateBishopMoves(sq, occupied, 0) & (bitboards[WHITE_BISHOP] | bitboards[BLACK_BISHOP] | bitboards[WHITE_QUEEN] | bitboards[BLACK_QUEEN]))
-         | (generateRookMoves(sq, occupied, 0)   & (bitboards[WHITE_ROOK]   | bitboards[BLACK_ROOK]   | bitboards[WHITE_QUEEN] | bitboards[BLACK_QUEEN]));
+    return (gen_bishop_moves(sq, occupied, 0) & (bitboards[WHITE_BISHOP] | bitboards[BLACK_BISHOP] | bitboards[WHITE_QUEEN] | bitboards[BLACK_QUEEN]))
+         | (gen_rook_moves(sq, occupied, 0)   & (bitboards[WHITE_ROOK]   | bitboards[BLACK_ROOK]   | bitboards[WHITE_QUEEN] | bitboards[BLACK_QUEEN]));
 
 }
 
 inline uint64_t Board::color_slider_attackers(const unsigned int sq, const uint64_t occupied, const Color color) const {
 
-    return (generateBishopMoves(sq, occupied, 0) & (bitboards[Bishop(color)] | bitboards[Queen(color)]))
-         | (generateRookMoves(sq, occupied, 0)   & (bitboards[Rook(color)]   | bitboards[Queen(color)]));
+    return (gen_bishop_moves(sq, occupied, 0) & (bitboards[Bishop(color)] | bitboards[Queen(color)]))
+         | (gen_rook_moves(sq, occupied, 0)   & (bitboards[Rook(color)]   | bitboards[Queen(color)]));
 
 }
 
@@ -325,8 +325,8 @@ inline uint64_t Board::color_slider_attackers(const Color color, const unsigned 
 
     const uint64_t occupied = (bitboards[ALLPIECES] ^ bStart) | bEnd;
 
-    uint64_t xrays = ((generateBishopMoves(sq, occupied, 0) & (bitboards[Bishop(color)] | bitboards[Queen(color)]))
-                    | (generateRookMoves  (sq, occupied, 0) & (bitboards[Rook(color)]   | bitboards[Queen(color)])));
+    uint64_t xrays = ((gen_bishop_moves(sq, occupied, 0) & (bitboards[Bishop(color)] | bitboards[Queen(color)]))
+                    | (gen_rook_moves  (sq, occupied, 0) & (bitboards[Rook(color)]   | bitboards[Queen(color)])));
 
     return (xrays & ~bStart);
 
@@ -337,8 +337,8 @@ inline bool Board::sq_attacked(const unsigned int sq, const Color color) const {
 
     return ((AttackBitboards[Pawn(!color)][sq]                 & bitboards[Pawn(color)])
           | (AttackBitboards[KNIGHT][sq]                      & bitboards[Knight(color)])
-          | (generateBishopMoves(sq, bitboards[ALLPIECES], 0) & (bitboards[Bishop(color)] | bitboards[Queen(color)]))
-          | (generateRookMoves  (sq, bitboards[ALLPIECES], 0) & (bitboards[Rook(color)] | bitboards[Queen(color)]))
+          | (gen_bishop_moves(sq, bitboards[ALLPIECES], 0) & (bitboards[Bishop(color)] | bitboards[Queen(color)]))
+          | (gen_rook_moves  (sq, bitboards[ALLPIECES], 0) & (bitboards[Rook(color)] | bitboards[Queen(color)]))
           | (AttackBitboards[KING][sq]                        & bitboards[King(color)])) != 0;
 
 }
@@ -348,8 +348,8 @@ inline bool Board::sq_attacked_noking(const unsigned int sq, const Color color) 
 
     return ((AttackBitboards[Pawn(!color)][sq]                                            & bitboards[Pawn(color)])
           | (AttackBitboards[KNIGHT][sq]                                                 & bitboards[Knight(color)])
-          | (generateBishopMoves(sq, (bitboards[ALLPIECES] ^ bitboards[King(!color)]), 0) & (bitboards[Bishop(color)] | bitboards[Queen(color)]))
-          | (generateRookMoves  (sq, (bitboards[ALLPIECES] ^ bitboards[King(!color)]), 0) & (bitboards[Rook(color)] | bitboards[Queen(color)]))
+          | (gen_bishop_moves(sq, (bitboards[ALLPIECES] ^ bitboards[King(!color)]), 0) & (bitboards[Bishop(color)] | bitboards[Queen(color)]))
+          | (gen_rook_moves  (sq, (bitboards[ALLPIECES] ^ bitboards[King(!color)]), 0) & (bitboards[Rook(color)] | bitboards[Queen(color)]))
           | (AttackBitboards[KING][sq]                                                   & bitboards[King(color)])) != 0;
 
 }
@@ -373,14 +373,14 @@ inline uint64_t Board::gen_pawns_attacks(const Color color) const {
 }
 
 // Get a bitboards with all pseudo-legal destination squares for a slider on the given square
-inline uint64_t slider_pseudo_bb(const PieceType pt, const unsigned int sq, const uint64_t occupied, const uint64_t friendly) {
+inline uint64_t slider_pseudo_bb(const Piecetype pt, const unsigned int sq, const uint64_t occupied, const uint64_t friendly) {
 
-    return (pt == BISHOP) ? generateBishopMoves(sq, occupied, friendly) : (pt == ROOK) ? generateRookMoves(sq, occupied, friendly) : generateQueenMoves(sq, occupied, friendly);
+    return (pt == BISHOP) ? gen_bishop_moves(sq, occupied, friendly) : (pt == ROOK) ? gen_rook_moves(sq, occupied, friendly) : get_queen_moves(sq, occupied, friendly);
 
 }
 
 // Get a bitboard with all pseudo-legal destination squares for a piece on the given square
-inline uint64_t Board::pseudo_bb(const PieceType pt, const Color color, const unsigned int sq) const {
+inline uint64_t Board::pseudo_bb(const Piecetype pt, const Color color, const unsigned int sq) const {
 
     return (pt == BISHOP || pt == ROOK || pt == QUEEN) ? slider_pseudo_bb(pt, sq, bitboards[ALLPIECES], bitboards[color]) : AttackBitboards[pt][sq] & ~bitboards[color];
 

@@ -74,7 +74,7 @@ typedef struct {
 
 } EvalInfo;
 
-inline const int scaled_eval(const int scale, const Value value) {
+inline int scaled_eval(const int scale, const Value value) {
 
     return ((value.mg * (256 - scale)) + (value.eg * scale)) / 256;
 
@@ -82,12 +82,12 @@ inline const int scaled_eval(const int scale, const Value value) {
 
 extern Value Pst[14][64];
 
-extern int kingDistance[64][64];
+extern int KingDistance[64][64];
 
 extern void init_king_distance();
 extern void init_psqt();
 extern void init_eval();
-extern const int evaluate(const Board& board);
+extern int evaluate(const Board& board);
 extern void evaluateInfo(const Board& board);
 
 #endif

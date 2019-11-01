@@ -21,10 +21,8 @@
   SOFTWARE.
 */
 
-#ifndef GENS_H
-#define GENS_H
-
-#define NDEBUG
+#ifndef TYPES_H
+#define TYPES_H
 
 #include <iostream>
 #include <map>
@@ -39,6 +37,7 @@
 #include <iomanip>
 #include <utility>
 #include <cmath>
+#include <chrono>
 
 // Ranks
 static const uint64_t RANK_1 = 0xFF;
@@ -60,34 +59,35 @@ static const uint64_t FILE_C = FILE_H << 5;
 static const uint64_t FILE_B = FILE_H << 6;
 static const uint64_t FILE_A = FILE_H << 7;
 
-static const uint64_t RANKS[8] = { RANK_8, RANK_7, RANK_6, RANK_5, RANK_4, RANK_3, RANK_2, RANK_1 };
-static const uint64_t FILES[8] = { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
+static const uint64_t RANKS[8] = { RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8 };
+static const uint64_t FILES[8] = { FILE_H, FILE_G, FILE_F, FILE_E, FILE_D, FILE_C, FILE_B, FILE_A };
 
 // 64bit integers for each square
 static const uint64_t SQUARES[65] = {
 
-    9223372036854775808U, 4611686018427387904, 2305843009213693952, 1152921504606846976, 576460752303423488, 288230376151711744, 144115188075855872, 72057594037927936,
-    36028797018963968, 18014398509481984, 9007199254740992, 4503599627370496, 2251799813685248, 1125899906842624, 562949953421312, 281474976710656,
-    140737488355328, 70368744177664, 35184372088832, 17592186044416, 8796093022208, 4398046511104, 2199023255552, 1099511627776,
-    549755813888, 274877906944, 137438953472, 68719476736, 34359738368, 17179869184, 8589934592, 4294967296,
-    2147483648, 1073741824, 536870912, 268435456, 134217728, 67108864, 33554432, 16777216,
-    8388608, 4194304, 2097152, 1048576, 524288, 262144, 131072, 65536,
-    32768, 16384, 8192, 4096, 2048, 1024, 512, 256,
-    128, 64, 32, 16, 8, 4, 2, 1, 0
+    0x1,               0x2,               0x4,               0x8,               0x10,               0x20,               0x40,               0x80,
+    0x100,             0x200,             0x400,             0x800,             0x1000,             0x2000,             0x4000,             0x8000,
+    0x10000,           0x20000,           0x40000,           0x80000,           0x100000,           0x200000,           0x400000,           0x800000,
+    0x1000000,         0x2000000,         0x4000000,         0x8000000,         0x10000000,         0x20000000,         0x40000000,         0x80000000,
+    0x100000000,       0x200000000,       0x400000000,       0x800000000,       0x1000000000,       0x2000000000,       0x4000000000,       0x8000000000,
+    0x10000000000,     0x20000000000,     0x40000000000,     0x80000000000,     0x100000000000,     0x200000000000,     0x400000000000,     0x800000000000,
+    0x1000000000000,   0x2000000000000,   0x4000000000000,   0x8000000000000,   0x10000000000000,   0x20000000000000,   0x40000000000000,   0x80000000000000,
+    0x100000000000000, 0x200000000000000, 0x400000000000000, 0x800000000000000, 0x1000000000000000, 0x2000000000000000, 0x4000000000000000, 0x8000000000000000,
+    0x0
 
 };
 
 // Square names
 enum {
 
-    A8, B8, C8, D8, E8, F8, G8, H8,
-    A7, B7, C7, D7, E7, F7, G7, H7,
-    A6, B6, C6, D6, E6, F6, G6, H6,
-    A5, B5, C5, D5, E5, F5, G5, H5,
-    A4, B4, C4, D4, E4, F4, G4, H4,
-    A3, B3, C3, D3, E3, F3, G3, H3,
-    A2, B2, C2, D2, E2, F2, G2, H2,
-    A1, B1, C1, D1, E1, F1, G1, H1
+    H1, G1, F1, E1, D1, C1, B1, A1,
+    H2, G2, F2, E2, D2, C2, B2, A2,
+    H3, G3, F3, E3, D3, C3, B3, A3,
+    H4, G4, F4, E4, D4, C4, B4, A4,
+    H5, G5, F5, E5, D5, C5, B5, A5,
+    H6, G6, F6, E6, D6, C6, B6, A6,
+    H7, G7, F7, E7, D7, C7, B7, A7,
+    H8, G8, F8, E8, D8, C8, B8, A8,
 
 };
 
@@ -106,13 +106,13 @@ static const uint64_t ALL_SQUARES   = WHITE_SQUARES | BLACK_SQUARES;
 #define BLACK_CASTLE_MASK 12
 #define ALL_CASTLE_MASK   15
 
-static const uint64_t CASTLE_MASKS[2] = { WHITE_CASTLE_MASK, BLACK_CASTLE_MASK };
+static const uint64_t CASTLE_MASKS[2]   = { WHITE_CASTLE_MASK, BLACK_CASTLE_MASK };
 static const uint64_t CASTLE_SQUARES[4] = { G1, C1, G8, C8 };
-static const uint64_t CASTLE_FLAGS[4] = { WKCASFLAG, WQCASFLAG, BKCASFLAG, BQCASFLAG };
+static const uint64_t CASTLE_FLAGS[4]   = { WKCASFLAG, WQCASFLAG, BKCASFLAG, BQCASFLAG };
 
-typedef unsigned int Color;
-typedef unsigned int PieceType;
-typedef unsigned int Direction;
+typedef unsigned Color;
+typedef unsigned Piecetype;
+typedef unsigned Direction;
 typedef uint16_t Move;
 typedef uint16_t MoveType;
 
@@ -153,6 +153,13 @@ typedef struct {
 enum {
 
     LEFT, UP, RIGHT, DOWN, LEFTUP, LEFTDOWN, RIGHTUP, RIGHTDOWN
+
+};
+
+static const int DIRECTIONS[2][8] = {
+
+    { 1,   8, -1, -8,  9, -7,  7, -9 },
+    { -1, -8,  1,  8, -9,  7, -7,  9 }
 
 };
 
@@ -208,27 +215,27 @@ static const uint64_t CENTRAL_FILES = FILE_D | FILE_E;
 
 static const uint64_t ADJ_FILES[8] = {
 
-    FILE_B,
-    FILE_A | FILE_C,
-    FILE_B | FILE_D,
-    FILE_C | FILE_E,
-    FILE_D | FILE_F,
-    FILE_E | FILE_G,
+    FILE_G,
     FILE_F | FILE_H,
-    FILE_G
+    FILE_E | FILE_G,
+    FILE_D | FILE_F,
+    FILE_C | FILE_E,
+    FILE_B | FILE_D,
+    FILE_A | FILE_C,
+    FILE_B,
 
 };
 
 static const uint64_t KING_FLANK[8] = {
 
-    FILE_A | FILE_B | FILE_C,
-    FILE_A | FILE_B | FILE_C | FILE_D,
-    FILE_A | FILE_B | FILE_C | FILE_D,
-    FILE_C | FILE_D | FILE_E | FILE_F,
-    FILE_C | FILE_D | FILE_E | FILE_F,
+    FILE_F | FILE_G | FILE_H,
     FILE_E | FILE_F | FILE_G | FILE_H,
     FILE_E | FILE_F | FILE_G | FILE_H,
-    FILE_F | FILE_G | FILE_H
+    FILE_C | FILE_D | FILE_E | FILE_F,
+    FILE_C | FILE_D | FILE_E | FILE_F,
+    FILE_A | FILE_B | FILE_C | FILE_D,
+    FILE_A | FILE_B | FILE_C | FILE_D,
+    FILE_A | FILE_B | FILE_C
 
 };
 
@@ -239,13 +246,6 @@ static const uint64_t COLOUR_BASE_SQUARES[2] = {
 };
 
 static const uint64_t CENTRAL_SQUARES = SQUARES[D4] | SQUARES[D5] | SQUARES[E4] | SQUARES[E5];
-
-static const int DIRECTIONS[2][8] = {
-
-    { -1, -8, 1, 8, -9, 7, -7, 9 },
-    { 1, 8, -1, -8, 9, -7, 7, -9 }
-
-};
 
 static const uint64_t PAWN_STARTRANK[2] = {
 
@@ -265,12 +265,12 @@ static const uint64_t PAWN_FINALRANK[2] = {
 
 };
 
-static std::map<unsigned int, unsigned int> castleByKingpos = { {62, WKCASFLAG}, {58, WQCASFLAG}, {6, BKCASFLAG}, {2, BQCASFLAG} };
+static std::map<unsigned int, unsigned int> castleByKingpos = { {G1, WKCASFLAG}, {C1, WQCASFLAG}, {G8, BKCASFLAG}, {C8, BQCASFLAG} };
 
 // Get least significant set bit in unsigned 64bit integer
 inline unsigned int lsb_index(const uint64_t bit) {
 
-    return (63 - bitIndex64[((bit & -bit) * debruijn64) >> 58]);
+    return bitIndex64[((bit & -bit) * debruijn64) >> 58];
 
 }
 
@@ -278,7 +278,7 @@ inline unsigned int msb_index(const uint64_t bit) {
 
     // __builtin_clzll returns undefined behaviour if bit is 0!
 
-    return __builtin_clzll(bit);
+    return 63 - __builtin_clzll(bit);
 
 }
 
@@ -294,15 +294,15 @@ inline uint64_t msb(const uint64_t bit) {
 
     // __builtin_clzll returns undefined behaviour if bit is 0!
 
-    return SQUARES[__builtin_clzll(bit)];
+    return SQUARES[63 - __builtin_clzll(bit)];
 
 }
 
 // Remove least significant set bit in unsigned 64bit integer
-inline unsigned int pop_lsb(uint64_t& bit) {
+inline unsigned pop_lsb(uint64_t& bit) {
 
-   const unsigned int index = lsb_index(bit);
-   bit ^= (1ULL << (63 - index));
+   const unsigned index = lsb_index(bit);
+   bit ^= (1ull << index);
    return index;
 
 }
@@ -314,41 +314,48 @@ inline int popcount(const uint64_t bit) {
 
 }
 
+// Check if a square is still on the board
+inline bool sq_valid(const int sq) {
+
+    return (sq >= 0 && sq < 64);
+
+}
+
 // Get rank index (0-7) of given square index
-inline unsigned int rank(const unsigned int sq) {
+inline unsigned rank(const unsigned int sq) {
 
     return (sq >> 3);
 
 }
 
 // Get file index (0-7) of given square index
-inline unsigned int file(const unsigned int sq) {
+inline unsigned file(const unsigned int sq) {
 
     return (sq & 7);
 
 }
 
-inline unsigned int square(const unsigned int file, const unsigned int rank) {
+inline unsigned square(const unsigned file, const unsigned rank) {
 
     return file + (rank * 8);
 
 }
 
 // Get relative rank index for given color of given square index
-inline unsigned int relative_rank(const Color color, const unsigned int sq) {
+inline unsigned relative_rank(const Color color, const unsigned sq) {
 
-    return (color == WHITE) ? 7 - rank(sq) : rank(sq);
+    return (color == WHITE) ? rank(sq) : 7 - rank(sq);
 
 }
 
-inline unsigned int relative_sq(const Color color, const unsigned int sq) {
+inline unsigned relative_square(const Color color, const unsigned sq) {
 
-    return (color == WHITE) ? 63 - sq : sq;
+    return (color == WHITE) ? sq : 63 - sq;
 
 }
 
 // Get absolute piecetype without color
-inline const PieceType type(const PieceType pt) {
+inline Piecetype type(const Piecetype pt) {
 
     return (pt & 14);
 
@@ -368,43 +375,43 @@ inline uint64_t most_backward(const Color color, const uint64_t bitboard) {
 
 }
 
-inline PieceType Pawn(const Color color) {
+inline Piecetype Pawn(const Color color) {
 
     return (PAWN | color);
 
 }
 
-inline PieceType Knight(const Color color) {
+inline Piecetype Knight(const Color color) {
 
     return (KNIGHT | color);
 
 }
 
-inline PieceType Bishop(const Color color) {
+inline Piecetype Bishop(const Color color) {
 
     return (BISHOP | color);
 
 }
 
-inline PieceType Rook(const Color color) {
+inline Piecetype Rook(const Color color) {
 
     return (ROOK | color);
 
 }
 
-inline PieceType Queen(const Color color) {
+inline Piecetype Queen(const Color color) {
 
     return (QUEEN | color);
 
 }
 
-inline PieceType King(const Color color) {
+inline Piecetype King(const Color color) {
 
     return (KING | color);
 
 }
 
-inline PieceType pt_index(const PieceType pt) {
+inline Piecetype pt_index(const Piecetype pt) {
 
     return (type(pt) / 2 - 1);
 

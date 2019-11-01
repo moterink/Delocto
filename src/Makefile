@@ -17,19 +17,17 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-CC = g++
-
 TARGET = delocto
 
-CCSTD = -std=c++11
+CXXSTD = -std=c++14
 
-OPTIMIZEFLAGS = -mtune=native -march=native -O3
+OPTIMIZEFLAGS = -mtune=native -march=native -DNDEBUG -O3
 DEBUGFLAGS = -g
 
 SRC = *.cpp
 
 all:
-	$(CC) $(CCSTD) $(OPTIMIZEFLAGS) $(SRC) -o $(TARGET)
+	$(CXX) $(CXXSTD) $(OPTIMIZEFLAGS) $(SRC) -o $(TARGET)
 
 debug:
-	$(CC) $(CCSTD) $(DEBUGFLAGS) $(SRC) -o $(TARGET)
+	$(CXX) $(CXXSTD) $(DEBUGFLAGS) $(SRC) -o $(TARGET)

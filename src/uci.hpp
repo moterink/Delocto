@@ -27,6 +27,7 @@
 #include "types.hpp"
 #include "hashkeys.hpp"
 #include "move.hpp"
+#include "search.hpp"
 #include "perft.hpp"
 
 #define MAXHASHSIZE 160
@@ -87,7 +88,8 @@ extern TranspositionTable tTable;
 extern PawnTable pawnTable;
 extern MaterialTable materialTable;
 
-extern std::string move_to_string(const Move raw);
+extern void send_info(const SearchInfo* info, const PvLine& pv, const long long duration);
+extern void send_bestmove(const Move bestMove);
 extern void uciloop(int argc, char* argv[]);
 
 #endif

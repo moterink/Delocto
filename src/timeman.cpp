@@ -27,7 +27,7 @@ int MoveOverhead = 100;
 
 long long get_time_elapsed(TimePoint start) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
-};
+}
 
 void init_time_management(const SearchLimits& limits, SearchInfo* info) {
 
@@ -46,9 +46,7 @@ void init_time_management(const SearchLimits& limits, SearchInfo* info) {
 
 }
 
-void update_time_managememnt(SearchInfo* info) {
-
-    const long long elapsed = get_time_elapsed(info->start);
+void update_time_managemement(SearchInfo* info) {
 
     if (info->depth > 5) {
 

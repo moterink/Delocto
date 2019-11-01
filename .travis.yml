@@ -1,0 +1,20 @@
+language: cpp
+
+matrix:
+    include:
+        - os: osx
+          compiler: clang
+
+        - os: linux
+          compiler: gcc
+
+        - os: linux
+          compiler: clang
+
+        - os: windows
+          compiler: gcc
+
+        - os: windows
+          compiler: clang
+
+script: ./tests/benchbuild.sh

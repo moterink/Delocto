@@ -25,6 +25,7 @@
 #include "evaluate.hpp"
 #include "hashkeys.hpp"
 #include "uci.hpp"
+#include "movepick.hpp"
 #include "timeman.hpp"
 
 static int LMRTable[MAX_DEPTH][MAX_MOVES];
@@ -41,7 +42,7 @@ void init_search() {
 
 void PvLine::merge(PvLine pv) {
 
-    int i;
+    unsigned i;
     for (i = 0; i < pv.size; i++) {
         line[size + i] = pv.line[i];
     }
@@ -105,7 +106,7 @@ static void checkUp(SearchInfo* info) {
 
 }
 
-uint64_t Board::getLeastValuablePiece(uint64_t attackers, const Color color, PieceType& pt) const {
+uint64_t Board::getLeastValuablePiece(uint64_t attackers, const Color color, Piecetype& pt) const {
 
     for (pt = Pawn(color); pt <= King(color); pt += 2) {
         uint64_t subset = attackers & bitboards[pt];
@@ -126,7 +127,7 @@ int Board::see(const Move move, Color color) const {
     unsigned int fromsq = from_sq(move);
     unsigned int tosq   = to_sq(move);
 
-    PieceType attacker = piecetypes[fromsq];
+    Piecetype attacker = piecetypes[fromsq];
 
     uint64_t mayXray = pieces(PAWN, WHITE) | pieces(PAWN, BLACK) | pieces(BISHOP, WHITE) | pieces(BISHOP, BLACK) | pieces(ROOK, WHITE) | pieces(ROOK, BLACK) | pieces(QUEEN, WHITE) | pieces(QUEEN, BLACK);
     uint64_t fromset = SQUARES[fromsq];
@@ -169,235 +170,44 @@ int Board::see(const Move move, Color color) const {
 
 }
 
-void MovePicker::valueCaptures() {
+static void update_quiet_stats(const Board& board, SearchInfo *info, const int plies, const int depth, const MoveList& quiets, const Move bestMove) {
 
-    for (unsigned int index = 0; index < caps.size; index++) {
-        caps.values[index] = board.mvvlva(caps.moves[index]);
-    }
+    int bonus = std::min(400, depth * depth);
 
-}
-
-void MovePicker::valueQuiets() {
-
-}
-
-void MovePicker::valueQsCaptures() {
-
-    for (unsigned int index = 0; index < qscaps.size; index++) {
-        qscaps.values[index] = board.mvvlva(qscaps.moves[index]);
-    }
-
-}
-
-Move MovePicker::pick() {
-
-    switch (phase) {
-
-        case HashMove:
-
-            {
-                ++phase;
-
-                // Hashmove validity tested before
-                if (ttMove != MOVE_NONE) {
-                    return ttMove;
-                }
-
-            }
-
-        case GenCaps:
-
-            {
-
-                ++phase;
-
-                caps = gen_caps(board, board.turn());
-                valueCaptures();
-
-            }
-
-        case GoodCaps:
-
-            {
-
-                while (caps.index < caps.size) {
-
-                    Move best = caps.pick();
-
-                    assert(best == MOVE_NONE);
-
-                    if (caps.values[caps.index] < 0) {
-                        break;
-                    }
-
-                    caps.index++;
-
-                    if (best != ttMove) {
-                        return best;
-                    }
-
-                }
-
-                ++phase;
-
-            }
-
-        case FirstKiller:
-
-            ++phase;
-
-            // Note: Checking wether killer is a capture, since it could have already been picked during GoodCaps
-            if (killers[0] != ttMove && killers[0] != MOVE_NONE && !board.is_capture(killers[0]) && board.is_valid(killers[0])) {
-                return killers[0];
-            }
-
-        case SecondKiller:
-
-            ++phase;
-
-            if (killers[1] != ttMove && killers[1] != MOVE_NONE && !board.is_capture(killers[1]) && board.is_valid(killers[1])) {
-                return killers[1];
-            }
-
-        case CounterMove:
-
-            ++phase;
-
-            if (countermove != ttMove && countermove != MOVE_NONE && countermove != killers[0] && countermove != killers[1] && !board.is_capture(countermove) && board.is_valid(countermove)) {
-                return countermove;
-            }
-
-        case GenQuiets:
-
-            {
-                ++phase;
-
-                quiets = gen_quiets(board, board.turn());
-
-                for (unsigned int index = 0; index < quiets.size; index++) {
-                    quiets.values[index] = info->history[board.piecetype(from_sq(quiets.moves[index]))][to_sq(quiets.moves[index])];
-                }
-
-            }
-
-        case Quiets:
-
-            {
-
-                while (quiets.index < quiets.size) {
-
-                    Move best = quiets.pick();
-                    assert(best == MOVE_NONE);
-                    ++quiets.index;
-
-                    if (best != ttMove && best != killers[0] && best != killers[1] && best != countermove) {
-
-                        return best;
-
-                    }
-
-                }
-
-                ++phase;
-
-            }
-
-        case LoosingCaps:
-
-            {
-
-                while (caps.index < caps.size) {
-
-                    Move best = caps.pick();
-                    caps.index++;
-
-                    // TODO: Check if comparison with killer even necessary? killers are not captures!
-                    if (best != ttMove && best != killers[0] && best != killers[1]) {
-
-                        return best;
-
-                    }
-
-                }
-
-                return MOVE_NONE;
-
-            }
-            break;
-
-        case HashMoveQS:
-
-            {
-                ++phase;
-
-                // Hashmove validity tested before
-                if (ttMove != MOVE_NONE) {
-                    return ttMove;
-                }
-            }
-
-        case GenCapsQS:
-
-            {
-                ++phase;
-
-                qscaps = gen_caps(board, board.turn());
-                valueQsCaptures();
-
-            }
-
-        case CapsQS:
-
-            {
-
-                if (qscaps.index >= qscaps.size)
-                    return MOVE_NONE;
-
-                Move best = qscaps.pick();
-                qscaps.index++;
-                return best;
-
-            }
-
-        default:
-
-            assert(false);
-
-    }
-
-    assert(false);
-    return false;
-
-}
-
-static void update_quiet_stats(const Board& board, SearchInfo *info, const int plies, const int depth, const Move move) {
-
-    if (move != info->killers[plies][0]) {
+    if (bestMove != info->killers[plies][0]) {
         info->killers[plies][1] = info->killers[plies][0];
-        info->killers[plies][0] = move;
+        info->killers[plies][0] = bestMove;
     }
 
     if (info->currentmove[plies-1] != MOVE_NONE) {
-        int prevsq = to_sq(info->currentmove[plies-1]);
-        info->countermove[board.piecetype(prevsq)][prevsq] = move;
+        const unsigned prevsq = to_sq(info->currentmove[plies-1]);
+        info->countermove[board.piecetype(prevsq)][prevsq] = bestMove;
     }
 
-    info->history[board.piecetype(from_sq(move))][to_sq(move)] += depth * depth;
+    for (unsigned i = 0; i < quiets.size; i++) {
+        Move move = quiets.moves[i];
+        unsigned fromSq = from_sq(move);
+        unsigned toSq = to_sq(move);
+
+        int delta = (move == bestMove) ? bonus : -bonus;
+        int value = info->history[board.piecetype(fromSq)][toSq];
+        info->history[board.piecetype(fromSq)][toSq] += 32 * delta - value * std::abs(delta) / 512;
+    }
 
 }
 
-static int quiescence(int alpha, int beta, int depth, int plies, Board& board, SearchInfo *info) {
+static int qsearch(int alpha, int beta, int depth, int plies, Board& board, SearchInfo *info) {
+
+    assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE && alpha < beta);
 
     info->nodes++;
     info->selectiveDepth = std::max(info->selectiveDepth, plies);
-
-    if (info->stopped) return VALUE_NONE;
 
     if ((info->nodes & 1023) == 1023) {
         checkUp(info);
     }
 
-    if (board.checkDraw()) {
+    if (info->stopped || board.checkDraw()) {
         return VALUE_DRAW;
     }
 
@@ -440,13 +250,12 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
         alpha = bestValue;
     }
 
-    int movecount = 0;
+    int moveCount = 0;
     Move bestMove = MOVE_NONE;
     Move move = MOVE_NONE;
 
-    MovePicker picker(board, info, plies);
-    picker.phase = HashMoveQS;
-    picker.ttMove = ttMove;
+    MovePicker picker(board, info, plies, ttMove);
+    picker.phase = TTMoveQS;
 
     while ( (move = picker.pick() ) != MOVE_NONE )  {
 
@@ -454,10 +263,10 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
             continue;
         }
 
-        movecount++;
+        moveCount++;
 
         if (!board.is_legal(move)) {
-            movecount--;
+            moveCount--;
             continue;
         }
 
@@ -465,7 +274,7 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
 
         info->currentmove[plies] = move;
 
-        value = -quiescence(-beta, -alpha, depth - 1, plies + 1, board, info);
+        value = -qsearch(-beta, -alpha, depth - 1, plies + 1, board, info);
 
         board.undo_move();
 
@@ -483,7 +292,7 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
 
     }
 
-    if (inCheck && movecount == 0) {
+    if (inCheck && moveCount == 0) {
         return -VALUE_MATE + plies;
     }
 
@@ -492,9 +301,7 @@ static int quiescence(int alpha, int beta, int depth, int plies, Board& board, S
 
 }
 
-static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Board& board, SearchInfo *info, PvLine& pv, bool pruning, Move excluded = MOVE_NONE) {
-
-    if (info->stopped) return VALUE_NONE;
+static int search(int alpha, int beta, int depth, int plies, bool cutNode, Board& board, SearchInfo *info, PvLine& pv, bool pruning, Move excluded = MOVE_NONE) {
 
     if ((info->nodes & 1023) == 1023) {
         checkUp(info);
@@ -502,14 +309,17 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
 
     if (depth <= 0) {
 
-        return quiescence(alpha, beta, 0, plies, board, info);
+        return qsearch(alpha, beta, 0, plies, board, info);
 
     } else {
+
+        assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE && alpha < beta);
+        assert(depth > 0 && depth <= MAX_DEPTH);
 
         info->nodes++;
         info->selectiveDepth = std::max(info->selectiveDepth, plies);
 
-        if (board.checkDraw()) {
+        if (info->stopped || board.checkDraw()) {
             return VALUE_DRAW;
         }
 
@@ -517,6 +327,7 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
         const bool pvNode   = (beta - alpha != 1);
 
         PvLine newpv;
+        MoveList quietMoves;
         bool ttHit = false;
         bool improving = false;
         int value, bestValue, eval;
@@ -526,7 +337,6 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
 
         info->currentmove[plies] = MOVE_NONE;
         info->killers[plies + 1][0] = info->killers[plies + 1][1] = MOVE_NONE;
-        int prevsq = to_sq(info->currentmove[plies - 1]);
 
         TTEntry * entry;
         Move ttMove = MOVE_NONE;
@@ -554,10 +364,10 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
 
         }
 
-        const bool incheck = board.checkers();
+        const bool inCheck = board.checkers();
 
         // Static Eval
-        if (!incheck) {
+        if (!inCheck) {
 
             if (ttHit && entry->eval != VALUE_NONE) {
                 eval = info->eval[plies] = entry->eval;
@@ -575,18 +385,14 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
                 && depth < 2
                 && eval <= alpha - RazorMargin[depth])
             {
-                return quiescence(alpha, beta, 0, plies, board, info);
-                /*int ralpha = alpha - RazorMargin[depth];
-                int value = quiescence(ralpha, ralpha + 1, 0, plies, board, info);
-                if (value <= ralpha)
-                    return value;*/
+                return qsearch(alpha, beta, 0, plies, board, info);
             }
 
             // Null move pruning
-            if (!pvNode && depth >= 2 && !incheck && board.minors_or_majors(board.turn()) && eval >= beta) {
+            if (!pvNode && depth >= 2 && !inCheck && board.minors_or_majors(board.turn()) && eval >= beta) {
 
                 board.do_nullmove();
-                value = -alphabeta(-beta, -beta + 1, depth - (2 + (32 * depth + std::min(eval - beta, 512)) / 128), plies + 1, !cutNode, board, info, newpv, false);
+                value = -search(-beta, -beta + 1, depth - (2 + (32 * depth + std::min(eval - beta, 512)) / 128), plies + 1, !cutNode, board, info, newpv, false);
                 board.undo_nullmove();
 
                 if (value >= beta && std::abs(value) < (VALUE_MATE - MAX_DEPTH)) {
@@ -597,13 +403,13 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
 
         }
 
-        int movecount = 0;
+        int moveCount = 0;
         improving = plies >= 2 && (eval >= info->eval[plies - 2] || info->eval[plies - 2] == VALUE_NONE);
 
         // Internal Iterative Deepening
-        if (pvNode && !incheck && ttMove == MOVE_NONE && depth >= 6) {
+        if (pvNode && !inCheck && ttMove == MOVE_NONE && depth >= 6) {
 
-            value = alphabeta(alpha, beta, depth - 2, plies + 1, cutNode, board, info, newpv, pruning);
+            value = search(alpha, beta, depth - 2, plies + 1, cutNode, board, info, newpv, pruning);
 
             entry = tTable.probe(board.hashkey(), ttHit);
 
@@ -612,13 +418,7 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
             }
         }
 
-        MovePicker picker(board, info, plies, info->countermove[board.piecetype(prevsq)][prevsq]);
-
-        if (ttMove != MOVE_NONE) {
-            picker.ttMove = ttMove;
-        } else {
-            picker.phase++;
-        }
+        MovePicker picker(board, info, plies, ttMove);
 
         Move move;
 
@@ -631,6 +431,9 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
             bool givescheck = board.gives_check(move);
             bool promotion = is_promotion(move);
 
+            if (!capture && !promotion) {
+                quietMoves.append(move);
+            }
 
             if (   !capture
                 && !givescheck
@@ -638,13 +441,13 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
             {
 
                 // Futility Pruning
-                if (!pvNode && !incheck && movecount > 0 && depth <= 5 && eval + FutilityMargin[depth] <= alpha) {
+                if (!pvNode && !inCheck && moveCount > 0 && depth <= 5 && eval + FutilityMargin[depth] <= alpha) {
                     continue;
                 }
 
             }
 
-            movecount++;
+            moveCount++;
 
             int reductions = 0;
             int extensions = 0;
@@ -660,18 +463,18 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
                 && board.is_legal(move))
             {
                 int rbeta = std::max(ttValue - 2 * depth, -VALUE_MATE);
-                value = alphabeta(rbeta - 1, rbeta, depth / 2, plies + 1, cutNode, board, info, newpv, false, move);
+                value = search(rbeta - 1, rbeta, depth / 2, plies + 1, cutNode, board, info, newpv, false, move);
                 if (value < rbeta)
                     extensions = 1;
             } else {
                 // Check extension
-                if (incheck && board.see(move, board.turn()) >= 0) {
+                if (inCheck && board.see(move, board.turn()) >= 0) {
                     extensions = 1;
                 }
             }
 
             if (!board.is_legal(move)) {
-                movecount--;
+                moveCount--;
                 continue;
             }
 
@@ -682,52 +485,50 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
             newpv.size = 0;
 
             // Late Move Reduction
-            if (movecount > 1) {
+            if (moveCount > 1) {
                 if (   !capture
                     && !givescheck
                     && !promotion
                     && depth >= 3)
                 {
 
-                    reductions = LMRTable[depth][movecount];
+                    reductions = LMRTable[depth][moveCount];
 
                     reductions -= pvNode;
 
                     reductions += cutNode;
 
-                    reductions -= (move == picker.killers[0] || move == picker.killers[1] || move == picker.countermove);
+                    reductions -= (move == info->killers[plies][0] || move == info->killers[plies][1] || move == picker.counterMove);
 
-                    reductions -= incheck;
+                    reductions -= inCheck;
 
-                    reductions -= std::min(1, info->history[board.piecetype(from_sq(move))][to_sq(move)] / 512);
+                    reductions -= std::min(1, info->history[board.piecetype(to_sq(move))][to_sq(move)] / 512);
 
                     reductions = std::max(0, std::min(reductions, depth - 2));
 
                 }
 
-                value = -alphabeta(-alpha - 1, -alpha, depth - 1 + extensions - reductions, plies + 1, true, board, info, newpv, pruning);
+                value = -search(-alpha - 1, -alpha, depth - 1 + extensions - reductions, plies + 1, true, board, info, newpv, pruning);
                 if (value > alpha && reductions) {
-                    value = -alphabeta(-alpha - 1, -alpha, depth - 1 + extensions, plies + 1, !cutNode, board, info, newpv, pruning);
+                    value = -search(-alpha - 1, -alpha, depth - 1 + extensions, plies + 1, !cutNode, board, info, newpv, pruning);
                 }
                 if (value > alpha && value < beta) {
-                    value = -alphabeta(-beta, -alpha, depth - 1 + extensions, plies + 1, false, board, info, newpv, pruning);
+                    value = -search(-beta, -alpha, depth - 1 + extensions, plies + 1, false, board, info, newpv, pruning);
                 }
 
             } else {
 
-                value = -alphabeta(-beta, -alpha, depth - 1 + extensions, plies + 1, (pvNode ? false : !cutNode), board, info, newpv, pruning);
+                value = -search(-beta, -alpha, depth - 1 + extensions, plies + 1, (pvNode ? false : !cutNode), board, info, newpv, pruning);
 
             }
 
             board.undo_move();
 
             if (info->stopped)
-                return VALUE_NONE;
+                return VALUE_DRAW;
 
             if (value > bestValue) {
-
                 bestValue = value;
-
                 if (value > alpha) {
                     alpha = value;
                     bestMove = move;
@@ -744,11 +545,11 @@ static int alphabeta(int alpha, int beta, int depth, int plies, bool cutNode, Bo
 
         }
 
-        if (movecount == 0)
-            return excluded != MOVE_NONE ? alpha : incheck ? -VALUE_MATE + plies : VALUE_DRAW;
+        if (moveCount == 0)
+            return excluded != MOVE_NONE ? alpha : inCheck ? -VALUE_MATE + plies : VALUE_DRAW;
 
         if (bestValue >= beta && !is_promotion(bestMove) && !board.is_capture(bestMove)) {
-            update_quiet_stats(board, info, plies, depth, bestMove);
+            update_quiet_stats(board, info, plies, depth, quietMoves, bestMove);
         }
 
         if (excluded == MOVE_NONE)
@@ -765,20 +566,18 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
     SearchStats stats;
     SearchInfo info;
 
+    PvLine pv;
+    pv.clear();
     Move bestMove = MOVE_NONE;
-    std::string pvstring;
     int value = 0;
 
     info.start = Clock::now();
     init_time_management(limits, &info);
 
-    PvLine pv;
-    pv.clear();
-
     clearHistory(&info);
     clearKillers(&info);
 
-    for (int depth = 1; depth < limits.depth; depth++) {
+    for (unsigned depth = 1; depth < limits.depth; depth++) {
 
         pv.size = 0;
 
@@ -789,13 +588,13 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
 
         if (depth > 5) {
 
-            int window = 25 - std::min(depth / 3, 10) + std::abs(value) / 25;
+            int window = 25 - std::min(depth / 3, 10u) + std::abs(value) / 25;
             int alpha = value - window;
             int beta = value + window;
 
             while (true) {
 
-                value = alphabeta(alpha, beta, depth, 0, false, board, &info, pv, true);
+                value = search(alpha, beta, depth, 0, false, board, &info, pv, true);
 
                 if (value <= alpha) {
                     beta = (alpha + beta) / 2;
@@ -813,62 +612,41 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
             }
 
         } else {
-
-            value = alphabeta(-VALUE_INFINITE, VALUE_INFINITE, depth, 0, false, board, &info, pv, true);
-
+            value = search(-VALUE_INFINITE, VALUE_INFINITE, depth, 0, false, board, &info, pv, true);
         }
 
         info.value[depth] = value;
         long long duration = get_time_elapsed(info.start);
 
         if (!info.stopped) {
-
             // Drawn/mate positions return an empty pv
             if (pv.size > 0) {
 
                 bestMove = pv.line[0];
                 info.bestmove[depth] = bestMove;
-
-                pvstring.clear();
-
-                for (int pcount = 0; pcount < pv.size; pcount++) {
-                    pvstring += std::string() + move_to_string(pv.line[pcount]) + ' ';
-                }
-
-                std::cout << "info depth " << depth << " seldepth " << info.selectiveDepth;
-
-                if (std::abs(value) >= VALUE_MATE - MAX_DEPTH) {
-                    std::cout << " score mate " << ((value > 0 ? VALUE_MATE - value + 1 : -VALUE_MATE - value) / 2);
-                } else {
-                    std::cout << " score cp " << value;
-                }
-
-                std::cout << " nodes " << info.nodes << " time " << duration << " nps " << ((duration != 0) ? ((info.nodes * 1000) / duration) : info.nodes * 1000) << " pv " << pvstring << std::endl;
+                send_info(&info, pv, duration);
 
             }  else {
-                std::cout << "info string No legal moves available" << std::endl;
+                send_info(&info, pv, duration);
                 break;
             }
 
-            update_time_managememnt(&info);
+            update_time_managemement(&info);
 
             if (info.limitTime) {
                 if (duration >= limits.time || should_stop(info)) {
                     break;
                 }
             }
-
         } else {
             break;
         }
 
     }
 
-    stats.totalNodes = info.nodes;
+    send_bestmove(bestMove);
 
-    if (bestMove != MOVE_NONE) {
-        std::cout << "bestmove " << move_to_string(bestMove) << std::endl;
-    }
+    stats.totalNodes = info.nodes;
 
     return stats;
 

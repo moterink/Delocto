@@ -20,23 +20,25 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
 */
-#include <algorithm>
-#include <ctype.h>
+
 #include "board.hpp"
 #include "evaluate.hpp"
 #include "movegen.hpp"
 #include "hashkeys.hpp"
 
+#include <algorithm>
+#include <ctype.h>
+
 static const unsigned int CastleMask[64] = {
 
-    7, 15, 15, 15, 3, 15, 15, 11,
+    14, 15, 15, 12, 15, 15, 15, 13,
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
-    13, 15, 15, 15, 12, 15, 15, 14
+    11, 15, 15,  3, 15, 15, 15,  7
 
 };
 
@@ -88,7 +90,7 @@ void Board::calc_keys() {
     while (temp) {
 
         const unsigned int sq = pop_lsb(temp);
-        const PieceType pt    = piecetypes[sq];
+        const Piecetype pt    = piecetypes[sq];
 
         hash_piece(pt, sq);
 
@@ -163,59 +165,57 @@ void Board::set_fen(std::string fen) {
 
     std::string nums = "12345678";
 
-    int index = -1;
-    unsigned int findex = 0;
+    unsigned i;
+    unsigned r = 0;
+    unsigned f = 0;
 
-    while (fen[findex] != ' ') {
+    for (i = 0; fen[i] != ' '; i++) {
 
-        index++;
+        unsigned sq = 63 - square(f, r);
 
-        Color color = WHITE;
-        PieceType type = NOPIECE;
-
-        switch (fen[findex]) {
-
-            case 'P': { color = WHITE; type = WHITE_PAWN; break; }
-            case 'N': { color = WHITE; type = WHITE_KNIGHT; break; }
-            case 'B': { color = WHITE; type = WHITE_BISHOP; break; }
-            case 'R': { color = WHITE; type = WHITE_ROOK; break; }
-            case 'Q': { color = WHITE; type = WHITE_QUEEN; break; }
-            case 'K': { color = WHITE; type = WHITE_KING; break; }
-            case 'p': { color = BLACK; type = BLACK_PAWN; break; }
-            case 'n': { color = BLACK; type = BLACK_KNIGHT; break; }
-            case 'b': { color = BLACK; type = BLACK_BISHOP; break; }
-            case 'r': { color = BLACK; type = BLACK_ROOK; break; }
-            case 'q': { color = BLACK; type = BLACK_QUEEN; break; }
-            case 'k': { color = BLACK; type = BLACK_KING; break; }
-
-        }
-
-        if (fen[findex] == '/') {
-            index--;
-        } else if (nums.find(fen[findex]) != std::string::npos) {
-            int pad = fen[findex] - '0';
-            pad--;
-            index += pad;
+        if (fen[i] == '/') {
+            f = 0;
+            r++;
+        } else if (nums.find(fen[i]) != std::string::npos) {
+            f += fen[i] - '0';
         } else {
-            bitboards[color] |= (1ULL << (63 - index));
-            bitboards[type] |= (1ULL << (63 - index));
-            state.pst[color] += Pst[type][index];
-            piecetypes[index] = type;
+            Color color;
+            Piecetype type;
+            switch (fen[i]) {
+
+                case 'P': { color = WHITE; type = WHITE_PAWN; break; }
+                case 'N': { color = WHITE; type = WHITE_KNIGHT; break; }
+                case 'B': { color = WHITE; type = WHITE_BISHOP; break; }
+                case 'R': { color = WHITE; type = WHITE_ROOK; break; }
+                case 'Q': { color = WHITE; type = WHITE_QUEEN; break; }
+                case 'K': { color = WHITE; type = WHITE_KING; break; }
+                case 'p': { color = BLACK; type = BLACK_PAWN; break; }
+                case 'n': { color = BLACK; type = BLACK_KNIGHT; break; }
+                case 'b': { color = BLACK; type = BLACK_BISHOP; break; }
+                case 'r': { color = BLACK; type = BLACK_ROOK; break; }
+                case 'q': { color = BLACK; type = BLACK_QUEEN; break; }
+                case 'k': { color = BLACK; type = BLACK_KING; break; }
+
+            }
+
+            bitboards[color] |= SQUARES[sq];
+            bitboards[type] |= SQUARES[sq];
+            state.pst[color] += Pst[type][sq];
+            piecetypes[sq] = type;
             state.material[color] += Material[pt_index(type)];
             piececounts[type]++;
+            f++;
         }
-
-        ++findex;
 
     }
 
-    ++findex;
-    stm = (fen[findex] == 'w') ? WHITE : BLACK;
-    findex += 2;
+    ++i;
+    stm = (fen[i] == 'w') ? WHITE : BLACK;
+    i += 2;
 
-    while (fen[findex] != ' ') {
+    while (fen[i] != ' ') {
 
-        switch (fen[findex]) {
+        switch (fen[i]) {
 
             case 'K': { state.castling |= WKCASFLAG; break; }
             case 'Q': { state.castling |= WQCASFLAG; break; }
@@ -224,22 +224,22 @@ void Board::set_fen(std::string fen) {
 
         }
 
-        ++findex;
+        ++i;
 
     }
 
-    ++findex;
+    ++i;
 
-    state.enPassant = (fen[findex] != '-') ? square(fen[findex] - 'a', 8 - (fen[findex + 1] - '0')) : NOSQ;
+    state.enPassant = (fen[i] != '-') ? square(7 - (fen[i] - 'a'), fen[i + 1] - '1') : NOSQ;
 
-    findex += 2;
+    i += 2;
 
     if (state.enPassant != NOSQ) {
-        findex++;
+        i++;
     }
 
-    if (fen.size() >= findex && isdigit(fen[findex])) {
-        std::string cut = fen.substr(findex);
+    if (fen.size() >= i && isdigit(fen[i])) {
+        std::string cut = fen.substr(i);
         state.fiftyMoves = std::stoi(cut.substr(0, cut.find(" ")));
     } else {
         state.fiftyMoves = 0;
@@ -282,8 +282,8 @@ bool Board::do_move(const Move move) {
     const int fromsq      = from_sq(move);
     const int tosq        = to_sq(move);
     const MoveType  mtype = move_type(move);
-    const PieceType ftype = piecetypes[fromsq];
-    const PieceType ttype = piecetypes[tosq];
+    const Piecetype ftype = piecetypes[fromsq];
+    const Piecetype ttype = piecetypes[tosq];
 
     states.push_back(state);
     moves.push_back(move);
@@ -360,9 +360,9 @@ bool Board::do_move(const Move move) {
 
             {
 
-                const unsigned int rtosq   = tosq + ((tosq == G1 || tosq == G8) ? -1 :  1);
-                const unsigned int rfromsq = tosq + ((tosq == G1 || tosq == G8) ?  1 : -2);
-                const PieceType rook = Rook(stm);
+                const unsigned int rtosq   = tosq + ((tosq == G1 || tosq == G8) ?  1 : -1);
+                const unsigned int rfromsq = tosq + ((tosq == G1 || tosq == G8) ? -1 :  2);
+                const Piecetype rook = Rook(stm);
 
                 bitboards[rook] ^= SQUARES[rfromsq];
                 bitboards[rook] |= SQUARES[rtosq];
@@ -388,7 +388,7 @@ bool Board::do_move(const Move move) {
             {
 
                 const unsigned int capsq = tosq + DIRECTIONS[stm][DOWN];
-                const PieceType pawn = Pawn(!stm);
+                const Piecetype pawn = Pawn(!stm);
 
                 // NOTE: do not assign pawn to state.captured!!!
 
@@ -418,7 +418,7 @@ bool Board::do_move(const Move move) {
 
             {
 
-                const PieceType ptype = prom_piecetype(mtype, stm);
+                const Piecetype ptype = prom_piecetype(mtype, stm);
 
                 // Change pawn to promotion piece
                 bitboards[ftype] ^= SQUARES[tosq];
@@ -465,7 +465,7 @@ bool Board::do_move(const Move move) {
 
 void Board::undo_move() {
 
-    assert(move != MOVE_NONE);
+    assert(!moves.empty());
 
     const Move move = moves.back();
 
@@ -474,7 +474,7 @@ void Board::undo_move() {
     const unsigned int fromsq = from_sq(move);
     const unsigned int tosq   = to_sq(move);
     const MoveType type       = move_type(move);
-    const PieceType ftype     = piecetypes[tosq];
+    const Piecetype ftype     = piecetypes[tosq];
 
     piecetypes[fromsq] = ftype;
     piecetypes[tosq] = state.captured;
@@ -499,9 +499,9 @@ void Board::undo_move() {
 
             {
 
-                const unsigned int rtosq   = tosq + ((tosq == G1 || tosq == G8) ? -1 :  1);
-                const unsigned int rfromsq = tosq + ((tosq == G1 || tosq == G8) ?  1 : -2);
-                const PieceType rook = Rook(stm);
+                const unsigned int rtosq   = tosq + ((tosq == G1 || tosq == G8) ?  1 : -1);
+                const unsigned int rfromsq = tosq + ((tosq == G1 || tosq == G8) ? -1 :  2);
+                const Piecetype rook = Rook(stm);
 
                 bitboards[rook] ^= SQUARES[rtosq];
                 bitboards[rook] |= SQUARES[rfromsq];
@@ -519,7 +519,7 @@ void Board::undo_move() {
             {
 
                 const unsigned int capsq = tosq + DIRECTIONS[stm][DOWN];
-                const PieceType pawn = Pawn(!stm);
+                const Piecetype pawn = Pawn(!stm);
 
                 bitboards[pawn] |= SQUARES[capsq];
                 bitboards[!stm] |= SQUARES[capsq];
@@ -534,7 +534,7 @@ void Board::undo_move() {
 
             {
 
-                const PieceType ptype = Pawn(stm);
+                const Piecetype ptype = Pawn(stm);
 
                 // Change pawn to promotion piece
                 bitboards[ftype] ^= SQUARES[fromsq];
@@ -644,7 +644,7 @@ bool Board::is_valid(const Move move) const {
         }
 
         if (is_promotion(move)) {
-            if (!(SQUARES[fromsq] & bitboards[Pawn(stm)]) || !(SQUARES[tosq] & PAWN_FINALRANK[stm]) || !(SQUARES[tosq] & generatePawnMoves(stm, fromsq, bitboards[ALLPIECES], bitboards[!stm]))) {
+            if (!(SQUARES[fromsq] & bitboards[Pawn(stm)]) || !(SQUARES[tosq] & PAWN_FINALRANK[stm]) || !(SQUARES[tosq] & generate_pawn_moves(stm, fromsq, bitboards[ALLPIECES], bitboards[!stm]))) {
                 return false;
             }
         }
