@@ -50,7 +50,7 @@ class MovePicker {
             ttMove = t;
             if (plies > 0 && info->currentmove[plies-1] != MOVE_NONE) {
                 unsigned prevSq = to_sq(info->currentmove[plies-1]);
-                counterMove = info->countermove[board.piecetype(prevSq)][prevSq];
+                counterMove = info->countermove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq];
             }
 
         }

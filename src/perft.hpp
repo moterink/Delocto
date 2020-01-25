@@ -29,13 +29,15 @@
 
 typedef struct {
 
-    uint64_t caps = 0;
-    uint64_t enpas = 0;
-    uint64_t castles = 0;
-    uint64_t proms = 0;
+    unsigned depth = 0;
+    unsigned long divide[250] = { 0 };
+    unsigned long caps = 0;
+    unsigned long enpas = 0;
+    unsigned long castles = 0;
+    unsigned long proms = 0;
 
 } PerftInfo;
 
-extern void perftTest(const int depth, Board& board);
+extern void perftTest(const unsigned depth, Board& board);
 
 #endif

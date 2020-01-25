@@ -25,32 +25,14 @@
 #include "evaluate.hpp"
 #include "timeman.hpp"
 
+#include <string_view>
+
 static const uint64_t KING_START_SQ[2]       = { SQUARES[E1], SQUARES[E8] };
 static const uint64_t KING_CASTLE_SQUARES[2] = { (SQUARES[G1] | SQUARES[C1]), (SQUARES[G8] | SQUARES[C8]) };
 
 TranspositionTable tTable;
 PawnTable pawnTable;
 MaterialTable materialTable;
-
-static const std::string PromotionChar = "qrbn";
-
-inline MoveType char_to_promotion(const char c) {
-
-    return (PromotionChar.find(c) * 2 + 1) * QUEENPROM;
-
-}
-
-inline char promotion_to_char(const MoveType mt) {
-
-    return PromotionChar[(mt / QUEENPROM) / 2];
-
-}
-
-inline std::string move_to_string(const Move raw) {
-
-    return (std::string() + SQUARE_NAMES[from_sq(raw)] + SQUARE_NAMES[to_sq(raw)]) + (is_promotion(raw) ? std::string(1, promotion_to_char(move_type(raw))) : "");
-
-}
 
 static void play_sequence(Board& board, std::string fen, std::string input, std::string::size_type start) {
 
@@ -69,9 +51,9 @@ static void play_sequence(Board& board, std::string fen, std::string input, std:
 
             if (input[c] != ' ') {
                 type = char_to_promotion(input[c]);
-            } else if ((SQUARES[fromsq] & (board.pieces(KING, board.turn()) & KING_START_SQ[board.turn()])) && (SQUARES[tosq] & KING_CASTLE_SQUARES[board.turn()])) {
+            } else if ((SQUARES[fromsq] & (board.pieces(board.turn(), KING) & KING_START_SQ[board.turn()])) && (SQUARES[tosq] & KING_CASTLE_SQUARES[board.turn()])) {
                 type = CASTLING;
-            } else if (tosq == board.enPassant() && SQUARES[fromsq] & board.pieces(PAWN, board.turn())) {
+            } else if (tosq == board.enPassant() && SQUARES[fromsq] & board.pieces(board.turn(), PAWN)) {
                 type = ENPASSANT;
             }
 
@@ -176,21 +158,21 @@ void uciloop(int argc, char* argv[]) {
 
     do {
 
-        if (argc == 1)
+        if (argc <= 1)
             std::getline(std::cin, input);
 
         std::cout << std::flush;
 
-        if (input.find("ucinewgame") == 0) {
-            newgame(board);
-        } else if (input.find("isready") == 0) {
-            std::cout << "readyok" << std::endl;
-        } else if (input.find("uci") == 0) {
+        if (input.compare("uci") == 0) {
             show_information();
-        }  else if (input.find("position startpos moves ") == 0) {
-            play_sequence(board, STARTFEN, input, 24);
-        } else if (input.find("position startpos") == 0) {
+        } else if (input.compare("ucinewgame") == 0) {
+            newgame(board);
+        } else if (input.compare("isready") == 0) {
+            std::cout << "readyok" << std::endl;
+        } else if (input.compare("position startpos") == 0) {
             board.set_fen(STARTFEN);
+        } else if (input.find("position startpos moves ") == 0) {
+            play_sequence(board, STARTFEN, input, 24);
         } else if (input.find("position fen ") == 0) {
             const std::string::size_type end = input.find("moves ");
             if (end != std::string::npos) {
@@ -236,18 +218,19 @@ void uciloop(int argc, char* argv[]) {
             }
 
             go(board, limits);
-        } else if (input.find("eval") == 0) {
+        } else if (input.compare("eval") == 0) {
             evaluateInfo(board);
-        } else if (input.find("perft") == 0) {
-            perftTest(10, board);
-        } else if (input.find("bench") == 0) {
+        } else if (input.find("perft ") == 0) {
+            unsigned depth = std::stoi(input.substr(6));
+            perftTest(depth, board);
+        } else if (input.compare("bench") == 0) {
             benchmark();
-        } else if (input.find("quit") == 0) {
+        } else if (input.compare("quit") == 0) {
             break;
         }
 
         input.clear();
 
-    } while (argc == 1);
+    } while (argc <= 1);
 
 }

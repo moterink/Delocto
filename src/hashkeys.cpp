@@ -23,41 +23,39 @@
 
 #include "hashkeys.hpp"
 
-uint64_t pieceHashKeys[16][64];
-uint64_t pawnHashKeys[2][64];
-uint64_t materialHashKeys[14][64];
-uint64_t turnHashKeys[2];
-uint64_t castlingHashKeys[16];
-uint64_t enPassantHashKeys[9];
+uint64_t PieceHashKeys[2][7][64];
+uint64_t PawnHashKeys[2][64];
+uint64_t MaterialHashKeys[2][6][9];
+uint64_t TurnHashKeys[2];
+uint64_t CastlingHashKeys[16];
+uint64_t EnPassantHashKeys[8];
 
 void init_hashkeys() {
 
-    for (int i = 0; i < 16; i++) {
-        for (int j = 0; j < 64; j++) {
-            pieceHashKeys[i][j] = rand64();
+    for (unsigned c = WHITE; c < BOTH; c++) {
+        for (unsigned sq = 0; sq < 64; sq++) {
+            for (unsigned pt = PAWN; pt < PIECE_NONE+1; pt++) {
+                PieceHashKeys[c][pt][sq] = rand64();
+            }
+            PawnHashKeys[c][sq] = rand64();
         }
-        castlingHashKeys[i] = rand64();
-    }
-
-    for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < 64; j++) {
-            pawnHashKeys[i][j] = rand64();
-        }
-    }
-
-    for (int i = 0; i < 14; i++) {
-        for (int j = 0; j < 64; j++) {
-            materialHashKeys[i][j] = rand64();
+        for (unsigned pt = PAWN; pt < PIECE_NONE; pt++) {
+            for (unsigned i = 0; i < 10; i++) {
+                MaterialHashKeys[c][pt][i] = rand64();
+            }
         }
     }
 
-    for (int i = 0; i < 9; i++) {
-        enPassantHashKeys[i] = rand64();
+    for (unsigned i = 0; i < 16; i++) {
+        CastlingHashKeys[i] = rand64();
     }
 
-    turnHashKeys[0] = rand64();
-    turnHashKeys[1] = rand64();
+    for (unsigned i = 0; i < 8; i++) {
+        EnPassantHashKeys[i] = rand64();
+    }
 
+    TurnHashKeys[WHITE] = rand64();
+    TurnHashKeys[BLACK] = rand64();
 
 }
 

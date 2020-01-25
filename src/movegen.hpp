@@ -54,19 +54,19 @@ class MoveList {
 // Pawns
 inline unsigned get_pawn_push_sq(const unsigned sq, const uint64_t allPieces, const int up) {
 
-    return (sq_valid(sq + up) && (!(SQUARES[sq + up] & allPieces))) ? sq + up : NOSQ;
+    return (sq_valid(sq + up) && (!(SQUARES[sq + up] & allPieces))) ? sq + up : SQUARE_NONE;
 
 }
 
 inline unsigned get_pawn_double_push_sq(const unsigned sq, const uint64_t allPieces, const int up, const Color color) {
 
-    return (sq_valid(sq + (2 * up)) && (SQUARES[sq] & PAWN_STARTRANK[color]) && (!((SQUARES[sq + (2 * up)]) & allPieces)) && (!(SQUARES[sq + up] & allPieces))) ? sq + (2 * up) : NOSQ;
+    return (sq_valid(sq + (2 * up)) && (SQUARES[sq] & PAWN_STARTRANK[color]) && (!((SQUARES[sq + (2 * up)]) & allPieces)) && (!(SQUARES[sq + up] & allPieces))) ? sq + (2 * up) : SQUARE_NONE;
 
 }
 
 inline uint64_t generate_pawn_captures(const unsigned sq, const uint64_t oppPieces, const Color color) {
 
-    return AttackBitboards[Pawn(color)][sq] & oppPieces;
+    return PawnAttacks[color][sq] & oppPieces;
 
 }
 
@@ -86,13 +86,13 @@ inline uint64_t generate_pawns_attacks(const uint64_t pawns, const Color color) 
 // Knights & Kings
 inline uint64_t gen_knight_moves(const unsigned sq, const uint64_t ownPieces) {
 
-    return AttackBitboards[KNIGHT][sq] & ~ownPieces;
+    return KnightAttacks[sq] & ~ownPieces;
 
 }
 
 inline uint64_t gen_king_moves(const unsigned sq, const uint64_t ownPieces) {
 
-    return AttackBitboards[KING][sq] & ~ownPieces;
+    return KingAttacks[sq] & ~ownPieces;
 
 }
 

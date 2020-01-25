@@ -76,10 +76,12 @@ void PvLine::clear() {
 
 void clearHistory(SearchInfo* info) {
 
-    for (unsigned int pt = WHITE_PAWN; pt <= BLACK_KING; pt++) {
-        for (unsigned int sq = 0; sq < 64; sq++) {
-            info->history[pt][sq] = 0;
-            info->countermove[pt][sq] = MOVE_NONE;
+    for (Color c = WHITE; c < BOTH; c++) {
+        for (Piecetype pt = PAWN; pt < PIECE_NONE+1; pt++) {
+            for (unsigned sq = 0; sq < 64; sq++) {
+                info->history[c][pt][sq] = 0;
+                info->countermove[c][pt][sq] = MOVE_NONE;
+            }
         }
     }
 
@@ -106,10 +108,10 @@ static void checkUp(SearchInfo* info) {
 
 }
 
-uint64_t Board::getLeastValuablePiece(uint64_t attackers, const Color color, Piecetype& pt) const {
+uint64_t Board::least_valuable_piece(uint64_t attackers, const Color color, Piecetype& pt) const {
 
-    for (pt = Pawn(color); pt <= King(color); pt += 2) {
-        uint64_t subset = attackers & bitboards[pt];
+    for (pt = PAWN; pt <= KING; pt++) {
+        uint64_t subset = attackers & pieces(color, pt);
         if (subset) {
             return subset & -subset;
         }
@@ -127,18 +129,18 @@ int Board::see(const Move move, Color color) const {
     unsigned int fromsq = from_sq(move);
     unsigned int tosq   = to_sq(move);
 
-    Piecetype attacker = piecetypes[fromsq];
+    Piecetype attacker = pieceTypes[fromsq];
 
-    uint64_t mayXray = pieces(PAWN, WHITE) | pieces(PAWN, BLACK) | pieces(BISHOP, WHITE) | pieces(BISHOP, BLACK) | pieces(ROOK, WHITE) | pieces(ROOK, BLACK) | pieces(QUEEN, WHITE) | pieces(QUEEN, BLACK);
+    uint64_t mayXray = bbPieces[PAWN] | bbPieces[BISHOP] | bbPieces[ROOK] | bbPieces[QUEEN];
     uint64_t fromset = SQUARES[fromsq];
 
-    uint64_t occupied  = pieces(ALLPIECES);
-    uint64_t attackers = all_attackers(tosq, occupied);
+    uint64_t occupied  = bbColors[BOTH];
+    uint64_t attackers = sq_attackers(WHITE, tosq, occupied) | sq_attackers(BLACK, tosq, occupied);
 
     if (is_ep(move)) {
         value[d] = SeeMaterial[PAWN];
     } else {
-        value[d] = SeeMaterial[piecetypes[tosq]];
+        value[d] = SeeMaterial[pieceTypes[tosq]];
     }
 
     do {
@@ -155,10 +157,10 @@ int Board::see(const Move move, Color color) const {
         occupied  ^= fromset;
 
         if (fromset & mayXray) {
-            attackers |= all_slider_attackers(tosq, occupied) & occupied;
+            attackers |= slider_attackers(tosq, occupied) & occupied;
         }
 
-        fromset = getLeastValuablePiece(attackers, color, attacker);
+        fromset = least_valuable_piece(attackers, color, attacker);
 
     } while (fromset);
 
@@ -180,8 +182,8 @@ static void update_quiet_stats(const Board& board, SearchInfo *info, const int p
     }
 
     if (info->currentmove[plies-1] != MOVE_NONE) {
-        const unsigned prevsq = to_sq(info->currentmove[plies-1]);
-        info->countermove[board.piecetype(prevsq)][prevsq] = bestMove;
+        const unsigned prevSq = to_sq(info->currentmove[plies-1]);
+        info->countermove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq] = bestMove;
     }
 
     for (unsigned i = 0; i < quiets.size; i++) {
@@ -190,8 +192,8 @@ static void update_quiet_stats(const Board& board, SearchInfo *info, const int p
         unsigned toSq = to_sq(move);
 
         int delta = (move == bestMove) ? bonus : -bonus;
-        int value = info->history[board.piecetype(fromSq)][toSq];
-        info->history[board.piecetype(fromSq)][toSq] += 32 * delta - value * std::abs(delta) / 512;
+        int value = info->history[board.turn()][board.piecetype(fromSq)][toSq];
+        info->history[board.turn()][board.piecetype(fromSq)][toSq] += 32 * delta - value * std::abs(delta) / 512;
     }
 
 }
@@ -228,7 +230,7 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
     if (!pvNode && ttHit && entry->depth >= ttDepth) {
 
         const int ttValue = value_from_tt(entry->value, plies);
-        ttMove = board.is_valid(entry->bestMove) ? entry->bestMove : MOVE_NONE;
+        ttMove = entry->bestMove;
 
         if (   ttValue != VALUE_NONE
             && ((entry->flag == BOUND_EXACT)
@@ -268,6 +270,10 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
         if (!board.is_legal(move)) {
             moveCount--;
             continue;
+        }
+
+        if (info->depth == 3 && plies == 4 && moveCount == 2) {
+            int x = 0;
         }
 
         board.do_move(move);
@@ -348,14 +354,13 @@ static int search(int alpha, int beta, int depth, int plies, bool cutNode, Board
 
             if (ttHit) {
 
-                ttMove = board.is_valid(entry->bestMove) ? entry->bestMove : MOVE_NONE;
+                ttMove = entry->bestMove;
                 ttValue = value_from_tt(entry->value, plies);
 
                 if (!pvNode && entry->depth >= depth) {
                     if ((entry->flag == BOUND_EXACT)
                      || (entry->flag == BOUND_UPPER && ttValue <= alpha)
                      || (entry->flag == BOUND_LOWER && ttValue >= beta)) {
-                        pv.append(ttMove);
                         return ttValue;
                     }
                 }
@@ -414,7 +419,7 @@ static int search(int alpha, int beta, int depth, int plies, bool cutNode, Board
             entry = tTable.probe(board.hashkey(), ttHit);
 
             if (ttHit) {
-                ttMove = board.is_valid(entry->bestMove) ? entry->bestMove : MOVE_NONE;
+                ttMove = entry->bestMove;
             }
         }
 
@@ -502,7 +507,7 @@ static int search(int alpha, int beta, int depth, int plies, bool cutNode, Board
 
                     reductions -= inCheck;
 
-                    reductions -= std::min(1, info->history[board.piecetype(to_sq(move))][to_sq(move)] / 512);
+                    reductions -= std::min(1, info->history[!board.turn()][board.piecetype(to_sq(move))][to_sq(move)] / 512);
 
                     reductions = std::max(0, std::min(reductions, depth - 2));
 

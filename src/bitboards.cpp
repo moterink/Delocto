@@ -59,15 +59,20 @@ constexpr uint64_t Magics[2][64] = {
 Magic BishopMagics[64];
 Magic RookMagics[64];
 
-uint64_t BishopAttacks[0x1480];
-uint64_t RookAttacks[0x19000];
+uint64_t BishopMagicAttacks[0x1480];
+uint64_t RookMagicAttacks[0x19000];
 
 uint64_t PawnAttacksSpan[2][64];
 uint64_t KingShelterSpan[2][64];
 uint64_t KingRing[2][64];
 uint64_t RayTable[64][64];
 uint64_t LineTable[64][64];
-uint64_t AttackBitboards[14][64];
+uint64_t PawnAttacks[2][64];
+uint64_t KnightAttacks[64];
+uint64_t BishopAttacks[64];
+uint64_t RookAttacks[64];
+uint64_t QueenAttacks[64];
+uint64_t KingAttacks[64];
 uint64_t FrontFileMask[2][64];
 uint64_t PassedPawnMask[2][64];
 uint64_t BackwardPawnMask[2][64];
@@ -130,15 +135,15 @@ void init_attacks() {
 
     for (unsigned sq = 0; sq < 64; sq++) {
 
-        AttackBitboards[WHITE_PAWN][sq]   = ((SQUARES[sq] & ~FILE_A) << 9) | ((SQUARES[sq] & ~FILE_H) << 7);
-        AttackBitboards[BLACK_PAWN][sq]   = ((SQUARES[sq] & ~FILE_A) >> 7) | ((SQUARES[sq] & ~FILE_H) >> 9);
+        PawnAttacks[WHITE][sq] = ((SQUARES[sq] & ~FILE_A) << 9) | ((SQUARES[sq] & ~FILE_H) << 7);
+        PawnAttacks[BLACK][sq] = ((SQUARES[sq] & ~FILE_A) >> 7) | ((SQUARES[sq] & ~FILE_H) >> 9);
 
-        AttackBitboards[WHITE_KNIGHT][sq] = AttackBitboards[BLACK_KNIGHT][sq] = ((SQUARES[sq] & ~(FILE_A | RANK_8 | RANK_7)) << 17) | ((SQUARES[sq] & ~(FILE_H | RANK_8 | RANK_7)) << 15) | ((SQUARES[sq] & ~(FILE_A | FILE_B | RANK_8)) << 10) | ((SQUARES[sq] & ~(FILE_H | FILE_G | RANK_8)) << 6) | ((SQUARES[sq] & ~(FILE_A | FILE_B | RANK_1)) >> 6) | ((SQUARES[sq] & ~(FILE_H | FILE_G | RANK_1)) >> 10) | ((SQUARES[sq] & ~(FILE_A | RANK_1 | RANK_2)) >> 15) | ((SQUARES[sq] & ~(FILE_H | RANK_1 | RANK_2)) >> 17);
-        AttackBitboards[WHITE_KING][sq]   = AttackBitboards[BLACK_KING][sq]   = ((SQUARES[sq] & ~(FILE_A | RANK_8)) << 9) | ((SQUARES[sq] & ~RANK_8) << 8) | ((SQUARES[sq] & ~(FILE_H | RANK_8)) << 7) | ((SQUARES[sq] & ~FILE_A) << 1) | ((SQUARES[sq] & ~FILE_H) >> 1) | ((SQUARES[sq] & ~(FILE_A | RANK_1)) >> 7) | ((SQUARES[sq] & ~RANK_1) >> 8) | ((SQUARES[sq] & ~(FILE_H | RANK_1)) >> 9);
+        KnightAttacks[sq] = ((SQUARES[sq] & ~(FILE_A | RANK_8 | RANK_7)) << 17) | ((SQUARES[sq] & ~(FILE_H | RANK_8 | RANK_7)) << 15) | ((SQUARES[sq] & ~(FILE_A | FILE_B | RANK_8)) << 10) | ((SQUARES[sq] & ~(FILE_H | FILE_G | RANK_8)) << 6) | ((SQUARES[sq] & ~(FILE_A | FILE_B | RANK_1)) >> 6) | ((SQUARES[sq] & ~(FILE_H | FILE_G | RANK_1)) >> 10) | ((SQUARES[sq] & ~(FILE_A | RANK_1 | RANK_2)) >> 15) | ((SQUARES[sq] & ~(FILE_H | RANK_1 | RANK_2)) >> 17);
+        KingAttacks[sq]   = ((SQUARES[sq] & ~(FILE_A | RANK_8)) << 9) | ((SQUARES[sq] & ~RANK_8) << 8) | ((SQUARES[sq] & ~(FILE_H | RANK_8)) << 7) | ((SQUARES[sq] & ~FILE_A) << 1) | ((SQUARES[sq] & ~FILE_H) >> 1) | ((SQUARES[sq] & ~(FILE_A | RANK_1)) >> 7) | ((SQUARES[sq] & ~RANK_1) >> 8) | ((SQUARES[sq] & ~(FILE_H | RANK_1)) >> 9);
 
-        AttackBitboards[WHITE_BISHOP][sq] = AttackBitboards[BLACK_BISHOP][sq] = get_slider_attacks(sq, 0, BishopDirections);
-        AttackBitboards[WHITE_ROOK][sq]   = AttackBitboards[BLACK_ROOK][sq]   = get_slider_attacks(sq, 0, RookDirections);
-        AttackBitboards[WHITE_QUEEN][sq]  = AttackBitboards[BLACK_QUEEN][sq]  = AttackBitboards[WHITE_BISHOP][sq] | AttackBitboards[WHITE_ROOK][sq];
+        BishopAttacks[sq] = get_slider_attacks(sq, 0, BishopDirections);
+        RookAttacks[sq]   = get_slider_attacks(sq, 0, RookDirections);
+        QueenAttacks[sq]  = BishopAttacks[sq] | RookAttacks[sq];
 
     }
 
@@ -146,8 +151,8 @@ void init_attacks() {
 
 void init_bitboards() {
 
-    BishopMagics[0].attacks = BishopAttacks;
-    RookMagics[0].attacks   = RookAttacks;
+    BishopMagics[0].attacks = BishopMagicAttacks;
+    RookMagics[0].attacks   = RookMagicAttacks;
 
     for (unsigned sq = 0; sq < 64; sq++) {
 
@@ -174,8 +179,8 @@ void init_bitboards() {
         KingShelterSpan[WHITE][sq] = ((kingsFrontW & ~FILE_A) << 1) | ((kingsFrontW & ~FILE_H) >> 1) | kingsFrontW;
         KingShelterSpan[BLACK][sq] = ((kingsFrontB & ~FILE_A) << 1) | ((kingsFrontB & ~FILE_H) >> 1) | kingsFrontB;
 
-        KingRing[WHITE][sq] = AttackBitboards[WHITE_KING][sq];
-        KingRing[BLACK][sq] = AttackBitboards[BLACK_KING][sq];
+        KingRing[WHITE][sq] = KingAttacks[sq];
+        KingRing[BLACK][sq] = KingAttacks[sq];
         if (relative_rank(WHITE, sq) == 0) {
             KingRing[WHITE][sq] |= shift_up(KingRing[WHITE][sq], WHITE);
         }
@@ -209,8 +214,8 @@ void init_bitboards() {
 
     for (unsigned int sq1 = 0; sq1 < 64; sq1++) {
 
-        const uint64_t bishopPseudoBB = AttackBitboards[BISHOP][sq1];
-        const uint64_t rookPseudoBB   = AttackBitboards[ROOK][sq1];
+        const uint64_t bishopPseudoBB = BishopAttacks[sq1];
+        const uint64_t rookPseudoBB   = RookAttacks[sq1];
 
         for (unsigned int sq2 = 0; sq2 < 64; sq2++) {
 

@@ -88,10 +88,9 @@ enum {
     H6, G6, F6, E6, D6, C6, B6, A6,
     H7, G7, F7, E7, D7, C7, B7, A7,
     H8, G8, F8, E8, D8, C8, B8, A8,
+    SQUARE_NONE
 
 };
-
-#define NOSQ 64
 
 static const uint64_t WHITE_SQUARES = 0xaa55aa55aa55aa55;
 static const uint64_t BLACK_SQUARES = 0x55aa55aa55aa55aa;
@@ -110,13 +109,11 @@ static const uint64_t CASTLE_MASKS[2]   = { WHITE_CASTLE_MASK, BLACK_CASTLE_MASK
 static const uint64_t CASTLE_SQUARES[4] = { G1, C1, G8, C8 };
 static const uint64_t CASTLE_FLAGS[4]   = { WKCASFLAG, WQCASFLAG, BKCASFLAG, BQCASFLAG };
 
-typedef unsigned Color;
-typedef unsigned Piecetype;
 typedef unsigned Direction;
 typedef uint16_t Move;
 typedef uint16_t MoveType;
 
-enum MoveGenType : unsigned int {
+enum MoveGenType : unsigned {
 
     QUIETS, CAPTURES
 
@@ -151,9 +148,7 @@ typedef struct {
 
 // Directions
 enum {
-
     LEFT, UP, RIGHT, DOWN, LEFTUP, LEFTDOWN, RIGHTUP, RIGHTDOWN
-
 };
 
 static const int DIRECTIONS[2][8] = {
@@ -164,36 +159,14 @@ static const int DIRECTIONS[2][8] = {
 };
 
 // Colors
-#define WHITE 0
-#define BLACK 1
+enum Color : unsigned{
+    WHITE, BLACK, BOTH
+};
 
 // Piecetypes
-#define PAWN       2
-#define KNIGHT     4
-#define BISHOP     6
-#define ROOK       8
-#define QUEEN     10
-#define KING      12
-#define NOPIECE   14
-#define ALLPIECES 15
-
-// Piecetypes are defined such that a simple AND can show color and general type
-
-// White piecetypes
-#define WHITE_PAWN    2
-#define WHITE_KNIGHT  4
-#define WHITE_BISHOP  6
-#define WHITE_ROOK    8
-#define WHITE_QUEEN  10
-#define WHITE_KING   12
-
-// Black piecetypes
-#define BLACK_PAWN    3
-#define BLACK_KNIGHT  5
-#define BLACK_BISHOP  7
-#define BLACK_ROOK    9
-#define BLACK_QUEEN  11
-#define BLACK_KING   13
+enum Piecetype : unsigned {
+    PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, PIECE_NONE
+};
 
 // Lookup table for debruijn-index
 static const int bitIndex64[64] = {
@@ -354,13 +327,6 @@ inline unsigned relative_square(const Color color, const unsigned sq) {
 
 }
 
-// Get absolute piecetype without color
-inline Piecetype type(const Piecetype pt) {
-
-    return (pt & 14);
-
-}
-
 // Get most forward piece on bitboard for the given color
 inline uint64_t most_forward(const Color color, const uint64_t bitboard) {
 
@@ -372,48 +338,6 @@ inline uint64_t most_forward(const Color color, const uint64_t bitboard) {
 inline uint64_t most_backward(const Color color, const uint64_t bitboard) {
 
     return (color == WHITE) ? lsb(bitboard) : msb(bitboard);
-
-}
-
-inline Piecetype Pawn(const Color color) {
-
-    return (PAWN | color);
-
-}
-
-inline Piecetype Knight(const Color color) {
-
-    return (KNIGHT | color);
-
-}
-
-inline Piecetype Bishop(const Color color) {
-
-    return (BISHOP | color);
-
-}
-
-inline Piecetype Rook(const Color color) {
-
-    return (ROOK | color);
-
-}
-
-inline Piecetype Queen(const Color color) {
-
-    return (QUEEN | color);
-
-}
-
-inline Piecetype King(const Color color) {
-
-    return (KING | color);
-
-}
-
-inline Piecetype pt_index(const Piecetype pt) {
-
-    return (type(pt) / 2 - 1);
 
 }
 
@@ -509,6 +433,24 @@ inline Value operator/(const Value value1, const int divisor) {
     value.mg = value1.mg / divisor;
     value.eg = value1.eg / divisor;
     return value;
+
+}
+
+inline Color operator!(const Color color) {
+
+    return Color(!unsigned(color));
+
+}
+
+inline Color& operator++(Color& c, int) {
+
+    return c = Color(int(c) + 1);
+
+}
+
+inline Piecetype& operator++(Piecetype& pt, int) {
+
+    return pt = Piecetype(int(pt) + 1);
 
 }
 

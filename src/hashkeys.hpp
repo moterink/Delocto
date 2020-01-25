@@ -144,12 +144,12 @@ static uint64_t rand64() {
 
 }
 
-extern uint64_t pieceHashKeys[16][64];
-extern uint64_t pawnHashKeys[2][64];
-extern uint64_t materialHashKeys[14][64];
-extern uint64_t turnHashKeys[2];
-extern uint64_t castlingHashKeys[16];
-extern uint64_t enPassantHashKeys[9];
+extern uint64_t PieceHashKeys[2][7][64];
+extern uint64_t PawnHashKeys[2][64];
+extern uint64_t MaterialHashKeys[2][6][9];
+extern uint64_t TurnHashKeys[2];
+extern uint64_t CastlingHashKeys[16];
+extern uint64_t EnPassantHashKeys[8];
 
 extern void init_hashkeys();
 

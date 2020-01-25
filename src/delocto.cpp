@@ -26,7 +26,6 @@
 #include "uci.hpp"
 #include "bitboards.hpp"
 #include "search.hpp"
-#include <limits>
 
 #define VERSION 0.6
 

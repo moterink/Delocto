@@ -59,8 +59,9 @@ static const int pieceValues[14] = { 0, 0, PawnValue, PawnValue, KnightValue, Kn
 typedef struct {
 
     uint64_t mobilityArea[2] = { 0 };
-    uint64_t attackedSquares[14] = { 0 };
-    uint64_t multiAttackedSquares[2] = { 0 };
+    uint64_t pieceAttacks[2][6] = { { 0, 0, 0, 0, 0, 0 }, { 0, 0, 0, 0, 0, 0 } };
+    uint64_t colorAttacks[2] = { 0 };
+    uint64_t multiAttacks[2] = { 0 };
     uint64_t blockedPawns[2] = { 0 };
     int kingAttackersWeight[2] = { 0 };
     int kingAttackersNum[2] = { 0 };
@@ -80,7 +81,7 @@ inline int scaled_eval(const int scale, const Value value) {
 
 }
 
-extern Value Pst[14][64];
+extern Value PieceSquareTable[2][6][64];
 
 extern int KingDistance[64][64];
 

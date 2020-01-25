@@ -75,8 +75,8 @@ typedef struct {
     uint64_t nodes = 0;
 
     Move killers[MAX_DEPTH + 1][2];
-    int history[14][64];
-    Move countermove[14][64];
+    int history[2][7][64];
+    Move countermove[2][7][64];
 
     Move bestmove[MAX_DEPTH] = { MOVE_NONE };
     Move currentmove[MAX_DEPTH] = { MOVE_NONE };
@@ -98,10 +98,10 @@ typedef struct {
 
 } SearchInfo;
 
-// Piece Values for Delta Pruning in Quiescence search - 100 at end for enpassant capture, where tosq == NOPIECE
-static const int DeltaMaterial[15] = { 0, 0, 100, 100, 320, 320, 330, 330, 500, 500, 950, 950, 999999, 999999, 100 };
+// Piece Values for Delta Pruning in Quiescence search - 100 at end for enpassant capture, where tosq == PIECE_NONE
+static const int DeltaMaterial[7]  = { 100, 320, 330, 500, 950, 999999, 100 };
 static const int FutilityMargin[6] = { 0, 100, 200, 320, 450, 590 };
-static const int SeeMaterial[15]   = { 0, 0, 100, 100, 320, 320, 330, 330, 500, 500, 950, 950, 999999, 999999, 0 };
+static const int SeeMaterial[7]    = { 100, 320, 330, 500, 950, 999999, 0 };
 static const int RazorMargin[5]    = { 0, 300, 350, 430, 520 };
 
 inline int value_to_tt(int value, int plies) {

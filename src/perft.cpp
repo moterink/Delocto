@@ -23,39 +23,51 @@
 
 #include "perft.hpp"
 #include "movegen.hpp"
+#include "uci.hpp"
 
 static uint64_t perft(int depth, PerftInfo& info, Board& board) {
 
     if (depth == 0) return 1;
 
-    uint64_t nodes = 0;
+    unsigned long total = 0;
 
     MoveList moves = gen_legals(board, gen_all(board, board.turn()));
 
-    for (unsigned int mcount = 0; mcount < moves.size; mcount++) {
-        board.do_move(moves.moves[mcount]);
+    for (unsigned i = 0; i < moves.size; i++) {
+        Move move = moves.moves[i];
 
-        nodes += perft(depth - 1, info, board);
+        board.do_move(move);
+
+        unsigned long nodes = perft(depth - 1, info, board);
+
+        if (depth == info.depth) {
+            info.divide[i] = nodes;
+        }
+
+        total += nodes;
+
         board.undo_move();
     }
 
-    return nodes;
+    return total;
 
 }
 
-void perftTest(const int depth, Board& board) {
+void perftTest(const unsigned depth, Board& board) {
 
-    std::cout << "Starting Perft test..." << std::endl;
+    std::cout << "Starting perft test..." << std::endl;
 
-    for (int dcount = 1; dcount <= depth; dcount++) {
-        PerftInfo info;
-        clock_t start = std::clock();
-        const uint64_t nodes = perft(dcount, info, board);
-        std::cout << "Depth(" << dcount << "): " << nodes << std::endl;
-        clock_t end = std::clock();
-        long long duration = end - start;
-        long long nps = (nodes * 1000) / ((duration > 0) ? duration : 1);
-        std::cout << "NPS: " << nps << std::endl;
+    PerftInfo info;
+    info.depth = depth;
+
+    const uint64_t nodes = perft(depth, info, board);
+
+    MoveList moves = gen_legals(board, gen_all(board, board.turn()));
+
+    std::cout << "Depth(" << depth << "): " << nodes << std::endl;
+
+    for (unsigned i = 0; i < moves.size; i++) {
+        std::cout << move_to_string(moves.moves[i]) << ": " << info.divide[i] << std::endl;
     }
 
     std::cout << "Perft test finished." << std::endl;

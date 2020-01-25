@@ -32,10 +32,10 @@
 #define NORMAL     0x2000
 #define ENPASSANT  0x4000
 #define CASTLING   0x6000
-#define QUEENPROM  0x1000
-#define ROOKPROM   0x3000
-#define BISHOPPROM 0x5000
-#define KNIGHTPROM 0x7000
+#define QUEENPROM  0x7000
+#define ROOKPROM   0x5000
+#define BISHOPPROM 0x3000
+#define KNIGHTPROM 0x1000
 
 static const std::string SQUARE_NAMES[64] = {
 
@@ -59,6 +59,7 @@ inline MoveType move_type(const Move move) {
 inline unsigned int from_sq(const Move move) {
 
     assert(sq_valid(move & 0x3f));
+    assert(move != MOVE_NONE);
     return move & 0x3f;
 
 }
@@ -66,19 +67,20 @@ inline unsigned int from_sq(const Move move) {
 inline unsigned int to_sq(const Move move) {
 
     assert(sq_valid((move & 0xfc0) >> 6));
+    assert(move != MOVE_NONE);
     return (move & 0xfc0) >> 6;
 
 }
 
-inline Move make_move(const unsigned int fromsq, const unsigned int tosq, const MoveType type) {
+inline Move make_move(const unsigned fromSq, const unsigned toSq, const MoveType type) {
 
-    return fromsq | (tosq << 6) | type;
+    return fromSq | (toSq << 6) | type;
 
 }
 
-inline Piecetype prom_piecetype(const MoveType mt, const Color color) {
+inline Piecetype prom_piecetype(const MoveType mt) {
 
-    return (QUEEN + 1 - mt / QUEENPROM) | color;
+    return Piecetype((mt / KNIGHTPROM + 1) / 2);
 
 }
 

@@ -84,6 +84,26 @@ static std::string BENCHMARK_FENS[42] = {
 
 };
 
+static const std::string PromotionChar = "qrbn";
+
+inline MoveType char_to_promotion(const char c) {
+
+    return (PromotionChar.find(c) * 2 + 1) * QUEENPROM;
+
+}
+
+inline char promotion_to_char(const MoveType mt) {
+
+    return PromotionChar[(mt / QUEENPROM) / 2];
+
+}
+
+inline std::string move_to_string(const Move raw) {
+
+    return (std::string() + SQUARE_NAMES[from_sq(raw)] + SQUARE_NAMES[to_sq(raw)]) + (is_promotion(raw) ? std::string(1, promotion_to_char(move_type(raw))) : "");
+
+}
+
 extern TranspositionTable tTable;
 extern PawnTable pawnTable;
 extern MaterialTable materialTable;

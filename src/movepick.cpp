@@ -52,8 +52,7 @@ Move MovePicker::pick() {
             {
                 ++phase;
 
-                // Hashmove validity tested before
-                if (ttMove != MOVE_NONE) {
+                if (ttMove != MOVE_NONE && board.is_valid(ttMove)) {
                     return ttMove;
                 }
 
@@ -129,7 +128,7 @@ Move MovePicker::pick() {
                 quiets = gen_quiets(board, board.turn());
 
                 for (unsigned int index = 0; index < quiets.size; index++) {
-                    quiets.values[index] = info->history[board.piecetype(from_sq(quiets.moves[index]))][to_sq(quiets.moves[index])];
+                    quiets.values[index] = info->history[board.turn()][board.piecetype(from_sq(quiets.moves[index]))][to_sq(quiets.moves[index])];
                 }
 
             }

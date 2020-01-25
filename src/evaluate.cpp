@@ -25,7 +25,7 @@
 #include "movegen.hpp"
 #include "uci.hpp"
 
-Value Pst[14][64];
+Value PieceSquareTable[2][6][64];
 
 static const Value PstValues[6][32] = {
 
@@ -33,12 +33,12 @@ static const Value PstValues[6][32] = {
     {
 
         V( 0,  0), V( 0,  0), V( 0,  0), V( 0,  0),
-        V(-1, -7), V(2, -2), V(7, 4), V(9, 5),
-        V(-7, -3), V(-3, -4), V(8, -2), V(11, 2),
-        V(-5, -1), V(-5, -3), V(6, -5), V(14, -4),
-        V(4, 4), V(-3, 4), V(-4, -1), V(3, -6),
-        V(-5, 10), V(-7, 6), V(-3, 7), V(3, 14),
-        V(-4, 2), V(4, -2), V(-5, 8), V(-2, 11),
+        V(-1, -7), V( 2, -2), V( 7,  4), V( 9,  5),
+        V(-7, -3), V(-3, -4), V( 8, -2), V(11,  2),
+        V(-5, -1), V(-5, -3), V( 6, -5), V(14, -4),
+        V( 4,  4), V(-3,  4), V(-4, -1), V( 3, -6),
+        V(-5, 10), V(-7,  6), V(-3,  7), V( 3, 14),
+        V(-4,  2), V( 4, -2), V(-5,  8), V(-2, 11),
         V( 0,  0), V( 0,  0), V( 0,  0), V( 0,  0)
 
     },
@@ -46,12 +46,12 @@ static const Value PstValues[6][32] = {
     {
 
         V(-79, -49), V(-45, -35), V(-38, -22), V(-37, -8),
-        V(-37, -33), V(-18, -26), V(-11, -7),  V(-4, 3),
-        V(-30, -18), V(-9, -15), V(2, -2), V(9, 13),
-        V(-13, -17), V(2, 0), V(19, 6), V(22, 16),
-        V(-14, -19), V(6, -9), V(20, 2), V(24, 16),
-        V(-5, -24), V(13, -18), V(30, -8), V(26, 9),
-        V(-31, -30), V(-10, -21), V(3, -17), V(17, 8),
+        V(-37, -33), V(-18, -26), V(-11,  -7), V( -4,  3),
+        V(-30, -18), V( -9, -15), V(  2,  -2), V(  9, 13),
+        V(-13, -17), V(  2,   0), V( 19,   6), V( 22, 16),
+        V(-14, -19), V(  6,  -9), V( 20,   2), V( 24, 16),
+        V( -5, -24), V( 13, -18), V( 30,  -8), V( 26,  9),
+        V(-31, -30), V(-10, -21), V(  3, -17), V( 17,  8),
         V(-94, -46), V(-38, -42), V(-25, -25), V(-15, -8),
 
     },
@@ -59,52 +59,52 @@ static const Value PstValues[6][32] = {
     {
 
         V(-21, -30), V(-2, -14), V(-5, -16), V(-13, -4),
-        V(-8, -18), V(3, -6), V(7, -7), V(1, 0),
-        V(-4, -8), V(11, 0), V(-1, -3), V(7, 6),
-        V(0, -12), V(4, -1), V(12, 0), V(17, 8),
-        V(-3, -11), V(14, -3), V(11, -5), V(13, 8),
-        V(-8, -12), V(2, 1), V(0, 0), V(4, 8),
-        V(-10, -16), V(-9, -8), V(5, -3), V(-3, 4),
+        V( -8, -18), V( 3,  -6), V( 7,  -7), V(  1,  0),
+        V( -4,  -8), V(11,   0), V(-1,  -3), V(  7,  6),
+        V(  0, -12), V( 4,  -1), V(12,   0), V( 17,  8),
+        V( -3, -11), V(14,  -3), V(11,  -5), V( 13,  8),
+        V( -8, -12), V( 2,   1), V( 0,   0), V(  4,  8),
+        V(-10, -16), V(-9,  -8), V( 5,  -3), V( -3,  4),
         V(-23, -24), V(-1, -19), V(-6, -18), V(-12, -9),
 
     },
     // Rooks
     {
 
-        V(-11, -1), V(-6, -3), V(-3, -1), V(1, -1),
-        V(-8, -5), V(-5, -3), V(-2, 0), V(4, 0),
-        V(-10, 5), V(-3, -2), V(1, 1), V(0, -1),
-        V(-6, -2), V(-2, 1), V(-2, -4), V(-3, 4),
-        V(-11, -4), V(-6, 2), V(0, 2), V(3, -4),
-        V(-11, 1), V(-2, -1), V(2, -5), V(5, 3),
-        V(-4, 0), V(3, 1), V(5, 8), V(6, -4),
-        V(-10, 6), V(-11, -3), V(-3, 6), V(2, 3)
+        V(-11, -1), V( -6, -3), V(-3, -1), V( 1, -1),
+        V( -8, -5), V( -5, -3), V(-2,  0), V( 4,  0),
+        V(-10,  5), V( -3, -2), V( 1,  1), V( 0, -1),
+        V( -6, -2), V( -2,  1), V(-2, -4), V(-3,  4),
+        V(-11, -4), V( -6,  2), V( 0,  2), V( 3, -4),
+        V(-11,  1), V( -2, -1), V( 2, -5), V( 5,  3),
+        V( -4,  0), V(  3,  1), V( 5,  8), V( 6, -4),
+        V(-10,  6), V(-11, -3), V(-3,  6), V( 2,  3)
 
     },
     // Queens
     {
 
-        V(1, -32), V(-2, -27), V(-2, -22), V(2, -12),
-        V(-1, -26), V(2, -15), V(4, -10), V(6, -2),
-        V(-1, -18), V(3, -8), V(6, -4), V(3, 1),
-        V(2, -11), V(2, -1), V(4, 6), V(4, 11),
-        V(0, -14), V(7, -3), V(6, 4), V(2, 10),
-        V(-2, -18), V(5, -8), V(3, -6), V(4, 0),
-        V(-2, -23), V(3, -13), V(5, -11), V(4, -4),
-        V(-1, -35), V(-1, -24), V(0, -20), V(-1, -17)
+        V( 1, -32), V(-2, -27), V(-2, -22), V( 2, -12),
+        V(-1, -26), V( 2, -15), V( 4, -10), V( 6,  -2),
+        V(-1, -18), V( 3,  -8), V( 6,  -4), V( 3,   1),
+        V( 2, -11), V( 2,  -1), V( 4,   6), V( 4,  11),
+        V( 0, -14), V( 7,  -3), V( 6,   4), V( 2,  10),
+        V(-2, -18), V( 5,  -8), V( 3,  -6), V( 4,   0),
+        V(-2, -23), V( 3, -13), V( 5, -11), V( 4,  -4),
+        V(-1, -35), V(-1, -24), V( 0, -20), V(-1, -17)
 
     },
     // King
     {
 
-        V(128, 0), V(153, 19), V(128, 38), V(89, 44),
+        V(128,  0), V(153, 19), V(128, 38), V(89, 44),
         V(130, 27), V(143, 46), V(112, 65), V(86, 62),
-        V(93, 40), V(119, 65), V(79, 77), V(56, 81),
-        V(79, 48), V(90, 71), V(64, 79), V(51, 79),
-        V(68, 46), V(83, 78), V(53, 92), V(32, 91),
-        V(56, 41), V(75, 77), V(40, 82), V(17, 89),
-        V(41, 19), V(56, 46), V(30, 60), V(12, 66),
-        V(30, 2), V(41, 28), V(23, 35), V(0, 35)
+        V( 93, 40), V(119, 65), V( 79, 77), V(56, 81),
+        V( 79, 48), V( 90, 71), V( 64, 79), V(51, 79),
+        V( 68, 46), V( 83, 78), V( 53, 92), V(32, 91),
+        V( 56, 41), V( 75, 77), V( 40, 82), V(17, 89),
+        V( 41, 19), V( 56, 46), V( 30, 60), V(12, 66),
+        V( 30,  2), V( 41, 28), V( 23, 35), V( 0, 35)
 
     }
 
@@ -203,7 +203,7 @@ static const unsigned int kingSliderBlocker          =  65;
 static const unsigned int kingKnightDefender         =  47;
 static const unsigned int kingBishopDefender         =  18;
 static const unsigned int kingNoQueenAttacker        = 410;
-static const unsigned int attackerWeight[4]          = { 36, 26, 21, 5 };
+static const unsigned int attackerWeight[5]          = { 0, 36, 26, 21, 5 };
 static const Value kingPawnlessFlank                 = V(8, 45);
 static const Value kingFlankAttack                   = V(4,  0);
 static const Value kingProtectorDistancePenalty      = V(3,  4);
@@ -265,16 +265,16 @@ void init_king_distance() {
 
 void init_psqt() {
 
-    for (unsigned int pt = PAWN; pt <= KING; pt+=2) {
-        for (unsigned int sq = 0; sq < 32;  sq++) {
-            const unsigned int r = sq / 4;
-            const unsigned int f = sq & 0x3;
-            Value value = PstValues[(pt - 2) / 2][sq];
+    for (Piecetype pt = PAWN; pt < PIECE_NONE; pt++) {
+        for (unsigned sq = 0; sq < 32; sq++) {
+            const unsigned r = sq / 4;
+            const unsigned f = sq & 0x3;
+            Value value = PstValues[pt][sq];
 
-            Pst[(pt | WHITE)][8 * r + f] = value;
-            Pst[(pt | WHITE)][8 * r + (7 - f)] = value;
-            Pst[(pt | BLACK)][8 * (7 - r) + f] = value;
-            Pst[(pt | BLACK)][8 * (7 - r) + (7 - f)] = value;
+            PieceSquareTable[WHITE][pt][8 * r + f]             = value;
+            PieceSquareTable[WHITE][pt][8 * r + (7 - f)]       = value;
+            PieceSquareTable[BLACK][pt][8 * (7 - r) + f]       = value;
+            PieceSquareTable[BLACK][pt][8 * (7 - r) + (7 - f)] = value;
 
         }
     }
@@ -301,19 +301,22 @@ void init_eval() {
 
 }
 
-bool Board::checkMaterialDraw(const unsigned int pieceCount) const {
+bool Board::is_material_draw() const {
 
-    if (bitboards[WHITE_PAWN] || bitboards[BLACK_PAWN] || bitboards[WHITE_ROOK] || bitboards[BLACK_ROOK] || bitboards[WHITE_QUEEN] || bitboards[BLACK_QUEEN]) {
+    if (bbPieces[PAWN] || bbPieces[ROOK] || bbPieces[QUEEN]) {
         return false;
     }
 
-    switch(pieceCount) {
+    switch(popcount(bbColors[BOTH])) {
 
         case 2: return true;
         case 3: return true;
         case 4:
             {
-                if (piececounts[WHITE_BISHOP] >= 2 || piececounts[BLACK_BISHOP] >= 2 || (bitboards[WHITE_KNIGHT] && bitboards[WHITE_BISHOP]) || (bitboards[BLACK_KNIGHT] && bitboards[BLACK_BISHOP]) || piececounts[WHITE_KNIGHT] == 2 || piececounts[BLACK_KNIGHT] == 2) {
+                if (   pieceCounts[WHITE][BISHOP] >= 2 || pieceCounts[BLACK][BISHOP] >= 2
+                    || (pieceCounts[WHITE][KNIGHT] && pieceCounts[WHITE][BISHOP]) || (pieceCounts[BLACK][KNIGHT] && pieceCounts[BLACK][BISHOP])
+                    || pieceCounts[WHITE][KNIGHT] == 2 || pieceCounts[BLACK][KNIGHT] == 2)
+                {
                     return false;
                 }
                 return true;
@@ -321,24 +324,21 @@ bool Board::checkMaterialDraw(const unsigned int pieceCount) const {
         default: assert(false);
     }
 
-    assert(false);
     return false;
 
 }
 
 static void update_attack_info(Color color, Piecetype pt, uint64_t moves, EvalInfo& info) {
 
-    unsigned int pindex = pt_index(pt) - 1;
-
-    info.attackedSquares[pt] |= moves;
-    info.multiAttackedSquares[color] |= info.attackedSquares[color] & moves;
-    info.attackedSquares[color] |= moves;
+    info.pieceAttacks[color][pt] |= moves;
+    info.multiAttacks[color] |= info.colorAttacks[color] & moves;
+    info.colorAttacks[color] |= moves;
 
     const uint64_t kingAttacks = moves & info.kingRing[!color];
 
     if (kingAttacks) {
 
-        info.kingAttackersWeight[!color] += attackerWeight[pindex];
+        info.kingAttackersWeight[!color] += attackerWeight[pt];
         info.kingAttackersNum[!color]++;
         info.kingRingAttacks[!color] += popcount(kingAttacks);
 
@@ -349,7 +349,7 @@ static void update_attack_info(Color color, Piecetype pt, uint64_t moves, EvalIn
 static const Value evaluate_knights(const Board& board, const Color color, EvalInfo& info) {
 
     Value value;
-    uint64_t knights = board.pieces(KNIGHT, color);
+    uint64_t knights = board.pieces(color, KNIGHT);
     while (knights) {
 
         unsigned int sq = pop_lsb(knights);
@@ -358,21 +358,21 @@ static const Value evaluate_knights(const Board& board, const Color color, EvalI
             moves &= LineTable[sq][info.kingSq[color]];
         }
 
-        uint64_t outposts = OutpostSquares[color] & info.attackedSquares[Pawn(color)] & ~info.pawnAttacksSpan[!color];
+        uint64_t outposts = OutpostSquares[color] & info.pieceAttacks[color][PAWN] & ~info.pawnAttacksSpan[!color];
         if (outposts & SQUARES[sq]) {
             value += OutpostBonus[0];
         } else if (outposts & moves & ~board.pieces(color)) {
             value += OutpostReachableBonus[0];
         }
 
-        if (SQUARES[sq] & shift_down(board.pieces(WHITE_PAWN) | board.pieces(BLACK_PAWN), color)) {
+        if (SQUARES[sq] & shift_down(board.pieces(PAWN), color)) {
             value += minorPawnShield;
         }
 
         value -= kingProtectorDistancePenalty * KingDistance[sq][info.kingSq[color]];
 
         info.mobility[color] += Mobility[0][popcount(moves & info.mobilityArea[color])];
-        update_attack_info(color, Knight(color), moves, info);
+        update_attack_info(color, KNIGHT, moves, info);
 
     }
 
@@ -384,40 +384,40 @@ static const Value evaluate_bishops(const Board& board, const Color color, EvalI
 
     Value value;
 
-    uint64_t bishops = board.pieces(BISHOP, color);
+    uint64_t bishops = board.pieces(color, BISHOP);
 
     while (bishops) {
 
         unsigned int sq = pop_lsb(bishops);
 
         // Exclude queen for xrays
-        uint64_t moves = gen_bishop_moves(sq, board.pieces(ALLPIECES) & ~(board.pieces(QUEEN, color) | board.pieces(QUEEN, !color)), 0);
+        uint64_t moves = gen_bishop_moves(sq, board.pieces(BOTH) & ~board.pieces(QUEEN), 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
 
-        uint64_t outposts = OutpostSquares[color] & info.attackedSquares[Pawn(color)] & ~info.pawnAttacksSpan[!color];
+        uint64_t outposts = OutpostSquares[color] & info.pieceAttacks[color][PAWN] & ~info.pawnAttacksSpan[!color];
         if (outposts & SQUARES[sq]) {
             value += OutpostBonus[1];
         } else if (outposts & moves & ~board.pieces(color)) {
             value += OutpostReachableBonus[1];
         }
 
-        if (SQUARES[sq] & shift_down(board.pieces(WHITE_PAWN) | board.pieces(BLACK_PAWN), color)) {
+        if (SQUARES[sq] & shift_down(board.pieces(PAWN), color)) {
             value += minorPawnShield;
         }
 
-        uint64_t pawnsOnSameColor = board.get_same_colored_squares(sq) & board.pieces(PAWN, color);
+        uint64_t pawnsOnSameColor = board.get_same_colored_squares(sq) & board.pieces(color, PAWN);
         value -= bishopPawnsSameColorPenalty * popcount(pawnsOnSameColor) * (1 + popcount(info.blockedPawns[color] & CENTRAL_FILES));
 
-        if (popcount(gen_bishop_moves(sq, board.pieces(WHITE_PAWN) | board.pieces(BLACK_PAWN), 0) & CENTRAL_SQUARES) > 1) {
+        if (popcount(gen_bishop_moves(sq, board.pieces(PAWN), 0) & CENTRAL_SQUARES) > 1) {
             value += bishopCenterAlignBonus;
         }
 
         value -= kingProtectorDistancePenalty * KingDistance[sq][info.kingSq[color]];
 
         info.mobility[color] += Mobility[1][popcount(moves & info.mobilityArea[color])];
-        update_attack_info(color, Bishop(color), moves, info);
+        update_attack_info(color, BISHOP, moves, info);
 
     }
 
@@ -429,13 +429,13 @@ static const Value evaluate_rooks(const Board& board, const Color color, EvalInf
 
     Value value;
 
-    uint64_t rooks = board.pieces(ROOK, color);
+    uint64_t rooks = board.pieces(color, ROOK);
     while (rooks) {
 
         unsigned int sq = pop_lsb(rooks);
 
         // Exclude queens and rooks for xrays
-        uint64_t moves = gen_rook_moves(sq, board.pieces(ALLPIECES) & ~board.all_majors(), 0);
+        uint64_t moves = gen_rook_moves(sq, board.pieces(BOTH) & ~board.majors(), 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
@@ -443,13 +443,13 @@ static const Value evaluate_rooks(const Board& board, const Color color, EvalInf
         const unsigned int f = file(sq);
         const unsigned int mob = popcount(moves & info.mobilityArea[color]);
 
-        if (!(FILES[f] & (board.pieces(WHITE_PAWN) | board.pieces(BLACK_PAWN)))) {
+        if (!(FILES[f] & board.pieces(PAWN))) {
             value += rookOpenFileBonus;
-        } else if (!(FILES[f] & board.pieces(PAWN, color))) {
+        } else if (!(FILES[f] & board.pieces(color, PAWN))) {
             value += rookSemiOpenFileBonus;
         } else {
 
-            const unsigned int kingFile = file(info.kingSq[color]);
+            const int kingFile = file(info.kingSq[color]);
             if (mob <= 3 && ((kingFile > 3) == (f > kingFile))) {
                 value -= rookTrappedPenalty;
             }
@@ -458,11 +458,11 @@ static const Value evaluate_rooks(const Board& board, const Color color, EvalInf
 
         // Bonus for aligning on file with enemy pawn
         if (relative_rank(color, sq) >= 4) {
-            value += rookPawnAlignBonus * popcount(moves & board.pieces(PAWN, !color));
+            value += rookPawnAlignBonus * popcount(moves & board.pieces(!color, PAWN));
         }
 
         info.mobility[color] += Mobility[2][mob];
-        update_attack_info(color, Rook(color), moves, info);
+        update_attack_info(color, ROOK, moves, info);
 
     }
 
@@ -474,21 +474,21 @@ static const Value evaluate_queens(const Board& board, const Color color, EvalIn
 
     Value value;
 
-    uint64_t queens = board.pieces(QUEEN, color);
+    uint64_t queens = board.pieces(color, QUEEN);
     while (queens) {
 
         unsigned int sq = pop_lsb(queens);
-        uint64_t moves = get_queen_moves(sq, board.pieces(ALLPIECES), 0);
+        uint64_t moves = get_queen_moves(sq, board.pieces(BOTH), 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
 
-        if (board.get_slider_blockers(board.pieces(Bishop(!color)) | board.pieces(Rook(!color)), sq)) {
+        if (board.get_slider_blockers(board.pieces(!color, BISHOP) | board.pieces(!color, ROOK), sq)) {
             value -= UnsafeQueen;
         }
 
         info.mobility[color] += Mobility[3][popcount(moves & info.mobilityArea[color])];
-        update_attack_info(color, Queen(color), moves, info);
+        update_attack_info(color, QUEEN, moves, info);
 
     }
 
@@ -500,8 +500,8 @@ static const Value evaluate_pawns(const Board& board, const Color color, EvalInf
 
     Value value;
 
-    const uint64_t ownPawns = board.pieces(PAWN, color);
-    const uint64_t oppPawns = board.pieces(PAWN, !color);
+    const uint64_t ownPawns = board.pieces(color, PAWN);
+    const uint64_t oppPawns = board.pieces(!color, PAWN);
 
     uint64_t pawns = ownPawns;
 
@@ -514,7 +514,7 @@ static const Value evaluate_pawns(const Board& board, const Color color, EvalInf
         const uint64_t front      = FrontFileMask[color][sq];
         const uint64_t neighbours = ADJ_FILES[f] & ownPawns;
         const uint64_t stoppers   = PassedPawnMask[color][sq] & oppPawns;
-        const uint64_t lever      = AttackBitboards[Pawn(color)][sq] & oppPawns;
+        const uint64_t lever      = PawnAttacks[color][sq] & oppPawns;
 
         info.pawnAttacksSpan[color] |= PawnAttacksSpan[color][sq];
 
@@ -566,8 +566,8 @@ static int evaluate_shelter_storm(const Board& board, const Color color, const u
     int value = 0;
 
     const uint64_t notBehind = ~KingShelterSpan[!color][kingSq];
-    const uint64_t ourPawns  = board.pieces(PAWN, color) & notBehind;
-    const uint64_t oppPawns  = board.pieces(PAWN, !color) & notBehind;
+    const uint64_t ourPawns  = board.pieces(color, PAWN) & notBehind;
+    const uint64_t oppPawns  = board.pieces(!color, PAWN) & notBehind;
     const int kingFile       = file(kingSq);
     const int centralFile    = std::max(1, std::min(kingFile, 6));
 
@@ -606,27 +606,27 @@ static const Value evaluate_king_safety(const Board& board, const Color color, c
     }
 
     const int kingFile = file(info.kingSq[color]);
-    const uint64_t flankAttackedSquares = KING_FLANK[kingFile] & (ALL_SQUARES ^ COLOUR_BASE_SQUARES[!color]) & info.attackedSquares[!color];
-    const unsigned int flankAttacksCount = popcount(flankAttackedSquares) + popcount(flankAttackedSquares & info.multiAttackedSquares[!color]);
+    const uint64_t flankAttackedSquares = KING_FLANK[kingFile] & (ALL_SQUARES ^ COLOUR_BASE_SQUARES[!color]) & info.colorAttacks[!color];
+    const unsigned int flankAttacksCount = popcount(flankAttackedSquares) + popcount(flankAttackedSquares & info.multiAttacks[!color]);
 
     const uint64_t ring = KingRing[color][info.kingSq[color]];
 
-    const uint64_t weakSquares = (info.attackedSquares[!color] & ~info.multiAttackedSquares[color]) & (~info.attackedSquares[color] | info.attackedSquares[Queen(color)] | info.attackedSquares[King(color)]);
-    const uint64_t safeSquares = ~board.pieces(!color) & (~info.attackedSquares[color] | (weakSquares & info.multiAttackedSquares[!color]));
+    const uint64_t weakSquares = (info.colorAttacks[!color] & ~info.multiAttacks[color]) & (~info.colorAttacks[color] | info.pieceAttacks[color][QUEEN] | info.pieceAttacks[color][KING]);
+    const uint64_t safeSquares = ~board.pieces(!color) & (~info.colorAttacks[color] | (weakSquares & info.multiAttacks[!color]));
 
     const uint64_t knightCheckSquares = gen_knight_moves(info.kingSq[color], board.pieces(color));
-    const uint64_t bishopCheckSquares = gen_bishop_moves(info.kingSq[color], board.pieces(ALLPIECES) ^ board.pieces(Queen(color)), 0);
-    const uint64_t rookCheckSquares   = gen_rook_moves(info.kingSq[color], board.pieces(ALLPIECES) ^ board.pieces(Queen(color)), 0);
+    const uint64_t bishopCheckSquares = gen_bishop_moves(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
+    const uint64_t rookCheckSquares   = gen_rook_moves(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
 
     uint64_t unsafeChecks = 0;
-    const uint64_t queenChecks  = info.attackedSquares[Queen(!color)] & (bishopCheckSquares | rookCheckSquares)  & ~info.attackedSquares[Queen(color)];
-    const uint64_t rookChecks   = info.attackedSquares[Rook(!color)] & rookCheckSquares;
-    const uint64_t bishopChecks = info.attackedSquares[Bishop(!color)] & bishopCheckSquares;
-    const uint64_t knightChecks = info.attackedSquares[Knight(!color)] & knightCheckSquares;
+    const uint64_t queenChecks  = info.pieceAttacks[!color][QUEEN] & (bishopCheckSquares | rookCheckSquares)  & ~info.pieceAttacks[color][QUEEN];
+    const uint64_t rookChecks   = info.pieceAttacks[!color][ROOK] & rookCheckSquares;
+    const uint64_t bishopChecks = info.pieceAttacks[!color][BISHOP] & bishopCheckSquares;
+    const uint64_t knightChecks = info.pieceAttacks[!color][KNIGHT] & knightCheckSquares;
 
     int danger = 0;
 
-    if (!board.pieces(QUEEN, !color)) {
+    if (!board.pieces(!color, QUEEN)) {
         danger -= kingNoQueenAttacker;
     }
 
@@ -664,8 +664,8 @@ static const Value evaluate_king_safety(const Board& board, const Color color, c
             + kingSliderBlocker * popcount(board.get_king_blockers(color))
             + 2 * flankAttacksCount / 8
             + info.mobility[!color].mg - info.mobility[color].mg
-            - kingKnightDefender * popcount(ring & info.attackedSquares[Knight(color)])
-            - kingBishopDefender * popcount(ring & info.attackedSquares[Bishop(color)])
+            - kingKnightDefender * popcount(ring & info.pieceAttacks[color][KNIGHT])
+            - kingBishopDefender * popcount(ring & info.pieceAttacks[color][BISHOP])
             - 6 * pawnValue / 9;
 
     /*std::cout << "Flank Attacks: " << kingFlankAttack * flankAttacksCount << std::endl;
@@ -685,7 +685,7 @@ static const Value evaluate_king_safety(const Board& board, const Color color, c
         value -= V(danger * danger / 2048, danger / 16);
     }
 
-    if (!(board.pieces(Pawn(color)) & KING_FLANK[kingFile])) {
+    if (!(board.pieces(color, PAWN) & KING_FLANK[kingFile])) {
         value -= kingPawnlessFlank;
     }
 
@@ -713,7 +713,7 @@ static const Value evaluate_passers(const Board& board, const Color color, const
 
         value += V(0, ((5 * KingDistance[info.kingSq[!color]][blocksq]) - (2 * KingDistance[info.kingSq[color]][blocksq])) * rfactor);
 
-        if (r > 2 && !(SQUARES[blocksq] & board.pieces(ALLPIECES))) {
+        if (r > 2 && !(SQUARES[blocksq] & board.pieces(BOTH))) {
 
             Value bonus = V(0, 0);
 
@@ -721,13 +721,13 @@ static const Value evaluate_passers(const Board& board, const Color color, const
             uint64_t behind = FrontFileMask[!color][sq];
             uint64_t attacked = PassedPawnMask[color][sq];
 
-            uint64_t slidersBehind = behind & board.all_majors();
+            uint64_t slidersBehind = behind & board.majors();
 
             if (!(slidersBehind & board.pieces(!color))) {
-                attacked &= info.attackedSquares[!color];
+                attacked &= info.colorAttacks[!color];
             }
 
-            if ((info.attackedSquares[color] & SQUARES[blocksq]) || (slidersBehind & board.pieces(color))) {
+            if ((info.colorAttacks[color] & SQUARES[blocksq]) || (slidersBehind & board.pieces(color))) {
                 bonus += passedPawnBlockSqDefended;
             }
 
@@ -755,18 +755,18 @@ static const Value evaluate_imbalances(const Board& board, const Color color) {
 
     Value value;
 
-    const unsigned int pieceCounts[2][6] = {
-        { board.piececount(WHITE_BISHOP) > 1, board.piececount(WHITE_PAWN), board.piececount(WHITE_KNIGHT), board.piececount(WHITE_BISHOP), board.piececount(WHITE_ROOK), board.piececount(WHITE_QUEEN) },
-        { board.piececount(BLACK_BISHOP) > 1, board.piececount(BLACK_PAWN), board.piececount(BLACK_KNIGHT), board.piececount(BLACK_BISHOP), board.piececount(BLACK_ROOK), board.piececount(BLACK_QUEEN) }
+    const unsigned pieceCounts[2][6] = {
+        { board.piececount(WHITE, BISHOP) > 1, board.piececount(WHITE, PAWN), board.piececount(WHITE, KNIGHT), board.piececount(WHITE, BISHOP), board.piececount(WHITE, ROOK), board.piececount(WHITE, QUEEN) },
+        { board.piececount(BLACK, BISHOP) > 1, board.piececount(BLACK, PAWN), board.piececount(BLACK, KNIGHT), board.piececount(BLACK, BISHOP), board.piececount(BLACK, ROOK), board.piececount(BLACK, QUEEN) }
     };
 
-    for (unsigned int pt1index = 0; pt1index <= 5; pt1index++) {
+    for (unsigned pt1index = 0; pt1index <= 5; pt1index++) {
 
         if (pieceCounts[color][pt1index] > 0) {
 
             int v = 0;
 
-            for (unsigned int pt2index = 0; pt2index <= pt1index; pt2index++) {
+            for (unsigned pt2index = 0; pt2index <= pt1index; pt2index++) {
                 v += Imbalance[0][pt1index][pt2index] * pieceCounts[color][pt2index] + Imbalance[1][pt1index][pt2index] * pieceCounts[!color][pt2index];
             }
 
@@ -784,71 +784,71 @@ static const Value evaluate_threats(const Board& board, const Color color, const
 
     Value value;
 
-    const uint64_t minorsAndMajors = board.pieces(!color) ^ board.pieces(Pawn(!color));
-    const uint64_t strongSquares   = info.attackedSquares[Pawn(!color)] | (info.multiAttackedSquares[!color] & ~info.multiAttackedSquares[color]);
+    const uint64_t minorsAndMajors = board.pieces(!color) ^ board.pieces(!color, PAWN);
+    const uint64_t strongSquares   = info.pieceAttacks[!color][PAWN] | (info.multiAttacks[!color] & ~info.multiAttacks[color]);
     const uint64_t defendedPieces  = minorsAndMajors & strongSquares;
-    const uint64_t weakPieces      = board.pieces(!color) & ~strongSquares & info.attackedSquares[color];
+    const uint64_t weakPieces      = board.pieces(!color) & ~strongSquares & info.colorAttacks[color];
 
     if (defendedPieces | weakPieces) {
 
-        uint64_t minorAttacks = (defendedPieces | weakPieces) & (info.attackedSquares[Knight(color)] | info.attackedSquares[Bishop(color)]);
+        uint64_t minorAttacks = (defendedPieces | weakPieces) & (info.pieceAttacks[color][KNIGHT] | info.pieceAttacks[color][BISHOP]);
         while (minorAttacks) {
 
             const unsigned int sq = pop_lsb(minorAttacks);
-            const Piecetype pt = type(board.piecetype(sq));
+            const Piecetype pt = board.piecetype(sq);
 
-            value += minorAttackWeight[pt_index(pt)];
+            value += minorAttackWeight[pt];
             if (pt != PAWN) {
                 value += pieceVulnerable * relative_rank(!color, sq);
             }
 
         }
 
-        uint64_t rookAttacks = weakPieces & info.attackedSquares[Rook(color)];
+        uint64_t rookAttacks = weakPieces & info.pieceAttacks[color][ROOK];
         while (rookAttacks) {
 
             const unsigned int sq = pop_lsb(rookAttacks);
-            const Piecetype pt = type(board.piecetype(sq));
+            const Piecetype pt = board.piecetype(sq);
 
-            value += rookAttackWeight[pt_index(pt)];
+            value += rookAttackWeight[pt];
             if (pt != PAWN) {
                 value += pieceVulnerable * relative_rank(!color, sq);
             }
 
         }
 
-        value += KingAttackThreat * popcount(weakPieces & info.attackedSquares[King(color)]);
+        value += KingAttackThreat * popcount(weakPieces & info.pieceAttacks[color][KING]);
 
-        value += HangingPiece * popcount(weakPieces & (~info.attackedSquares[!color] | (minorsAndMajors & info.multiAttackedSquares[color])));
+        value += HangingPiece * popcount(weakPieces & (~info.colorAttacks[!color] | (minorsAndMajors & info.multiAttacks[color])));
 
     }
 
-    value += mobilityRestriction * popcount(info.attackedSquares[!color] & ~strongSquares & info.attackedSquares[color]);
+    value += mobilityRestriction * popcount(info.colorAttacks[!color] & ~strongSquares & info.colorAttacks[color]);
 
-    const uint64_t safeSquares = info.attackedSquares[color] | ~info.attackedSquares[!color];
-    const uint64_t safePawns   = board.pieces(PAWN, color) & safeSquares;
+    const uint64_t safeSquares = info.colorAttacks[color] | ~info.colorAttacks[!color];
+    const uint64_t safePawns   = board.pieces(color, PAWN) & safeSquares;
 
     value += safePawnAttack * popcount(generate_pawns_attacks(safePawns, color) & minorsAndMajors);
 
-    uint64_t pawnPushes = shift_up(board.pieces(Pawn(color)), color) & ~board.pieces(ALLPIECES);
-    pawnPushes |= shift_up(pawnPushes & PAWN_FIRST_PUSH_RANK[color], color) & ~board.pieces(ALLPIECES);
-    pawnPushes &= ~info.attackedSquares[Pawn(!color)] & safeSquares;
+    uint64_t pawnPushes = shift_up(board.pieces(color, PAWN), color) & ~board.pieces(BOTH);
+    pawnPushes |= shift_up(pawnPushes & PAWN_FIRST_PUSH_RANK[color], color) & ~board.pieces(BOTH);
+    pawnPushes &= ~info.pieceAttacks[!color][PAWN] & safeSquares;
 
     value += pawnPushThreat * popcount(generate_pawns_attacks(pawnPushes, color) & minorsAndMajors);
 
     // Evaluate possible safe attacks on queen
-    uint64_t queens = board.pieces(QUEEN, !color);
+    uint64_t queens = board.pieces(!color, QUEEN);
     if (queens) {
 
         unsigned int sq = pop_lsb(queens);
-        uint64_t knightAttackSquares = gen_knight_moves(sq, board.pieces(color)) & info.attackedSquares[Knight(color)];
-        uint64_t bishopAttackSquares = gen_bishop_moves(sq, board.pieces(ALLPIECES), 0) & info.attackedSquares[Bishop(color)];
-        uint64_t rookAttackSquares   = gen_rook_moves(sq, board.pieces(ALLPIECES), 0) & info.attackedSquares[Rook(color)];
+        uint64_t knightAttackSquares = gen_knight_moves(sq, board.pieces(color)) & info.pieceAttacks[color][KNIGHT];
+        uint64_t bishopAttackSquares = gen_bishop_moves(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][BISHOP];
+        uint64_t rookAttackSquares   = gen_rook_moves(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][ROOK];
         uint64_t safe = info.mobilityArea[color] & ~strongSquares;
 
         value += KnightQueenAttackThreat * popcount(knightAttackSquares & safe);
 
-        safe &= info.multiAttackedSquares[color];
+        safe &= info.multiAttacks[color];
 
         value += BishopQueenAttackThreat * popcount(bishopAttackSquares & safe);
         value += RookQueenAttackThreat   * popcount(rookAttackSquares & safe);
@@ -861,29 +861,29 @@ static const Value evaluate_threats(const Board& board, const Color color, const
 
 static void init_eval_info(const Board& board, EvalInfo& info) {
 
-    info.mobilityArea[WHITE] = ALL_SQUARES & ~((board.pieces(WHITE_KING) | board.pieces(WHITE_QUEEN)) | (board.pieces(WHITE_PAWN) & (shift_down(board.pieces(ALLPIECES), WHITE) | RANK_2 | RANK_3)) | info.attackedSquares[BLACK_PAWN]);
-    info.mobilityArea[BLACK] = ALL_SQUARES & ~((board.pieces(BLACK_KING) | board.pieces(BLACK_QUEEN)) | (board.pieces(BLACK_PAWN) & (shift_down(board.pieces(ALLPIECES), BLACK) | RANK_7 | RANK_6)) | info.attackedSquares[WHITE_PAWN]);
+    info.mobilityArea[WHITE] = ALL_SQUARES & ~((board.pieces(WHITE, KING) | board.pieces(WHITE, QUEEN)) | (board.pieces(WHITE, PAWN) & (shift_down(board.pieces(BOTH), WHITE) | RANK_2 | RANK_3)) | info.pieceAttacks[BLACK][PAWN]);
+    info.mobilityArea[BLACK] = ALL_SQUARES & ~((board.pieces(BLACK, KING) | board.pieces(BLACK, QUEEN)) | (board.pieces(BLACK, PAWN) & (shift_down(board.pieces(BOTH), BLACK) | RANK_7 | RANK_6)) | info.pieceAttacks[WHITE][PAWN]);
 
-    info.kingSq[WHITE] = lsb_index(board.pieces(WHITE_KING));
-    info.kingSq[BLACK] = lsb_index(board.pieces(BLACK_KING));
+    info.kingSq[WHITE] = lsb_index(board.pieces(WHITE, KING));
+    info.kingSq[BLACK] = lsb_index(board.pieces(BLACK, KING));
 
     info.kingRing[WHITE] = KingRing[WHITE][info.kingSq[WHITE]];
     info.kingRing[BLACK] = KingRing[BLACK][info.kingSq[BLACK]];
 
-    info.attackedSquares[WHITE_KING] = AttackBitboards[WHITE_KING][info.kingSq[WHITE]];
-    info.attackedSquares[BLACK_KING] = AttackBitboards[BLACK_KING][info.kingSq[BLACK]];
+    info.pieceAttacks[WHITE][KING] = KingAttacks[info.kingSq[WHITE]];
+    info.pieceAttacks[BLACK][KING] = KingAttacks[info.kingSq[BLACK]];
 
-    info.attackedSquares[WHITE] |= info.attackedSquares[WHITE_KING] | info.attackedSquares[WHITE_PAWN];
-    info.attackedSquares[BLACK] |= info.attackedSquares[BLACK_KING] | info.attackedSquares[BLACK_PAWN];
+    info.colorAttacks[WHITE] |= info.pieceAttacks[WHITE][KING] | info.pieceAttacks[WHITE][PAWN];
+    info.colorAttacks[BLACK] |= info.pieceAttacks[BLACK][KING] | info.pieceAttacks[BLACK][PAWN];
 
-    info.multiAttackedSquares[WHITE] = info.attackedSquares[WHITE_KING] & info.attackedSquares[WHITE_PAWN];
-    info.multiAttackedSquares[BLACK] = info.attackedSquares[BLACK_KING] & info.attackedSquares[BLACK_PAWN];
+    info.multiAttacks[WHITE] = info.pieceAttacks[WHITE][KING] & info.pieceAttacks[WHITE][PAWN];
+    info.multiAttacks[BLACK] = info.pieceAttacks[BLACK][KING] & info.pieceAttacks[BLACK][PAWN];
 
-    info.kingAttackersNum[WHITE] = popcount(info.attackedSquares[WHITE_KING] & info.attackedSquares[BLACK_PAWN]);
-    info.kingAttackersNum[BLACK] = popcount(info.attackedSquares[BLACK_KING] & info.attackedSquares[WHITE_PAWN]);
+    info.kingAttackersNum[WHITE] = popcount(info.pieceAttacks[WHITE][KING] & info.pieceAttacks[BLACK][PAWN]);
+    info.kingAttackersNum[BLACK] = popcount(info.pieceAttacks[BLACK][KING] & info.pieceAttacks[WHITE][PAWN]);
 
-    info.blockedPawns[WHITE] = shift_up(board.pieces(WHITE_PAWN), WHITE) & board.pieces(ALLPIECES);
-    info.blockedPawns[BLACK] = shift_up(board.pieces(BLACK_PAWN), BLACK) & board.pieces(ALLPIECES);
+    info.blockedPawns[WHITE] = shift_up(board.pieces(WHITE, PAWN), WHITE) & board.pieces(BOTH);
+    info.blockedPawns[BLACK] = shift_up(board.pieces(BLACK, PAWN), BLACK) & board.pieces(BOTH);
 
 }
 
@@ -893,25 +893,22 @@ int evaluate(const Board& board) {
 
     EvalInfo info;
 
-    unsigned int pieceCount;
-
     // Material draw
-    if ((pieceCount = popcount(board.pieces(ALLPIECES))) <= 4) {
-        if (board.checkMaterialDraw(pieceCount) == true)
-            return 0;
+    if (board.is_material_draw()) {
+        return 0;
     }
 
     PawnEntry * pentry = pawnTable.probe(board.pawnkey());
     if (pentry != NULL) {
         value += pentry->value;
         info.passedPawns = pentry->passedPawns;
-        info.attackedSquares[WHITE_PAWN] = pentry->pawnWAttacks;
-        info.attackedSquares[BLACK_PAWN] = pentry->pawnBAttacks;
+        info.pieceAttacks[WHITE][PAWN] = pentry->pawnWAttacks;
+        info.pieceAttacks[BLACK][PAWN] = pentry->pawnBAttacks;
         info.pawnAttacksSpan[WHITE] = pentry->pawnWAttacksSpan;
         info.pawnAttacksSpan[BLACK] = pentry->pawnBAttacksSpan;
     } else {
-        info.attackedSquares[WHITE_PAWN] = board.gen_wpawns_attacks();
-        info.attackedSquares[BLACK_PAWN] = board.gen_bpawns_attacks();
+        info.pieceAttacks[WHITE][PAWN] = board.gen_wpawns_attacks();
+        info.pieceAttacks[BLACK][PAWN] = board.gen_bpawns_attacks();
     }
 
     init_eval_info(board, info);
@@ -927,7 +924,7 @@ int evaluate(const Board& board) {
     // Pawns
     if (pentry == NULL) {
         Value pawnValue = evaluate_pawns(board, WHITE, info) - evaluate_pawns(board, BLACK, info);
-        pawnTable.store(board.pawnkey(), pawnValue, info.attackedSquares[WHITE_PAWN], info.attackedSquares[BLACK_PAWN], info.passedPawns, info.pawnAttacksSpan[WHITE], info.pawnAttacksSpan[BLACK]);
+        pawnTable.store(board.pawnkey(), pawnValue, info.pieceAttacks[WHITE][PAWN], info.pieceAttacks[BLACK][PAWN], info.passedPawns, info.pawnAttacksSpan[WHITE], info.pawnAttacksSpan[BLACK]);
         value += pawnValue;
     }
 
@@ -978,8 +975,8 @@ void evaluateInfo(const Board& board) {
 
     EvalInfo info;
 
-    info.attackedSquares[WHITE_PAWN] = board.gen_wpawns_attacks();
-    info.attackedSquares[BLACK_PAWN] = board.gen_bpawns_attacks();
+    info.pieceAttacks[WHITE][PAWN] = board.gen_wpawns_attacks();
+    info.pieceAttacks[BLACK][PAWN] = board.gen_bpawns_attacks();
 
     init_eval_info(board, info);
 
