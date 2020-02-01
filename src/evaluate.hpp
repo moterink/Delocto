@@ -42,19 +42,9 @@ static const Value Material[6] = {
 
 };
 
-// Values for pieces for mvvlva/see
-#define PawnValue      100
-#define KnightValue    320
-#define BishopValue    330
-#define RookValue      500
-#define QueenValue     950
-#define KingValue    99999
-
 // Phases
 #define MG 0
 #define EG 1
-
-static const int pieceValues[14] = { 0, 0, PawnValue, PawnValue, KnightValue, KnightValue, BishopValue, BishopValue, RookValue, RookValue, QueenValue, QueenValue, KingValue, KingValue };
 
 typedef struct {
 

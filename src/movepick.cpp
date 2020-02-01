@@ -48,6 +48,7 @@ Move MovePicker::pick() {
     switch (phase) {
 
         case TTMove:
+        case TTMoveQS:
 
             {
                 ++phase;
@@ -177,17 +178,6 @@ Move MovePicker::pick() {
 
             }
             break;
-
-        case TTMoveQS:
-
-            {
-                ++phase;
-
-                // Hashmove validity tested before
-                if (ttMove != MOVE_NONE) {
-                    return ttMove;
-                }
-            }
 
         case GenCapsQS:
 

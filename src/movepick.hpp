@@ -43,14 +43,34 @@ class MovePicker {
 
         Move counterMove = MOVE_NONE;
 
-        MovePicker(const Board& b, SearchInfo * i, int plies, Move t=MOVE_NONE, Move c=MOVE_NONE) : board(b), info(i) {
+        // Constructor for normal search
+        MovePicker(const Board& b, SearchInfo * i, int plies, Move t=MOVE_NONE) : board(b), info(i) {
 
             killers[0] = info->killers[plies][0];
             killers[1] = info->killers[plies][1];
-            ttMove = t;
+
+            if (t != MOVE_NONE) {
+                ttMove = t;
+            } else {
+                phase = GenCaps;
+            }
+
+
             if (plies > 0 && info->currentmove[plies-1] != MOVE_NONE) {
                 unsigned prevSq = to_sq(info->currentmove[plies-1]);
                 counterMove = info->countermove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq];
+            }
+
+        }
+
+        // Constructor for quiescence search
+        MovePicker(const Board& b, int plies, Move lastMove, Move t=MOVE_NONE) : board(b) {
+
+            ttMove = t != MOVE_NONE && (to_sq(lastMove) == to_sq(t)) ? t : MOVE_NONE;
+
+            phase = TTMoveQS;
+            if (ttMove == MOVE_NONE) {
+                phase = GenCapsQS;
             }
 
         }

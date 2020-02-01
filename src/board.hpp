@@ -103,7 +103,7 @@ class Board {
         bool gives_check(const Move move);
 
         int mvvlva(const Move move) const;
-        int see(const Move move, Color color) const;
+        int see(const Move move) const;
 
         inline uint64_t minors_or_majors(const Color color) const;
         inline uint64_t majors() const;

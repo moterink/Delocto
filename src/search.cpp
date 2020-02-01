@@ -121,13 +121,15 @@ uint64_t Board::least_valuable_piece(uint64_t attackers, const Color color, Piec
 
 }
 
-int Board::see(const Move move, Color color) const {
+int Board::see(const Move move) const {
 
     int value[32];
     unsigned int d = 0;
 
     unsigned int fromsq = from_sq(move);
     unsigned int tosq   = to_sq(move);
+
+    Color color = stm;
 
     Piecetype attacker = pieceTypes[fromsq];
 
@@ -242,38 +244,45 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
 
     }
 
-    bestValue = eval = (ttHit && entry->eval != VALUE_NONE ? entry->eval : evaluate(board));
+    if (inCheck) {
+        bestValue = eval = -VALUE_INFINITE;
+    } else {
 
-    if (bestValue >= beta) {
-        return bestValue;
-    }
+        bestValue = eval = (ttHit && entry->eval != VALUE_NONE ? entry->eval : evaluate(board));
 
-    if (bestValue > alpha) {
-        alpha = bestValue;
+        if (bestValue >= beta) {
+            return bestValue;
+        }
+
+        if (bestValue > alpha) {
+            alpha = bestValue;
+        }
+
     }
 
     int moveCount = 0;
     Move bestMove = MOVE_NONE;
     Move move = MOVE_NONE;
 
-    MovePicker picker(board, info, plies, ttMove);
-    picker.phase = TTMoveQS;
+    MovePicker picker(board, plies, info->currentmove[plies-1], ttMove);
 
     while ( (move = picker.pick() ) != MOVE_NONE )  {
 
-        if (eval + DeltaMaterial[board.piecetype(to_sq(move))] < alpha - DELTA_MARGIN) {
-            continue;
-        }
-
         moveCount++;
+
+        if (!inCheck) {
+            if (eval + DeltaMaterial[board.piecetype(to_sq(move))] < alpha - DELTA_MARGIN) {
+                continue;
+            }
+
+            if (board.see(move) < 0) {
+                continue;
+            }
+        }
 
         if (!board.is_legal(move)) {
             moveCount--;
             continue;
-        }
-
-        if (info->depth == 3 && plies == 4 && moveCount == 2) {
-            int x = 0;
         }
 
         board.do_move(move);
@@ -298,6 +307,7 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
 
     }
 
+    // FIXME: shows incorrect mates because evasions are not searched in qsearch
     if (inCheck && moveCount == 0) {
         return -VALUE_MATE + plies;
     }
@@ -473,7 +483,7 @@ static int search(int alpha, int beta, int depth, int plies, bool cutNode, Board
                     extensions = 1;
             } else {
                 // Check extension
-                if (inCheck && board.see(move, board.turn()) >= 0) {
+                if (inCheck && board.see(move) >= 0) {
                     extensions = 1;
                 }
             }
@@ -550,15 +560,17 @@ static int search(int alpha, int beta, int depth, int plies, bool cutNode, Board
 
         }
 
-        if (moveCount == 0)
+        if (moveCount == 0) {
             return excluded != MOVE_NONE ? alpha : inCheck ? -VALUE_MATE + plies : VALUE_DRAW;
+        }
 
         if (bestValue >= beta && !is_promotion(bestMove) && !board.is_capture(bestMove)) {
             update_quiet_stats(board, info, plies, depth, quietMoves, bestMove);
         }
 
-        if (excluded == MOVE_NONE)
+        if (excluded == MOVE_NONE) {
             tTable.store(board.hashkey(), depth, value_to_tt(bestValue, plies), eval, bestMove, bestValue >= beta ? BOUND_LOWER : pvNode && bestMove != MOVE_NONE ? BOUND_EXACT : BOUND_UPPER);
+        }
         return bestValue;
 
     }
@@ -601,18 +613,22 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
 
                 value = search(alpha, beta, depth, 0, false, board, &info, pv, true);
 
-                if (value <= alpha) {
-                    beta = (alpha + beta) / 2;
-                    alpha = value - window;
-                } else if (value >= beta) {
-                    beta = value + window;
+                if (!info.stopped) {
+                    if (value <= alpha) {
+                        beta = (alpha + beta) / 2;
+                        alpha = value - window;
+                    } else if (value >= beta) {
+                        beta = value + window;
+                    } else {
+                        break;
+                    }
+
+                    window += window / 4;
+
+                    pv.clear();
                 } else {
                     break;
                 }
-
-                window += window / 4;
-
-                pv.clear();
 
             }
 

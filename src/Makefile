@@ -19,7 +19,7 @@
 
 TARGET = delocto
 
-CXXSTD = -std=c++14
+CXXSTD = -std=c++17
 
 OPTIMIZEFLAGS = -mtune=native -march=native -DNDEBUG -O3
 DEBUGFLAGS = -g

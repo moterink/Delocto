@@ -25,8 +25,6 @@
 #include "evaluate.hpp"
 #include "timeman.hpp"
 
-#include <string_view>
-
 static const uint64_t KING_START_SQ[2]       = { SQUARES[E1], SQUARES[E8] };
 static const uint64_t KING_CASTLE_SQUARES[2] = { (SQUARES[G1] | SQUARES[C1]), (SQUARES[G8] | SQUARES[C8]) };
 
