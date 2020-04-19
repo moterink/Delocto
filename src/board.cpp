@@ -545,6 +545,10 @@ bool Board::checkDraw() {
         return true;
     }
 
+    if (is_material_draw()) {
+        return true;
+    }
+
     unsigned count = 0;
     for (unsigned i = 0; i < states.size(); i++) {
         if (states[i].hashKey == state.hashKey) {

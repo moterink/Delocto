@@ -23,7 +23,7 @@
 
 #include "movepick.hpp"
 
-void MovePicker::valueCaptures() {
+void MovePicker::scoreCaptures() {
 
     for (unsigned int index = 0; index < caps.size; index++) {
         caps.values[index] = board.mvvlva(caps.moves[index]);
@@ -31,11 +31,28 @@ void MovePicker::valueCaptures() {
 
 }
 
-void MovePicker::valueQuiets() {
+void MovePicker::scoreQuiets() {
+
+    for (unsigned int index = 0; index < quiets.size; index++) {
+        quiets.values[index] = info->history[board.turn()][board.piecetype(from_sq(quiets.moves[index]))][to_sq(quiets.moves[index])];
+    }
 
 }
 
-void MovePicker::valueQsCaptures() {
+void MovePicker::scoreEvasions() {
+
+    for (unsigned int index = 0; index < evasions.size; index++) {
+        if (board.is_capture(evasions.moves[index])) {
+            evasions.values[index] = board.mvvlva(evasions.moves[index]);
+        } else {
+            evasions.values[index] = info->history[board.turn()][board.piecetype(from_sq(evasions.moves[index]))][to_sq(evasions.moves[index])];
+        }
+
+    }
+
+}
+
+void MovePicker::scoreQsCaptures() {
 
     for (unsigned int index = 0; index < qscaps.size; index++) {
         qscaps.values[index] = board.mvvlva(qscaps.moves[index]);
@@ -66,7 +83,7 @@ Move MovePicker::pick() {
                 ++phase;
 
                 caps = gen_caps(board, board.turn());
-                valueCaptures();
+                scoreCaptures();
 
             }
 
@@ -127,10 +144,7 @@ Move MovePicker::pick() {
                 ++phase;
 
                 quiets = gen_quiets(board, board.turn());
-
-                for (unsigned int index = 0; index < quiets.size; index++) {
-                    quiets.values[index] = info->history[board.turn()][board.piecetype(from_sq(quiets.moves[index]))][to_sq(quiets.moves[index])];
-                }
+                scoreQuiets();
 
             }
 
@@ -179,13 +193,45 @@ Move MovePicker::pick() {
             }
             break;
 
+        case GenEvasions:
+
+            {
+
+                ++phase;
+
+                gen_evasions(board, MOVES_ALL, evasions, board.turn());
+                scoreEvasions();
+
+            }
+
+        case Evasions:
+
+            {
+
+                while (evasions.index < evasions.size) {
+
+                    Move best = evasions.pick();
+                    assert(best != MOVE_NONE);
+                    ++evasions.index;
+
+                    if (best != ttMove) {
+                        return best;
+                    }
+
+                }
+
+                // Do not continue with captures in quiescence search; all captures evading check have already been search in Evasions
+                return MOVE_NONE;
+
+            }
+
         case GenCapsQS:
 
             {
                 ++phase;
 
                 qscaps = gen_caps(board, board.turn());
-                valueQsCaptures();
+                scoreQsCaptures();
 
             }
 

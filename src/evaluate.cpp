@@ -305,26 +305,11 @@ bool Board::is_material_draw() const {
 
     if (bbPieces[PAWN] || bbPieces[ROOK] || bbPieces[QUEEN]) {
         return false;
+    } else if (popcount(bbColors[BOTH]) > 3) {
+        return false;
     }
 
-    switch(popcount(bbColors[BOTH])) {
-
-        case 2: return true;
-        case 3: return true;
-        case 4:
-            {
-                if (   pieceCounts[WHITE][BISHOP] >= 2 || pieceCounts[BLACK][BISHOP] >= 2
-                    || (pieceCounts[WHITE][KNIGHT] && pieceCounts[WHITE][BISHOP]) || (pieceCounts[BLACK][KNIGHT] && pieceCounts[BLACK][BISHOP])
-                    || pieceCounts[WHITE][KNIGHT] == 2 || pieceCounts[BLACK][KNIGHT] == 2)
-                {
-                    return false;
-                }
-                return true;
-            }
-        default: assert(false);
-    }
-
-    return false;
+    return true;
 
 }
 

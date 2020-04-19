@@ -51,6 +51,10 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Delocto " << VERSION << " by Moritz Terink" << std::endl << std::endl;
 
+    Board board;
+    board.set_fen("6r1/pk3p1p/3p4/1P2p3/1P1P4/PR3NP1/3K1P1P/7R w - - 0 2");
+    board.see(make_move(D4, E5, NORMAL));
+
     uciloop(argc, argv);
 
     return 0;

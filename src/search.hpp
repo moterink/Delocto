@@ -30,7 +30,7 @@
 #include "move.hpp"
 #include "movegen.hpp"
 
-#define DELTA_MARGIN  125
+#define DELTA_MARGIN 100
 
 enum NodeType {
 

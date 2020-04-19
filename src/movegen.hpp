@@ -117,6 +117,7 @@ inline uint64_t get_queen_moves(const unsigned int sq, const uint64_t both, cons
 
 extern MoveList gen_quiets(const Board& board, const Color color);
 extern MoveList gen_caps(const Board& board, const Color color);
+extern void gen_evasions(const Board&board, const MoveGenType mtype, MoveList& moveList, const Color color);
 extern MoveList gen_all(const Board& board, const Color color);
 extern MoveList gen_legals(const Board& board, const MoveList& moves);
 

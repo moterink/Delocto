@@ -115,7 +115,7 @@ typedef uint16_t MoveType;
 
 enum MoveGenType : unsigned {
 
-    QUIETS, CAPTURES
+    MOVES_QUIETS, MOVES_CAPTURES, MOVES_ALL
 
 };
 

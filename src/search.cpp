@@ -108,69 +108,74 @@ static void checkUp(SearchInfo* info) {
 
 }
 
-uint64_t Board::least_valuable_piece(uint64_t attackers, const Color color, Piecetype& pt) const {
+unsigned Board::least_valuable_piece(uint64_t attackers, const Color color) const {
 
-    for (pt = PAWN; pt <= KING; pt++) {
+    for (Piecetype pt = PAWN; pt <= KING; pt++) {
         uint64_t subset = attackers & pieces(color, pt);
         if (subset) {
-            return subset & -subset;
+            return lsb_index(subset);
         }
     }
 
-    return 0;
+    return SQUARE_NONE;
 
 }
 
 int Board::see(const Move move) const {
 
-    int value[32];
-    unsigned int d = 0;
+    if (move_type(move) != NORMAL) {
+        return 0;
+    }
 
-    unsigned int fromsq = from_sq(move);
-    unsigned int tosq   = to_sq(move);
+    unsigned fromSq = from_sq(move);
+    unsigned toSq   = to_sq(move);
 
-    Color color = stm;
+    Color color = !stm;
 
-    Piecetype attacker = pieceTypes[fromsq];
-
-    uint64_t mayXray = bbPieces[PAWN] | bbPieces[BISHOP] | bbPieces[ROOK] | bbPieces[QUEEN];
-    uint64_t fromset = SQUARES[fromsq];
-
+    uint64_t mayXray  = bbPieces[PAWN] | bbPieces[BISHOP] | bbPieces[ROOK] | bbPieces[QUEEN];
     uint64_t occupied  = bbColors[BOTH];
-    uint64_t attackers = sq_attackers(WHITE, tosq, occupied) | sq_attackers(BLACK, tosq, occupied);
+    uint64_t attackers = sq_attackers(WHITE, toSq, occupied) | sq_attackers(BLACK, toSq, occupied);
+
+    unsigned attacker = fromSq;
+    Piecetype victim;
 
     if (is_ep(move)) {
-        value[d] = SeeMaterial[PAWN];
+        victim = PAWN;
     } else {
-        value[d] = SeeMaterial[pieceTypes[tosq]];
+        if (pieceTypes[toSq] != PIECE_NONE) {
+            victim = pieceTypes[toSq];
+        } else {
+            victim = PIECE_NONE;
+        }
+
     }
+
+    int value = 0;
 
     do {
 
         color = !color;
-        d++;
-        value[d] = SeeMaterial[attacker] - value[d - 1];
 
-        if (-value[d - 1] < 0 && value[d] < 0) {
-            return value[d];
+        if (color == stm) {
+            value += SeeMaterial[victim];
+        } else {
+            value -= SeeMaterial[victim];
         }
 
-        attackers ^= fromset;
-        occupied  ^= fromset;
+        victim = pieceTypes[attacker];
 
-        if (fromset & mayXray) {
-            attackers |= slider_attackers(tosq, occupied) & occupied;
+        attackers ^= SQUARES[attacker];
+        occupied  ^= SQUARES[attacker];
+
+        if (SQUARES[attacker] & mayXray) {
+            attackers |= slider_attackers(toSq, occupied) & occupied;
         }
 
-        fromset = least_valuable_piece(attackers, color, attacker);
+        attacker = least_valuable_piece(attackers, !color);
 
-    } while (fromset);
+    } while (attacker != SQUARE_NONE && pieceTypes[attacker] != KING);
 
-    while (--d) {
-        value[d - 1] = -((-value[d-1] > value[d]) ? -value[d-1] : value[d]);
-    }
-
-    return value[0];
+    return value;
 
 }
 
@@ -218,7 +223,7 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
     const bool pvNode = (beta - alpha != 1);
     Move ttMove = MOVE_NONE;
 
-    int bestValue, value, eval;
+    int bestValue, value, eval, deltaBase, deltaValue;
     bool ttHit;
 
     const int oldAlpha = alpha;
@@ -245,7 +250,10 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
     }
 
     if (inCheck) {
-        bestValue = eval = -VALUE_INFINITE;
+
+        eval = VALUE_NONE;
+        bestValue = deltaBase = -VALUE_INFINITE;
+
     } else {
 
         bestValue = eval = (ttHit && entry->eval != VALUE_NONE ? entry->eval : evaluate(board));
@@ -258,27 +266,45 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
             alpha = bestValue;
         }
 
+        deltaBase = bestValue + DELTA_MARGIN;
+
     }
 
     int moveCount = 0;
     Move bestMove = MOVE_NONE;
     Move move = MOVE_NONE;
 
-    MovePicker picker(board, plies, info->currentmove[plies-1], ttMove);
+    MovePicker picker(board, info, plies, info->currentmove[plies-1], ttMove);
 
-    while ( (move = picker.pick() ) != MOVE_NONE )  {
+    while ( (move = picker.pick()) != MOVE_NONE ) {
 
         moveCount++;
 
-        if (!inCheck) {
-            if (eval + DeltaMaterial[board.piecetype(to_sq(move))] < alpha - DELTA_MARGIN) {
+        const bool givesCheck = board.gives_check(move);
+
+        if (   !inCheck
+            && !givesCheck
+            && !board.is_dangerous_pawn_push(move))
+        {
+
+            deltaValue = deltaBase + Material[board.piecetype(to_sq(move))].eg;
+
+            if (deltaValue <= alpha) {
+                bestValue = std::max(bestValue, deltaValue);
                 continue;
             }
 
-            if (board.see(move) < 0) {
+            if (deltaBase <= alpha && board.see(move) <= 0) {
+                bestValue = std::max(bestValue, deltaBase);
                 continue;
             }
+
         }
+
+        if (!inCheck && board.see(move) < 0) {
+            continue;
+        }
+
 
         if (!board.is_legal(move)) {
             moveCount--;
@@ -311,6 +337,8 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
     if (inCheck && moveCount == 0) {
         return -VALUE_MATE + plies;
     }
+
+    assert(bestMove != MOVE_NONE);
 
     tTable.store(board.hashkey(), ttDepth, value_to_tt(bestValue, plies), eval, bestMove, bestValue >= beta ? BOUND_LOWER : pvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER);
     return bestValue;

@@ -29,7 +29,7 @@ constexpr int HISTORY_VALUE_MAX = 0x4000;
 
 enum MovePickPhase : unsigned int {
 
-    TTMove, GenCaps, GoodCaps, FirstKiller, SecondKiller, CounterMove, GenQuiets, Quiets, LoosingCaps, TTMoveQS, GenCapsQS, CapsQS
+    TTMove, GenCaps, GoodCaps, FirstKiller, SecondKiller, CounterMove, GenQuiets, Quiets, LoosingCaps, TTMoveQS, GenEvasions, Evasions, GenCapsQS, CapsQS
 
 };
 
@@ -44,7 +44,7 @@ class MovePicker {
         Move counterMove = MOVE_NONE;
 
         // Constructor for normal search
-        MovePicker(const Board& b, SearchInfo * i, int plies, Move t=MOVE_NONE) : board(b), info(i) {
+        MovePicker(const Board& b, SearchInfo * i, int plies, Move t) : board(b), info(i) {
 
             killers[0] = info->killers[plies][0];
             killers[1] = info->killers[plies][1];
@@ -64,20 +64,28 @@ class MovePicker {
         }
 
         // Constructor for quiescence search
-        MovePicker(const Board& b, int plies, Move lastMove, Move t=MOVE_NONE) : board(b) {
+        MovePicker(const Board& b, SearchInfo * i, int plies, Move lastMove, Move t) : board(b), info(i) {
 
-            ttMove = t != MOVE_NONE && (to_sq(lastMove) == to_sq(t)) ? t : MOVE_NONE;
+            // Check if there is a hash move available and if it is a capture to the square of the last move
+            if (plies > 0 && lastMove != MOVE_NONE) {
+                ttMove = t != MOVE_NONE && (to_sq(lastMove) == to_sq(t)) ? t : MOVE_NONE;
+            }
 
             phase = TTMoveQS;
             if (ttMove == MOVE_NONE) {
-                phase = GenCapsQS;
+                if (board.checkers()) {
+                    phase = GenEvasions;
+                } else {
+                    phase = GenCapsQS;
+                }
             }
 
         }
 
-        void valueCaptures();
-        void valueQuiets();
-        void valueQsCaptures();
+        void scoreCaptures();
+        void scoreQuiets();
+        void scoreEvasions();
+        void scoreQsCaptures();
 
         Move pick();
 
@@ -90,6 +98,7 @@ class MovePicker {
         MoveList quiets;
         MoveList lcaps;
         MoveList moves;
+        MoveList evasions;
         MoveList qscaps;
 
 };

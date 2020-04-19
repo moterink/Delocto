@@ -110,6 +110,7 @@ class Board {
         inline uint64_t sliders(const Color color) const;
 
         inline bool is_capture(const Move move) const;
+        inline bool is_dangerous_pawn_push(const Move move) const;
         inline uint64_t getAllOccupancy(const uint64_t squares) const;
         inline uint64_t getPieceOccupancy(const uint64_t squares, const Piecetype type);
         uint64_t get_king_blockers(const Color color) const;
@@ -168,7 +169,7 @@ class Board {
         inline bool sq_attacked(const unsigned sq, const Color color) const;
         inline bool sq_attacked_noking(const unsigned sq, const Color color) const;
 
-        uint64_t least_valuable_piece(uint64_t attackers, const Color color, Piecetype& pt) const;
+        unsigned least_valuable_piece(uint64_t attackers, const Color color) const;
 
         void update_check_info();
 
@@ -207,6 +208,12 @@ inline uint64_t Board::sliders(const Color color) const {
 inline bool Board::is_capture(const Move move) const {
 
     return (pieceTypes[to_sq(move)] != PIECE_NONE || move_type(move) == ENPASSANT);
+
+}
+
+inline bool Board::is_dangerous_pawn_push(const Move move) const {
+
+    return pieceTypes[from_sq(move)] == PAWN && relative_rank(stm, to_sq(move)) > 5;
 
 }
 

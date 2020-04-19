@@ -403,7 +403,7 @@ static void gen_castlings(const Board& board, MoveList& moveList, const Color co
 
 }
 
-static void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& moveList, const Color color) {
+void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& moveList, const Color color) {
 
     const unsigned ksq      = lsb_index(board.pieces(color, KING));
     const uint64_t checkers = board.checkers();
@@ -411,7 +411,7 @@ static void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& 
 
     if (popcount(checkers) >= 2) {
 
-        uint64_t kingMoves = KingAttacks[ksq] & ((mtype == QUIETS) ? ~board.pieces(BOTH) : board.pieces(!color));
+        uint64_t kingMoves = KingAttacks[ksq] & ((mtype == MOVES_QUIETS) ? ~board.pieces(BOTH) : board.pieces(!color));
         while (kingMoves) {
             moveList.append(make_move(ksq, pop_lsb(kingMoves), NORMAL));
         }
@@ -421,15 +421,27 @@ static void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& 
 
     switch(mtype) {
 
-        case QUIETS:
+        case MOVES_QUIETS:
         {
             const uint64_t targets = (sliders ? (RayTable[lsb_index(sliders)][ksq] & ~board.pieces(BOTH)) : ~board.pieces(BOTH));
             gen_quietproms(board, moveList, color, targets);
             gen_piece_quiets(board, moveList, color, targets);
             break;
         }
-        case CAPTURES:
+        case MOVES_CAPTURES:
         {
+            gen_capproms(board, moveList, color, checkers);
+            gen_piece_caps(board, moveList, color, checkers);
+            if (checkers & board.pieces(!color, PAWN)) {
+                gen_ep(board, moveList, color, SQUARES[board.enPassant()]);
+            }
+            break;
+        }
+        case MOVES_ALL:
+        {
+            const uint64_t targets = (sliders ? (RayTable[lsb_index(sliders)][ksq] & ~board.pieces(BOTH)) : ~board.pieces(BOTH));
+            gen_quietproms(board, moveList, color, targets);
+            gen_piece_quiets(board, moveList, color, targets);
             gen_capproms(board, moveList, color, checkers);
             gen_piece_caps(board, moveList, color, checkers);
             if (checkers & board.pieces(!color, PAWN)) {
@@ -467,7 +479,7 @@ MoveList gen_quiets(const Board& board, const Color color) {
     MoveList moveList;
 
     if (board.checkers()) {
-        gen_evasions(board, QUIETS, moveList, color);
+        gen_evasions(board, MOVES_QUIETS, moveList, color);
     } else {
         const uint64_t targets = ~board.pieces(BOTH);
         gen_quietproms(board, moveList, color, targets);
@@ -484,7 +496,7 @@ MoveList gen_caps(const Board& board, const Color color) {
     MoveList moveList;
 
     if (board.checkers()) {
-        gen_evasions(board, CAPTURES, moveList, color);
+        gen_evasions(board, MOVES_CAPTURES, moveList, color);
     } else {
         const uint64_t targets = board.pieces(!color);
         gen_capproms(board, moveList, color, targets);
