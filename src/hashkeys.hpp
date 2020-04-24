@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,7 @@
 #include "types.hpp"
 #include "move.hpp"
 
+// A megabyte
 #define MB 0x100000
 
 // Hash flags
@@ -73,11 +74,11 @@ class TranspositionTable {
 
     public:
 
-        int size;
+        unsigned size;
 
         TTEntry *table;
 
-        void setSize(const int hashsize);
+        void set_size(const unsigned hashsize);
         void clear();
         TTEntry * probe(const uint64_t key, bool& tthit);
         void store(const uint64_t key, const int depth, const int value, const int eval, const Move bestMove, const int flag);
@@ -85,13 +86,14 @@ class TranspositionTable {
         ~TranspositionTable() {
             delete[] table;
         }
+
 };
 
 class PawnTable {
 
     public:
 
-        int size = 0x10000;
+        unsigned size = 0x10000;
 
         PawnEntry *table;
 
@@ -113,7 +115,7 @@ class MaterialTable {
 
     public:
 
-        int size = 0x2000;
+        unsigned size = 0x2000;
 
         MaterialEntry *table;
 
@@ -146,7 +148,7 @@ static uint64_t rand64() {
 
 extern uint64_t PieceHashKeys[2][7][64];
 extern uint64_t PawnHashKeys[2][64];
-extern uint64_t MaterialHashKeys[2][6][9];
+extern uint64_t MaterialHashKeys[2][6][11];
 extern uint64_t TurnHashKeys[2];
 extern uint64_t CastlingHashKeys[16];
 extern uint64_t EnPassantHashKeys[8];

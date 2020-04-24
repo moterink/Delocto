@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -39,30 +39,45 @@
 #include <cmath>
 #include <chrono>
 
-// Ranks
-static const uint64_t RANK_1 = 0xFF;
-static const uint64_t RANK_2 = RANK_1 << 8;
-static const uint64_t RANK_3 = RANK_1 << 16;
-static const uint64_t RANK_4 = RANK_1 << 24;
-static const uint64_t RANK_5 = RANK_1 << 32;
-static const uint64_t RANK_6 = RANK_1 << 40;
-static const uint64_t RANK_7 = RANK_1 << 48;
-static const uint64_t RANK_8 = RANK_1 << 56;
+// Indices for ranks
+enum Rank : int {
 
-// Files
-static const uint64_t FILE_H = 0x101010101010101;
-static const uint64_t FILE_G = FILE_H << 1;
-static const uint64_t FILE_F = FILE_H << 2;
-static const uint64_t FILE_E = FILE_H << 3;
-static const uint64_t FILE_D = FILE_H << 4;
-static const uint64_t FILE_C = FILE_H << 5;
-static const uint64_t FILE_B = FILE_H << 6;
-static const uint64_t FILE_A = FILE_H << 7;
+    RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8
 
-static const uint64_t RANKS[8] = { RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8 };
-static const uint64_t FILES[8] = { FILE_H, FILE_G, FILE_F, FILE_E, FILE_D, FILE_C, FILE_B, FILE_A };
+};
 
-// 64bit integers for each square
+// Indices for files
+enum File : int {
+
+    FILE_H, FILE_G, FILE_F, FILE_E, FILE_D, FILE_C, FILE_B, FILE_A
+
+};
+
+// Bitboards for ranks
+static const uint64_t BB_RANK_1 = 0xFF;
+static const uint64_t BB_RANK_2 = BB_RANK_1 << 8;
+static const uint64_t BB_RANK_3 = BB_RANK_1 << 16;
+static const uint64_t BB_RANK_4 = BB_RANK_1 << 24;
+static const uint64_t BB_RANK_5 = BB_RANK_1 << 32;
+static const uint64_t BB_RANK_6 = BB_RANK_1 << 40;
+static const uint64_t BB_RANK_7 = BB_RANK_1 << 48;
+static const uint64_t BB_RANK_8 = BB_RANK_1 << 56;
+
+// Bitboards for files
+static const uint64_t BB_FILE_H = 0x101010101010101;
+static const uint64_t BB_FILE_G = BB_FILE_H << 1;
+static const uint64_t BB_FILE_F = BB_FILE_H << 2;
+static const uint64_t BB_FILE_E = BB_FILE_H << 3;
+static const uint64_t BB_FILE_D = BB_FILE_H << 4;
+static const uint64_t BB_FILE_C = BB_FILE_H << 5;
+static const uint64_t BB_FILE_B = BB_FILE_H << 6;
+static const uint64_t BB_FILE_A = BB_FILE_H << 7;
+
+// Arrays of bitboards for ranks and files so they can be accessed numerically
+static const uint64_t RANKS[8] = { BB_RANK_1, BB_RANK_2, BB_RANK_3, BB_RANK_4, BB_RANK_5, BB_RANK_6, BB_RANK_7, BB_RANK_8 };
+static const uint64_t FILES[8] = { BB_FILE_H, BB_FILE_G, BB_FILE_F, BB_FILE_E, BB_FILE_D, BB_FILE_C, BB_FILE_B, BB_FILE_A };
+
+// Bitboards for each square
 static const uint64_t SQUARES[65] = {
 
     0x1,               0x2,               0x4,               0x8,               0x10,               0x20,               0x40,               0x80,
@@ -77,36 +92,39 @@ static const uint64_t SQUARES[65] = {
 
 };
 
-// Square names
-enum {
+// Indices for each square, SQUARE_NONE = 64
+enum Square : unsigned {
 
-    H1, G1, F1, E1, D1, C1, B1, A1,
-    H2, G2, F2, E2, D2, C2, B2, A2,
-    H3, G3, F3, E3, D3, C3, B3, A3,
-    H4, G4, F4, E4, D4, C4, B4, A4,
-    H5, G5, F5, E5, D5, C5, B5, A5,
-    H6, G6, F6, E6, D6, C6, B6, A6,
-    H7, G7, F7, E7, D7, C7, B7, A7,
-    H8, G8, F8, E8, D8, C8, B8, A8,
+    SQUARE_H1, SQUARE_G1, SQUARE_F1, SQUARE_E1, SQUARE_D1, SQUARE_C1, SQUARE_B1, SQUARE_A1,
+    SQUARE_H2, SQUARE_G2, SQUARE_F2, SQUARE_E2, SQUARE_D2, SQUARE_C2, SQUARE_B2, SQUARE_A2,
+    SQUARE_H3, SQUARE_G3, SQUARE_F3, SQUARE_E3, SQUARE_D3, SQUARE_C3, SQUARE_B3, SQUARE_A3,
+    SQUARE_H4, SQUARE_G4, SQUARE_F4, SQUARE_E4, SQUARE_D4, SQUARE_C4, SQUARE_B4, SQUARE_A4,
+    SQUARE_H5, SQUARE_G5, SQUARE_F5, SQUARE_E5, SQUARE_D5, SQUARE_C5, SQUARE_B5, SQUARE_A5,
+    SQUARE_H6, SQUARE_G6, SQUARE_F6, SQUARE_E6, SQUARE_D6, SQUARE_C6, SQUARE_B6, SQUARE_A6,
+    SQUARE_H7, SQUARE_G7, SQUARE_F7, SQUARE_E7, SQUARE_D7, SQUARE_C7, SQUARE_B7, SQUARE_A7,
+    SQUARE_H8, SQUARE_G8, SQUARE_F8, SQUARE_E8, SQUARE_D8, SQUARE_C8, SQUARE_B8, SQUARE_A8,
     SQUARE_NONE
 
 };
 
+// Bitboards for white, black and all squares on the board
 static const uint64_t WHITE_SQUARES = 0xaa55aa55aa55aa55;
 static const uint64_t BLACK_SQUARES = 0x55aa55aa55aa55aa;
 static const uint64_t ALL_SQUARES   = WHITE_SQUARES | BLACK_SQUARES;
 
+// Flags for the castling rights
 #define WKCASFLAG 1
 #define WQCASFLAG 2
 #define BKCASFLAG 4
 #define BQCASFLAG 8
 
+// Masks which extract castling rights based on the color
 #define WHITE_CASTLE_MASK  3
 #define BLACK_CASTLE_MASK 12
 #define ALL_CASTLE_MASK   15
 
 static const uint64_t CASTLE_MASKS[2]   = { WHITE_CASTLE_MASK, BLACK_CASTLE_MASK };
-static const uint64_t CASTLE_SQUARES[4] = { G1, C1, G8, C8 };
+static const uint64_t CASTLE_SQUARES[4] = { SQUARE_G1, SQUARE_C1, SQUARE_G8, SQUARE_C8 };
 static const uint64_t CASTLE_FLAGS[4]   = { WKCASFLAG, WQCASFLAG, BKCASFLAG, BQCASFLAG };
 
 typedef unsigned Direction;
@@ -139,6 +157,8 @@ class MoveList;
 typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::high_resolution_clock::time_point TimePoint;
 
+// Value structure
+// Consists of a value for the midgame and one for the endgame
 typedef struct {
 
     int mg = 0;
@@ -184,61 +204,69 @@ static const int bitIndex64[64] = {
 
 static const uint64_t debruijn64 = 0x03f79d71b4cb0a89;
 
-static const uint64_t CENTRAL_FILES = FILE_D | FILE_E;
+// Central files bitboards on the board
+static const uint64_t CENTRAL_FILES = BB_FILE_D | BB_FILE_E;
 
+// Adjacent files bitboards array, accessed by file index
 static const uint64_t ADJ_FILES[8] = {
 
-    FILE_G,
-    FILE_F | FILE_H,
-    FILE_E | FILE_G,
-    FILE_D | FILE_F,
-    FILE_C | FILE_E,
-    FILE_B | FILE_D,
-    FILE_A | FILE_C,
-    FILE_B,
+    BB_FILE_G,
+    BB_FILE_F | BB_FILE_H,
+    BB_FILE_E | BB_FILE_G,
+    BB_FILE_D | BB_FILE_F,
+    BB_FILE_C | BB_FILE_E,
+    BB_FILE_B | BB_FILE_D,
+    BB_FILE_A | BB_FILE_C,
+    BB_FILE_B,
 
 };
 
+// Bitboards for the king flank given a file index
 static const uint64_t KING_FLANK[8] = {
 
-    FILE_F | FILE_G | FILE_H,
-    FILE_E | FILE_F | FILE_G | FILE_H,
-    FILE_E | FILE_F | FILE_G | FILE_H,
-    FILE_C | FILE_D | FILE_E | FILE_F,
-    FILE_C | FILE_D | FILE_E | FILE_F,
-    FILE_A | FILE_B | FILE_C | FILE_D,
-    FILE_A | FILE_B | FILE_C | FILE_D,
-    FILE_A | FILE_B | FILE_C
+    BB_FILE_F | BB_FILE_G | BB_FILE_H,
+    BB_FILE_E | BB_FILE_F | BB_FILE_G | BB_FILE_H,
+    BB_FILE_E | BB_FILE_F | BB_FILE_G | BB_FILE_H,
+    BB_FILE_C | BB_FILE_D | BB_FILE_E | BB_FILE_F,
+    BB_FILE_C | BB_FILE_D | BB_FILE_E | BB_FILE_F,
+    BB_FILE_A | BB_FILE_B | BB_FILE_C | BB_FILE_D,
+    BB_FILE_A | BB_FILE_B | BB_FILE_C | BB_FILE_D,
+    BB_FILE_A | BB_FILE_B | BB_FILE_C
 
 };
 
-static const uint64_t COLOUR_BASE_SQUARES[2] = {
+// Base ranks (first 3 ranks) for a given color
+static const uint64_t COLOR_BASE_RANKS[2] = {
 
-    RANK_1 | RANK_2 | RANK_3, RANK_8 | RANK_7 | RANK_6
+    BB_RANK_1 | BB_RANK_2 | BB_RANK_3, BB_RANK_8 | BB_RANK_7 | BB_RANK_6
 
 };
 
-static const uint64_t CENTRAL_SQUARES = SQUARES[D4] | SQUARES[D5] | SQUARES[E4] | SQUARES[E5];
+// 4 central squares bitboard (D4, D5, E4, E5)
+static const uint64_t CENTRAL_SQUARES = SQUARES[SQUARE_D4] | SQUARES[SQUARE_D5] | SQUARES[SQUARE_E4] | SQUARES[SQUARE_E5];
 
+// Start rank bitboards of the pawns
 static const uint64_t PAWN_STARTRANK[2] = {
 
-    RANK_2, RANK_7
+    BB_RANK_2, BB_RANK_7
 
 };
 
+// Bitboards for the first rank pawns can reach
 static const uint64_t PAWN_FIRST_PUSH_RANK[2] = {
 
-    RANK_3, RANK_6
+    BB_RANK_3, BB_RANK_6
 
 };
 
+// Bitboards for the ranks pawns have to reach in order to be promoted
 static const uint64_t PAWN_FINALRANK[2] = {
 
-    RANK_8, RANK_1
+    BB_RANK_8, BB_RANK_1
 
 };
 
-static std::map<unsigned int, unsigned int> castleByKingpos = { {G1, WKCASFLAG}, {C1, WQCASFLAG}, {G8, BKCASFLAG}, {C8, BQCASFLAG} };
+static std::map<unsigned int, unsigned int> castleByKingpos = { {SQUARE_G1, WKCASFLAG}, {SQUARE_C1, WQCASFLAG}, {SQUARE_G8, BKCASFLAG}, {SQUARE_C8, BQCASFLAG} };
 
 // Get least significant set bit in unsigned 64bit integer
 inline unsigned int lsb_index(const uint64_t bit) {
@@ -295,16 +323,16 @@ inline bool sq_valid(const int sq) {
 }
 
 // Get rank index (0-7) of given square index
-inline unsigned rank(const unsigned int sq) {
+inline Rank rank(const unsigned sq) {
 
-    return (sq >> 3);
+    return Rank(sq >> 3);
 
 }
 
 // Get file index (0-7) of given square index
-inline unsigned file(const unsigned int sq) {
+inline File file(const unsigned sq) {
 
-    return (sq & 7);
+    return File(sq & 7);
 
 }
 
@@ -315,9 +343,9 @@ inline unsigned square(const unsigned file, const unsigned rank) {
 }
 
 // Get relative rank index for given color of given square index
-inline unsigned relative_rank(const Color color, const unsigned sq) {
+inline Rank relative_rank(const Color color, const unsigned sq) {
 
-    return (color == WHITE) ? rank(sq) : 7 - rank(sq);
+    return Rank((color == WHITE) ? rank(sq) : 7 - rank(sq));
 
 }
 
@@ -454,6 +482,7 @@ inline Piecetype& operator++(Piecetype& pt, int) {
 
 }
 
+// Print a value to the console, showing the midgame and endgame terms
 inline std::ostream& operator<<(std::ostream& os, const Value& value) {
 
     return os << "MG: " << value.mg << " | EG: " << value.eg;

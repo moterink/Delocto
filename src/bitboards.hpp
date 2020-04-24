@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,8 @@
 
 #include "types.hpp"
 
+// A Magic object, containing the magic number, the magic shift,
+// the attack mask and all attack bitboards for every magic index
 typedef struct {
 
     uint64_t magic;

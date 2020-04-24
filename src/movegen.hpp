@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -28,14 +28,13 @@
 #include "move.hpp"
 #include "bitboards.hpp"
 
-// TODO: make size, index, values private!
-
 class MoveList {
 
     public:
 
         unsigned size = 0;
         unsigned index = 0;
+
         Move moves[250];
         int values[250];
 
@@ -44,7 +43,7 @@ class MoveList {
         }
 
         void merge(MoveList list);
-        unsigned int find(const Move move);
+        unsigned find(const Move move);
         void swap(const unsigned int index1, const unsigned int index2);
         Move pick();
         void print();
@@ -52,63 +51,71 @@ class MoveList {
 };
 
 // Pawns
+// Returns the index of the single push square for a pawn on the given square for the given color
 inline unsigned get_pawn_push_sq(const unsigned sq, const uint64_t allPieces, const int up) {
 
     return (sq_valid(sq + up) && (!(SQUARES[sq + up] & allPieces))) ? sq + up : SQUARE_NONE;
 
 }
 
+// Returns the index of the double push square for a pawn on the given square for the given color
 inline unsigned get_pawn_double_push_sq(const unsigned sq, const uint64_t allPieces, const int up, const Color color) {
 
     return (sq_valid(sq + (2 * up)) && (SQUARES[sq] & PAWN_STARTRANK[color]) && (!((SQUARES[sq + (2 * up)]) & allPieces)) && (!(SQUARES[sq + up] & allPieces))) ? sq + (2 * up) : SQUARE_NONE;
 
 }
 
+// Returns a bitboard of all squares a pawn on the given square can capture pieces for the given color
 inline uint64_t generate_pawn_captures(const unsigned sq, const uint64_t oppPieces, const Color color) {
 
     return PawnAttacks[color][sq] & oppPieces;
 
 }
 
-// Pawns
+// Returns a bitboard of all possible pawn destination squares on the given square for the given color
 inline uint64_t generate_pawn_moves(const Color color, const unsigned sq, const uint64_t allPieces, const uint64_t oppPieces) {
 
     return (SQUARES[get_pawn_push_sq(sq, allPieces, DIRECTIONS[color][UP])] | SQUARES[get_pawn_double_push_sq(sq, allPieces, DIRECTIONS[color][UP], color)] | generate_pawn_captures(sq, oppPieces, color));
 
 }
 
+// Returns a bitboard of all attack squares for a pawn on the given square for the given color
 inline uint64_t generate_pawns_attacks(const uint64_t pawns, const Color color) {
 
-	return (color == WHITE) ? (((pawns & ~FILE_A) << 9) | ((pawns & ~FILE_H) << 7)) : (((pawns & ~FILE_A) >> 7) | ((pawns & ~FILE_H) >> 9));
+	return (color == WHITE) ? (((pawns & ~BB_FILE_A) << 9) | ((pawns & ~BB_FILE_H) << 7)) : (((pawns & ~BB_FILE_A) >> 7) | ((pawns & ~BB_FILE_H) >> 9));
 
 }
 
-// Knights & Kings
+// Returns a bitboard of all possible destination squares for a knight on the given square
 inline uint64_t gen_knight_moves(const unsigned sq, const uint64_t ownPieces) {
 
     return KnightAttacks[sq] & ~ownPieces;
 
 }
 
+// Returns a bitboard of all possible destination squares for a king on the given square
 inline uint64_t gen_king_moves(const unsigned sq, const uint64_t ownPieces) {
 
     return KingAttacks[sq] & ~ownPieces;
 
 }
 
-// Sliders
+// Sliding Pieces
+// Returns a bitboard of all possible destination squares for a bishop on the given square
 inline uint64_t gen_bishop_moves(const unsigned sq, const uint64_t both, const uint64_t friendly) {
 
     return BishopMagics[sq].attacks[get_magic_index(both, &BishopMagics[sq])] & ~friendly;
 
 }
 
+// Returns a bitboard of all possible destination squares for a rook on the given square
 inline uint64_t gen_rook_moves(const unsigned sq, const uint64_t both, const uint64_t friendly) {
 
     return RookMagics[sq].attacks[get_magic_index(both, &RookMagics[sq])] & ~friendly;
 
 }
 
+// Returns a bitboard of all possible destination squares for a queen on the given square
 inline uint64_t get_queen_moves(const unsigned int sq, const uint64_t both, const uint64_t friendly) {
 
     return gen_bishop_moves(sq, both, friendly) | gen_rook_moves(sq, both, friendly);

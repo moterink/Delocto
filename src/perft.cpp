@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -25,12 +25,17 @@
 #include "movegen.hpp"
 #include "uci.hpp"
 
+// Runs a perft to a given depth.
+// This method returns the total number of nodes visited
+// by traversing the search tree and counting the number of all positions
+// which may occur until a given depth.
 static uint64_t perft(int depth, PerftInfo& info, Board& board) {
 
     if (depth == 0) return 1;
 
     unsigned long total = 0;
 
+    // Generare all legal moves for the current position
     MoveList moves = gen_legals(board, gen_all(board, board.turn()));
 
     for (unsigned i = 0; i < moves.size; i++) {
@@ -38,12 +43,15 @@ static uint64_t perft(int depth, PerftInfo& info, Board& board) {
 
         board.do_move(move);
 
+        // Recursive call
         unsigned long nodes = perft(depth - 1, info, board);
 
+        // If we are in a root node, add the number of nodes for divide
         if (depth == info.depth) {
             info.divide[i] = nodes;
         }
 
+        // Add to the total number of nodes
         total += nodes;
 
         board.undo_move();
@@ -53,6 +61,9 @@ static uint64_t perft(int depth, PerftInfo& info, Board& board) {
 
 }
 
+// Starts a perft test to a given depth.
+// The function outputs the number of total nodes visited
+// and divides the number for all root nodes.
 void perftTest(const unsigned depth, Board& board) {
 
     std::cout << "Starting perft test..." << std::endl;
@@ -62,10 +73,12 @@ void perftTest(const unsigned depth, Board& board) {
 
     const uint64_t nodes = perft(depth, info, board);
 
+    // Generate all legal moves for the root position
     MoveList moves = gen_legals(board, gen_all(board, board.turn()));
 
     std::cout << "Depth(" << depth << "): " << nodes << std::endl;
 
+    // Show the root moves and the resulting number of nodes for each in the console
     for (unsigned i = 0; i < moves.size; i++) {
         std::cout << move_to_string(moves.moves[i]) << ": " << info.divide[i] << std::endl;
     }

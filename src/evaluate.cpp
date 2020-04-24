@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,8 @@
 
 Value PieceSquareTable[2][6][64];
 
+// Piece Square Table Values
+// The values are mirrored for each color at execution time
 static const Value PstValues[6][32] = {
 
     // Pawns
@@ -110,6 +112,7 @@ static const Value PstValues[6][32] = {
 
 };
 
+// Imbalance matrix
 static const int Imbalance[2][6][6] = {
 
     {
@@ -131,10 +134,13 @@ static const int Imbalance[2][6][6] = {
 
 };
 
-static const uint64_t OutpostSquares[2]     = { RANK_3 | RANK_4 | RANK_5, RANK_6 | RANK_5 | RANK_4 };
+// Bitboards for outposts and boni for having minors on those squares or attacking them
+static const uint64_t OutpostSquares[2]     = { BB_RANK_3 | BB_RANK_4 | BB_RANK_5, BB_RANK_6 | BB_RANK_5 | BB_RANK_4 };
 static const Value OutpostBonus[2]          = { V(34, 11), V(17, 6) };
 static const Value OutpostReachableBonus[2] = { V(17,  6), V( 8, 3) };
 
+// Mobilty Values
+// The more squares available to the piece, the higher the value
 static const Value Mobility[4][28] = {
 
     // Knights
@@ -153,12 +159,12 @@ static const Value pawnDoubledPenalty           = V(8, 14);
 static const Value pawnIsolatedPenalty[2]       = { V(11, 12), V(5, 7) };
 static const Value pawnBackwardPenalty[2]       = { V(17, 11), V(10, 5) };
 static const Value pawnLeverBonus[8]            = { V(0, 0), V(0, 0), V(0, 0), V(0, 0), V(7, 6), V(13, 13), V(0, 0), V(0, 0) };
-static const int pawnConnectedBonus[8]  = {
+static const int pawnConnectedBonus[8] = {
 
     0, 3, 4, 6, 14, 23, 40, 0
 
 };
-static const Value pawnPhalanxBonus[2][8]  = {
+static const Value pawnPhalanxBonus[2][8] = {
 
     { V(0, 0), V(8, 0), V(9, 0), V(16, 2), V(37, 18), V(57, 43), V(105, 105), V(0, 0) },
     { V(0, 0), V(4, 0), V(4, 0), V( 9, 1), V(18,  9), V(29, 21), V( 52,  52), V(0, 0) }
@@ -192,21 +198,21 @@ static const Value rookTrappedPenalty     = V(22,  2);
 static const Value UnsafeQueen = V(23, 7);
 
 // King
-static const unsigned int queenSafeCheckWeight       = 365;
-static const unsigned int rookSafeCheckWeight        = 505;
-static const unsigned int bishopSafeCheckWeight      = 300;
-static const unsigned int knightSafeCheckWeight      = 370;
-static const unsigned int kingUnsafeCheck            =  65;
-static const unsigned int kingRingAttackWeight       =  32;
-static const unsigned int kingRingWeakSquareAttack   =  86;
-static const unsigned int kingSliderBlocker          =  65;
-static const unsigned int kingKnightDefender         =  47;
-static const unsigned int kingBishopDefender         =  18;
-static const unsigned int kingNoQueenAttacker        = 410;
-static const unsigned int attackerWeight[5]          = { 0, 36, 26, 21, 5 };
-static const Value kingPawnlessFlank                 = V(8, 45);
-static const Value kingFlankAttack                   = V(4,  0);
-static const Value kingProtectorDistancePenalty      = V(3,  4);
+static const unsigned queenSafeCheckWeight       = 365;
+static const unsigned rookSafeCheckWeight        = 505;
+static const unsigned bishopSafeCheckWeight      = 300;
+static const unsigned knightSafeCheckWeight      = 370;
+static const unsigned kingUnsafeCheck            =  65;
+static const unsigned kingRingAttackWeight       =  32;
+static const unsigned kingRingWeakSquareAttack   =  86;
+static const unsigned kingSliderBlocker          =  65;
+static const unsigned kingKnightDefender         =  47;
+static const unsigned kingBishopDefender         =  18;
+static const unsigned kingNoQueenAttacker        = 410;
+static const unsigned attackerWeight[5]          = { 0, 36, 26, 21, 5 };
+static const Value kingPawnlessFlank             = V(8, 45);
+static const Value kingFlankAttack               = V(4,  0);
+static const Value kingProtectorDistancePenalty  = V(3,  4);
 
 static const int kingPawnShelterValues[4][8] = {
 
@@ -251,6 +257,7 @@ int KingDistance[64][64];
 static int kingPawnShelter[8][8];
 static int kingPawnStorm[8][8];
 
+// Initialize king distance arrays
 void init_king_distance() {
 
     unsigned int findex, tindex;
@@ -263,6 +270,7 @@ void init_king_distance() {
 
 }
 
+// Initialize the piece square tables
 void init_psqt() {
 
     for (Piecetype pt = PAWN; pt < PIECE_NONE; pt++) {
@@ -281,6 +289,7 @@ void init_psqt() {
 
 }
 
+// Initialize evaluation terms
 void init_eval() {
 
     // Mirror King Pawn Shelter Values
@@ -301,6 +310,7 @@ void init_eval() {
 
 }
 
+// Check if there is enough mating material on the board
 bool Board::is_material_draw() const {
 
     if (bbPieces[PAWN] || bbPieces[ROOK] || bbPieces[QUEEN]) {
@@ -313,36 +323,40 @@ bool Board::is_material_draw() const {
 
 }
 
+// Update attack info for calculating king safety
 static void update_attack_info(Color color, Piecetype pt, uint64_t moves, EvalInfo& info) {
 
+    // Merge the piece moves into the piece attacks bitboard
     info.pieceAttacks[color][pt] |= moves;
-    info.multiAttacks[color] |= info.colorAttacks[color] & moves;
-    info.colorAttacks[color] |= moves;
+    info.multiAttacks[color] |= info.colorAttacks[color] & moves; // Squares which are attacked more than once
+    info.colorAttacks[color] |= moves; // All attacks by a color on the board
 
+    // Detect attacks on the king area
     const uint64_t kingAttacks = moves & info.kingRing[!color];
 
+    // If there is an attack, count the attacked squares and add the attacker weight
     if (kingAttacks) {
-
         info.kingAttackersWeight[!color] += attackerWeight[pt];
         info.kingAttackersNum[!color]++;
         info.kingRingAttacks[!color] += popcount(kingAttacks);
-
     }
 
 }
 
+// Evaluate all knights on the board for a given color
 static const Value evaluate_knights(const Board& board, const Color color, EvalInfo& info) {
 
     Value value;
     uint64_t knights = board.pieces(color, KNIGHT);
     while (knights) {
 
-        unsigned int sq = pop_lsb(knights);
+        unsigned sq = pop_lsb(knights);
         uint64_t moves = gen_knight_moves(sq, 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
 
+        // Bonus for outposts
         uint64_t outposts = OutpostSquares[color] & info.pieceAttacks[color][PAWN] & ~info.pawnAttacksSpan[!color];
         if (outposts & SQUARES[sq]) {
             value += OutpostBonus[0];
@@ -350,10 +364,12 @@ static const Value evaluate_knights(const Board& board, const Color color, EvalI
             value += OutpostReachableBonus[0];
         }
 
+        // Bonus for being behind a friendly pawn
         if (SQUARES[sq] & shift_down(board.pieces(PAWN), color)) {
             value += minorPawnShield;
         }
 
+        // Penalty for being far away from the king
         value -= kingProtectorDistancePenalty * KingDistance[sq][info.kingSq[color]];
 
         info.mobility[color] += Mobility[0][popcount(moves & info.mobilityArea[color])];
@@ -365,6 +381,7 @@ static const Value evaluate_knights(const Board& board, const Color color, EvalI
 
 }
 
+// Evaluate all bishops on the board for a given color
 static const Value evaluate_bishops(const Board& board, const Color color, EvalInfo& info) {
 
     Value value;
@@ -373,7 +390,7 @@ static const Value evaluate_bishops(const Board& board, const Color color, EvalI
 
     while (bishops) {
 
-        unsigned int sq = pop_lsb(bishops);
+        unsigned sq = pop_lsb(bishops);
 
         // Exclude queen for xrays
         uint64_t moves = gen_bishop_moves(sq, board.pieces(BOTH) & ~board.pieces(QUEEN), 0);
@@ -381,6 +398,7 @@ static const Value evaluate_bishops(const Board& board, const Color color, EvalI
             moves &= LineTable[sq][info.kingSq[color]];
         }
 
+        // Bonus for outposts
         uint64_t outposts = OutpostSquares[color] & info.pieceAttacks[color][PAWN] & ~info.pawnAttacksSpan[!color];
         if (outposts & SQUARES[sq]) {
             value += OutpostBonus[1];
@@ -388,17 +406,22 @@ static const Value evaluate_bishops(const Board& board, const Color color, EvalI
             value += OutpostReachableBonus[1];
         }
 
+        // Bonus for being behind a friendly pawn
         if (SQUARES[sq] & shift_down(board.pieces(PAWN), color)) {
             value += minorPawnShield;
         }
 
+        // Penalty for having many pawns on the same square color as the bishop,
+        // since this restricts the mobility of the bishop
         uint64_t pawnsOnSameColor = board.get_same_colored_squares(sq) & board.pieces(color, PAWN);
         value -= bishopPawnsSameColorPenalty * popcount(pawnsOnSameColor) * (1 + popcount(info.blockedPawns[color] & CENTRAL_FILES));
 
+        // Bonus for being attacking central squares
         if (popcount(gen_bishop_moves(sq, board.pieces(PAWN), 0) & CENTRAL_SQUARES) > 1) {
             value += bishopCenterAlignBonus;
         }
 
+        // Penalty for being far away from the king
         value -= kingProtectorDistancePenalty * KingDistance[sq][info.kingSq[color]];
 
         info.mobility[color] += Mobility[1][popcount(moves & info.mobilityArea[color])];
@@ -410,6 +433,7 @@ static const Value evaluate_bishops(const Board& board, const Color color, EvalI
 
 }
 
+// Evaluate all rooks on the board for a given color
 static const Value evaluate_rooks(const Board& board, const Color color, EvalInfo& info) {
 
     Value value;
@@ -417,7 +441,7 @@ static const Value evaluate_rooks(const Board& board, const Color color, EvalInf
     uint64_t rooks = board.pieces(color, ROOK);
     while (rooks) {
 
-        unsigned int sq = pop_lsb(rooks);
+        unsigned sq = pop_lsb(rooks);
 
         // Exclude queens and rooks for xrays
         uint64_t moves = gen_rook_moves(sq, board.pieces(BOTH) & ~board.majors(), 0);
@@ -425,15 +449,17 @@ static const Value evaluate_rooks(const Board& board, const Color color, EvalInf
             moves &= LineTable[sq][info.kingSq[color]];
         }
 
-        const unsigned int f = file(sq);
-        const unsigned int mob = popcount(moves & info.mobilityArea[color]);
+        const unsigned f = file(sq);
+        const unsigned mob = popcount(moves & info.mobilityArea[color]);
 
+        // Bonus for being on an open file (no pawns)
         if (!(FILES[f] & board.pieces(PAWN))) {
             value += rookOpenFileBonus;
+        // Bonus for being on a semi-open file (no friendly pawns)
         } else if (!(FILES[f] & board.pieces(color, PAWN))) {
             value += rookSemiOpenFileBonus;
         } else {
-
+            // Penalty for being in the corner and having low mobility
             const int kingFile = file(info.kingSq[color]);
             if (mob <= 3 && ((kingFile > 3) == (f > kingFile))) {
                 value -= rookTrappedPenalty;
@@ -455,6 +481,7 @@ static const Value evaluate_rooks(const Board& board, const Color color, EvalInf
 
 }
 
+// Evaluate all queens on the board for a given color
 static const Value evaluate_queens(const Board& board, const Color color, EvalInfo& info) {
 
     Value value;
@@ -462,12 +489,13 @@ static const Value evaluate_queens(const Board& board, const Color color, EvalIn
     uint64_t queens = board.pieces(color, QUEEN);
     while (queens) {
 
-        unsigned int sq = pop_lsb(queens);
+        unsigned sq = pop_lsb(queens);
         uint64_t moves = get_queen_moves(sq, board.pieces(BOTH), 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
 
+        // Penalty for being in a discoverd attack by a slider
         if (board.get_slider_blockers(board.pieces(!color, BISHOP) | board.pieces(!color, ROOK), sq)) {
             value -= UnsafeQueen;
         }
@@ -481,6 +509,7 @@ static const Value evaluate_queens(const Board& board, const Color color, EvalIn
 
 }
 
+// Evaluate all pawns on the board for a given color
 static const Value evaluate_pawns(const Board& board, const Color color, EvalInfo& info) {
 
     Value value;
@@ -492,9 +521,9 @@ static const Value evaluate_pawns(const Board& board, const Color color, EvalInf
 
     while (pawns) {
 
-        const unsigned int sq = pop_lsb(pawns);
-        const int f  = file(sq);
-        const int r  = relative_rank(color, sq);
+        const unsigned sq = pop_lsb(pawns);
+        const File f      = file(sq);
+        const Rank r      = relative_rank(color, sq);
 
         const uint64_t front      = FrontFileMask[color][sq];
         const uint64_t neighbours = ADJ_FILES[f] & ownPawns;
@@ -503,22 +532,28 @@ static const Value evaluate_pawns(const Board& board, const Color color, EvalInf
 
         info.pawnAttacksSpan[color] |= PawnAttacksSpan[color][sq];
 
-        const bool doubled       = front & ownPawns;
+        const bool doubled       = front & ownPawns; // Two friendly pawns on the same file
         const bool opposed       = front & oppPawns;
-        const bool isolated      = !neighbours;
-        const bool passed        = !(stoppers ^ lever);
+        const bool isolated      = !neighbours; // A pawn is isolated if there are no friendly pawns on the adjacent squares
+        const bool passed        = !(stoppers ^ lever); // No enemy pawn can hinder the pawn from promoting
         const uint64_t supported = (neighbours & RANKS[rank(sq + DIRECTIONS[color][DOWN])]);
-        const uint64_t phalanx   = (neighbours & RANKS[rank(sq)]);
+        const uint64_t phalanx   = (neighbours & RANKS[rank(sq)]); // Friendly pawns which are on the same rank and on adjacent squares
 
         bool backward = false;
 
+        // A pawn is considered backwards if there are no other friendly pawns
+        // on the same rank or behind the pawn and there are also no enemy pawns
+        // ahead of the pawn. The pawn is only backwards however if it can be captured
+        // by enemy pawns if he pushes one square north.
         if (!isolated && !phalanx && r <= 4 && !lever) {
             const uint64_t br = RANKS[rank(lsb_index(most_backward(color, neighbours | stoppers)))];
             backward = (br | shift_up(ADJ_FILES[f] & br, color)) & stoppers;
         }
 
+        // Penalty for doubled pawns
         if (doubled) {
             value -= pawnDoubledPenalty;
+        // Passed pawns bitboard gets saved in a pawn hash table entry
         } else if (passed) {
             info.passedPawns |= SQUARES[sq];
         }
@@ -528,14 +563,18 @@ static const Value evaluate_pawns(const Board& board, const Color color, EvalInf
             value += V(bonus, bonus * (r - 2) / 4);
         }
 
+        // Bonus for adjacent friendy pawns on the same rank
         if (phalanx) {
             value += pawnPhalanxBonus[opposed][r];
+        // Penalty for not having any friendly pawns on adjacent files
         } else if (isolated) {
             value -= pawnIsolatedPenalty[opposed];
+        // Penalty for not having
         } else if (backward) {
             value -= pawnBackwardPenalty[opposed];
         }
 
+        // Bonus for attacking enemy pawns
         if (lever) {
             value += pawnLeverBonus[r];
         }
@@ -546,7 +585,8 @@ static const Value evaluate_pawns(const Board& board, const Color color, EvalInf
 
 }
 
-static int evaluate_shelter_storm(const Board& board, const Color color, const unsigned int kingSq, const int oldValue) {
+// Evaluate Pawn Shelter and Pawn Storm on the board for a given color
+static int evaluate_shelter_storm(const Board& board, const Color color, const unsigned kingSq, const int oldValue) {
 
     int value = 0;
 
@@ -554,21 +594,26 @@ static int evaluate_shelter_storm(const Board& board, const Color color, const u
     const uint64_t ourPawns  = board.pieces(color, PAWN) & notBehind;
     const uint64_t oppPawns  = board.pieces(!color, PAWN) & notBehind;
     const int kingFile       = file(kingSq);
-    const int centralFile    = std::max(1, std::min(kingFile, 6));
+    const int centralFile    = std::max(1, std::min(kingFile, 6)); // The central file for the shelter. Adjusted on the edges
 
+    // Loop over each file ahead of the king
     for (int f = centralFile - 1; f <= centralFile + 1; f++) {
 
         uint64_t owns = FILES[f] & ourPawns;
         uint64_t opps = FILES[f] & oppPawns;
 
-        unsigned int ownRank = (owns ? relative_rank(color, lsb_index(most_backward(color, owns))) : 0);
-        unsigned int oppRank = (opps ? relative_rank(color, lsb_index(most_forward(!color, opps))) : 0);
+        // Get the square of the most backward friendly and most forward enemy pawn on the file
+        unsigned ownRank = owns ? relative_rank(color, lsb_index(most_backward(color, owns))) : 0;
+        unsigned oppRank = opps ? relative_rank(color, lsb_index(most_forward(!color, opps))) : 0;
 
+        // Add shelter bonus for our pawns and subtract storm penalty for enemy pawns
         value += kingPawnShelter[f][ownRank];
         value -= kingPawnStorm[f][oppRank];
 
     }
 
+    // If we have not castled yet and the shelter score is greater
+    // once we castle, use the better value
     if (oldValue > value) {
         return oldValue;
     }
@@ -577,12 +622,15 @@ static int evaluate_shelter_storm(const Board& board, const Color color, const u
 
 }
 
+// King Safety Evaluation
 static const Value evaluate_king_safety(const Board& board, const Color color, const EvalInfo& info) {
 
     Value value = V(0, 0);
+    // Evaluate pawn shelter and pawn storms
     int pawnValue = evaluate_shelter_storm(board, color, info.kingSq[color], -VALUE_INFINITE);
 
     // Idea from Stockfish
+    // If we can still castle, and the shelter bonus after the castling is greater, use the better value
     if (board.can_castle(CASTLE_FLAGS[color * 2])) {
         pawnValue = evaluate_shelter_storm(board, color, CASTLE_SQUARES[color * 2], pawnValue);
     }
@@ -590,14 +638,24 @@ static const Value evaluate_king_safety(const Board& board, const Color color, c
         pawnValue = evaluate_shelter_storm(board, color, CASTLE_SQUARES[color * 2 + 1], pawnValue);
     }
 
-    const int kingFile = file(info.kingSq[color]);
-    const uint64_t flankAttackedSquares = KING_FLANK[kingFile] & (ALL_SQUARES ^ COLOUR_BASE_SQUARES[!color]) & info.colorAttacks[!color];
-    const unsigned int flankAttacksCount = popcount(flankAttackedSquares) + popcount(flankAttackedSquares & info.multiAttacks[!color]);
+    const File kingFile = file(info.kingSq[color]);
 
+    // All squares attacked on the flank of the king excluding the base ranks (first 3 ranks) for our color
+    // Count the number of squares which are attacked once and multiple times
+    const uint64_t flankAttackedSquares = KING_FLANK[kingFile] & (ALL_SQUARES ^ COLOR_BASE_RANKS[!color]) & info.colorAttacks[!color];
+    const unsigned flankAttacksCount = popcount(flankAttackedSquares) + popcount(flankAttackedSquares & info.multiAttacks[!color]);
+
+    // The squares surrounding the king
     const uint64_t ring = KingRing[color][info.kingSq[color]];
 
+    // Weak squares are squares are squares which we do not attack or only with queens or the king.
+    // These squares are considered weak if the enemy attacks them, but not if we protect them with
+    // multiple pieces
     const uint64_t weakSquares = (info.colorAttacks[!color] & ~info.multiAttacks[color]) & (~info.colorAttacks[color] | info.pieceAttacks[color][QUEEN] | info.pieceAttacks[color][KING]);
-    const uint64_t safeSquares = ~board.pieces(!color) & (~info.colorAttacks[color] | (weakSquares & info.multiAttacks[!color]));
+
+    // A square is considered safe for a enemy check if there it is not attacked by us or
+    // it is a weak square which is attacked by multiple enemy pieces
+    const uint64_t safeCheckSquares = ~board.pieces(!color) & (~info.colorAttacks[color] | (weakSquares & info.multiAttacks[!color]));
 
     const uint64_t knightCheckSquares = gen_knight_moves(info.kingSq[color], board.pieces(color));
     const uint64_t bishopCheckSquares = gen_bishop_moves(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
@@ -611,27 +669,29 @@ static const Value evaluate_king_safety(const Board& board, const Color color, c
 
     int danger = 0;
 
+    // If there is no enemy queen, decrease the king danger value drastically
     if (!board.pieces(!color, QUEEN)) {
         danger -= kingNoQueenAttacker;
     }
 
-    if (queenChecks & (safeSquares & ~rookChecks)) {
+    // Add a check weight value to the king danger balance if there is a safe check
+    if (queenChecks & (safeCheckSquares & ~rookChecks)) {
         danger += queenSafeCheckWeight;
     }
 
-    if (rookChecks & safeSquares) {
+    if (rookChecks & safeCheckSquares) {
         danger += rookSafeCheckWeight;
     } else {
         unsafeChecks |= rookChecks;
     }
 
-    if (bishopChecks & (safeSquares & ~queenChecks)) {
+    if (bishopChecks & (safeCheckSquares & ~queenChecks)) {
         danger += bishopSafeCheckWeight;
     } else {
         unsafeChecks |= bishopChecks;
     }
 
-    if (knightChecks & safeSquares) {
+    if (knightChecks & safeCheckSquares) {
         danger += knightSafeCheckWeight;
     } else {
         unsafeChecks |= knightChecks;
@@ -642,6 +702,11 @@ static const Value evaluate_king_safety(const Board& board, const Color color, c
     /*std::cout << "Color: " << color << std::endl;
     std::cout << "Safe Checks & No Queen: " << danger << std::endl;*/
 
+    // Calculate the king danger.
+    // We multiply the total king attacker weights by the number of total attacks
+    // Attacks on the king ring and on weak squares are also considered.
+    // We count the total number of unsafe checks and add it to the danger value.
+    // Also, minors within the king ring count as defenders and decrease the king danger.
     danger += info.kingAttackersNum[color] * info.kingAttackersWeight[color]
             + kingRingAttackWeight * info.kingRingAttacks[color]
             + kingRingWeakSquareAttack * popcount(ring & weakSquares)
@@ -666,10 +731,12 @@ static const Value evaluate_king_safety(const Board& board, const Color color, c
     std::cout << "Pawn Value: " << pawnValue << ":" << (6 * pawnValue / 9) << std::endl;
     std::cout << "Final: " << danger << ":" << std::max(0, (danger * danger / 2048)) << std::endl << std::endl;*/
 
+    // We transform the king danger into a value which is subtracted from the king safety
     if (danger > 0) {
         value -= V(danger * danger / 2048, danger / 16);
     }
 
+    // If there are no pawns on the king flank, we decrease the king safety value
     if (!(board.pieces(color, PAWN) & KING_FLANK[kingFile])) {
         value -= kingPawnlessFlank;
     }
@@ -682,40 +749,47 @@ static const Value evaluate_king_safety(const Board& board, const Color color, c
 
 }
 
+// Evaluate Passed Pawns on the board by a given color
 static const Value evaluate_passers(const Board& board, const Color color, const EvalInfo& info) {
 
     Value value;
 
     uint64_t passers = info.passedPawns & board.pieces(color);
 
+    // Loop over all passed pawns
     while (passers) {
 
-        const unsigned int sq      = pop_lsb(passers);
-        const unsigned int blocksq = sq + DIRECTIONS[color][UP];
-        const int r                = relative_rank(color, sq);
-        const unsigned int f       = file(sq);
-        const unsigned int rfactor = (r - 2) * (r - 1) / 2;
+        const unsigned sq      = pop_lsb(passers);
+        const unsigned blocksq = sq + DIRECTIONS[color][UP];
+        const Rank r           = relative_rank(color, sq);
+        const File f           = file(sq);
+        const unsigned rfactor = (r - 2) * (r - 1) / 2;
 
+        // Add a bonus based on both king's distancte to the pawn
         value += V(0, ((5 * KingDistance[info.kingSq[!color]][blocksq]) - (2 * KingDistance[info.kingSq[color]][blocksq])) * rfactor);
 
         if (r > 2 && !(SQUARES[blocksq] & board.pieces(BOTH))) {
 
             Value bonus = V(0, 0);
 
-            uint64_t path = FrontFileMask[color][sq];
-            uint64_t behind = FrontFileMask[!color][sq];
+            uint64_t path     = FrontFileMask[color][sq];
+            uint64_t behind   = FrontFileMask[!color][sq];
             uint64_t attacked = PassedPawnMask[color][sq];
 
-            uint64_t slidersBehind = behind & board.majors();
+            uint64_t majorsBehind = behind & board.majors();
 
-            if (!(slidersBehind & board.pieces(!color))) {
+            // If there are no major enemy pieces on the file behind the pawn,
+            // check if there are any squares in front of the pawn atttacked
+            if (!(majorsBehind & board.pieces(!color))) {
                 attacked &= info.colorAttacks[!color];
             }
 
-            if ((info.colorAttacks[color] & SQUARES[blocksq]) || (slidersBehind & board.pieces(color))) {
+            // If the block square is defended, add a bonus
+            if ((info.colorAttacks[color] & SQUARES[blocksq]) || (majorsBehind & board.pieces(color))) {
                 bonus += passedPawnBlockSqDefended;
             }
 
+            // Add a bonus based on the kind of attacks on the pawn
             if (!attacked) {
                 bonus += passedPawnNoAttacks;
             } else if (!(attacked & path)) {
@@ -724,18 +798,23 @@ static const Value evaluate_passers(const Board& board, const Color color, const
                 bonus += passedPawnSafePush;
             }
 
+            // Multiply the bonus with a factor based on the relative rank
+            // and add it to the passed pawns evaluation
             value += bonus * rfactor;
 
         }
 
+        // Add a bonus based on the rank and the file of the pawn
         value += pawnPassedRankBonus[r] - pawnPassedFilePenalty[f];
 
     }
 
+    // No negative evaluation for passed pawns
     return V(std::max(0, value.mg), std::max(0, value.eg));
 
 }
 
+// Evaluate all material imbalances on the board for the given color
 static const Value evaluate_imbalances(const Board& board, const Color color) {
 
     Value value;
@@ -745,16 +824,20 @@ static const Value evaluate_imbalances(const Board& board, const Color color) {
         { board.piececount(BLACK, BISHOP) > 1, board.piececount(BLACK, PAWN), board.piececount(BLACK, KNIGHT), board.piececount(BLACK, BISHOP), board.piececount(BLACK, ROOK), board.piececount(BLACK, QUEEN) }
     };
 
+    // Loop over all piece types
     for (unsigned pt1index = 0; pt1index <= 5; pt1index++) {
 
         if (pieceCounts[color][pt1index] > 0) {
 
             int v = 0;
 
+            // Loop over all the piece types again, and add the imbalance value based
+            // on how many pieces are on the board
             for (unsigned pt2index = 0; pt2index <= pt1index; pt2index++) {
                 v += Imbalance[0][pt1index][pt2index] * pieceCounts[color][pt2index] + Imbalance[1][pt1index][pt2index] * pieceCounts[!color][pt2index];
             }
 
+            // Multiply the value with the number of pieces of the current type
             value += V(v * pieceCounts[color][pt1index], v * pieceCounts[color][pt1index]);
 
         }
@@ -765,6 +848,7 @@ static const Value evaluate_imbalances(const Board& board, const Color color) {
 
 }
 
+// Evaluate all threats on the board for the given color
 static const Value evaluate_threats(const Board& board, const Color color, const EvalInfo& info) {
 
     Value value;
@@ -774,6 +858,9 @@ static const Value evaluate_threats(const Board& board, const Color color, const
     const uint64_t defendedPieces  = minorsAndMajors & strongSquares;
     const uint64_t weakPieces      = board.pieces(!color) & ~strongSquares & info.colorAttacks[color];
 
+    // Evaluate minors and rooks attacking weak and defended pieces
+    // Add a bigger bonus for pieces which are are close to our base
+    // since they are more vulnerable there
     if (defendedPieces | weakPieces) {
 
         uint64_t minorAttacks = (defendedPieces | weakPieces) & (info.pieceAttacks[color][KNIGHT] | info.pieceAttacks[color][BISHOP]);
@@ -802,19 +889,24 @@ static const Value evaluate_threats(const Board& board, const Color color, const
 
         }
 
+        // Bonus for king attacking weak pieces
         value += KingAttackThreat * popcount(weakPieces & info.pieceAttacks[color][KING]);
 
+        // Bonus for unprotected weak pieces and weak pieces which are attacked multiple times by us
         value += HangingPiece * popcount(weakPieces & (~info.colorAttacks[!color] | (minorsAndMajors & info.multiAttacks[color])));
 
     }
 
+    // Bonus for restricting the mobility of enemy pieces
     value += mobilityRestriction * popcount(info.colorAttacks[!color] & ~strongSquares & info.colorAttacks[color]);
 
     const uint64_t safeSquares = info.colorAttacks[color] | ~info.colorAttacks[!color];
     const uint64_t safePawns   = board.pieces(color, PAWN) & safeSquares;
 
+    // Bonus for safe pawns attacking minor and major pieces
     value += safePawnAttack * popcount(generate_pawns_attacks(safePawns, color) & minorsAndMajors);
 
+    // Bonus for pawn pushes which attack enemy pieces
     uint64_t pawnPushes = shift_up(board.pieces(color, PAWN), color) & ~board.pieces(BOTH);
     pawnPushes |= shift_up(pawnPushes & PAWN_FIRST_PUSH_RANK[color], color) & ~board.pieces(BOTH);
     pawnPushes &= ~info.pieceAttacks[!color][PAWN] & safeSquares;
@@ -825,7 +917,7 @@ static const Value evaluate_threats(const Board& board, const Color color, const
     uint64_t queens = board.pieces(!color, QUEEN);
     if (queens) {
 
-        unsigned int sq = pop_lsb(queens);
+        unsigned sq = pop_lsb(queens);
         uint64_t knightAttackSquares = gen_knight_moves(sq, board.pieces(color)) & info.pieceAttacks[color][KNIGHT];
         uint64_t bishopAttackSquares = gen_bishop_moves(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][BISHOP];
         uint64_t rookAttackSquares   = gen_rook_moves(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][ROOK];
@@ -844,45 +936,57 @@ static const Value evaluate_threats(const Board& board, const Color color, const
 
 }
 
+// Initialize the evaluation info object
 static void init_eval_info(const Board& board, EvalInfo& info) {
 
-    info.mobilityArea[WHITE] = ALL_SQUARES & ~((board.pieces(WHITE, KING) | board.pieces(WHITE, QUEEN)) | (board.pieces(WHITE, PAWN) & (shift_down(board.pieces(BOTH), WHITE) | RANK_2 | RANK_3)) | info.pieceAttacks[BLACK][PAWN]);
-    info.mobilityArea[BLACK] = ALL_SQUARES & ~((board.pieces(BLACK, KING) | board.pieces(BLACK, QUEEN)) | (board.pieces(BLACK, PAWN) & (shift_down(board.pieces(BOTH), BLACK) | RANK_7 | RANK_6)) | info.pieceAttacks[WHITE][PAWN]);
+    // The mobility area is all squares we count for mobility.
+    // We count all squares except for those attacked by enemy pawns
+    // and blocked friendly pawns, our queens and king.
+    info.mobilityArea[WHITE] = ALL_SQUARES & ~((board.pieces(WHITE, KING) | board.pieces(WHITE, QUEEN)) | (board.pieces(WHITE, PAWN) & (shift_down(board.pieces(BOTH), WHITE) | BB_RANK_2 | BB_RANK_3)) | info.pieceAttacks[BLACK][PAWN]);
+    info.mobilityArea[BLACK] = ALL_SQUARES & ~((board.pieces(BLACK, KING) | board.pieces(BLACK, QUEEN)) | (board.pieces(BLACK, PAWN) & (shift_down(board.pieces(BOTH), BLACK) | BB_RANK_7 | BB_RANK_6)) | info.pieceAttacks[WHITE][PAWN]);
 
+    // Set king square and ring area bitboards for each color
     info.kingSq[WHITE] = lsb_index(board.pieces(WHITE, KING));
     info.kingSq[BLACK] = lsb_index(board.pieces(BLACK, KING));
 
     info.kingRing[WHITE] = KingRing[WHITE][info.kingSq[WHITE]];
     info.kingRing[BLACK] = KingRing[BLACK][info.kingSq[BLACK]];
 
+    // Bitboards for cumulative piece attacks for each piece type for each color
     info.pieceAttacks[WHITE][KING] = KingAttacks[info.kingSq[WHITE]];
     info.pieceAttacks[BLACK][KING] = KingAttacks[info.kingSq[BLACK]];
 
+    // Bitboards for attacks of each color
     info.colorAttacks[WHITE] |= info.pieceAttacks[WHITE][KING] | info.pieceAttacks[WHITE][PAWN];
     info.colorAttacks[BLACK] |= info.pieceAttacks[BLACK][KING] | info.pieceAttacks[BLACK][PAWN];
 
+    // Squares which are attacked by multiple pieces
     info.multiAttacks[WHITE] = info.pieceAttacks[WHITE][KING] & info.pieceAttacks[WHITE][PAWN];
     info.multiAttacks[BLACK] = info.pieceAttacks[BLACK][KING] & info.pieceAttacks[BLACK][PAWN];
 
+    // Count of total pieces attacking the king for each color
     info.kingAttackersNum[WHITE] = popcount(info.pieceAttacks[WHITE][KING] & info.pieceAttacks[BLACK][PAWN]);
     info.kingAttackersNum[BLACK] = popcount(info.pieceAttacks[BLACK][KING] & info.pieceAttacks[WHITE][PAWN]);
 
+    // Bitboards of pawns which cannot advance because there is a piece on their push square
     info.blockedPawns[WHITE] = shift_up(board.pieces(WHITE, PAWN), WHITE) & board.pieces(BOTH);
     info.blockedPawns[BLACK] = shift_up(board.pieces(BLACK, PAWN), BLACK) & board.pieces(BOTH);
 
 }
 
+// Evaluate the position statically
 int evaluate(const Board& board) {
 
     Value value;
 
     EvalInfo info;
 
-    // Material draw
+    // Check for draw by insufficient material
     if (board.is_material_draw()) {
         return 0;
     }
 
+    // Probe the pawn hash table
     PawnEntry * pentry = pawnTable.probe(board.pawnkey());
     if (pentry != NULL) {
         value += pentry->value;
@@ -892,28 +996,30 @@ int evaluate(const Board& board) {
         info.pawnAttacksSpan[WHITE] = pentry->pawnWAttacksSpan;
         info.pawnAttacksSpan[BLACK] = pentry->pawnBAttacksSpan;
     } else {
-        info.pieceAttacks[WHITE][PAWN] = board.gen_wpawns_attacks();
-        info.pieceAttacks[BLACK][PAWN] = board.gen_bpawns_attacks();
+        // If there is no entry available, compute the pawn attacks
+        info.pieceAttacks[WHITE][PAWN] = board.gen_white_pawns_attacks();
+        info.pieceAttacks[BLACK][PAWN] = board.gen_black_pawns_attacks();
     }
 
+    // Initialize the evaluation
     init_eval_info(board, info);
 
-    // Material
+    // Material balance
     value += board.material(WHITE);
     value -= board.material(BLACK);
 
-    // Piece square tables
+    // Piece square table values
     value += board.pst(WHITE);
     value -= board.pst(BLACK);
 
-    // Pawns
+    // Pawns Evaluation (skip if we already have a value from the hash table)
     if (pentry == NULL) {
         Value pawnValue = evaluate_pawns(board, WHITE, info) - evaluate_pawns(board, BLACK, info);
         pawnTable.store(board.pawnkey(), pawnValue, info.pieceAttacks[WHITE][PAWN], info.pieceAttacks[BLACK][PAWN], info.passedPawns, info.pawnAttacksSpan[WHITE], info.pawnAttacksSpan[BLACK]);
         value += pawnValue;
     }
 
-    // Pieces
+    // Evaluate the pieces
     value += evaluate_knights(board, WHITE, info);
     value += evaluate_bishops(board, WHITE, info);
     value += evaluate_rooks(board, WHITE, info);
@@ -950,18 +1056,23 @@ int evaluate(const Board& board) {
         value += imbalanceValue;
     }
 
-    return ((board.turn() == WHITE) ? scaled_eval(board.scale(), value) : -scaled_eval(board.scale(), value)) + tempoBonus;
+    // Return the scaled evaluation and add a tempo bonus for the color to move
+    // Also, invert the evaluation to match the perspective of the color to move
+    return ((board.turn() == WHITE) ?  scaled_eval(board.scale(), value)
+                                    : -scaled_eval(board.scale(), value)) + tempoBonus;
 
 }
 
-void evaluateInfo(const Board& board) {
+// Evaluate the position statically and print a table containing
+// all evaluation terms to the console. Useful for debugging
+void evaluate_info(const Board& board) {
 
     Value value;
 
     EvalInfo info;
 
-    info.pieceAttacks[WHITE][PAWN] = board.gen_wpawns_attacks();
-    info.pieceAttacks[BLACK][PAWN] = board.gen_bpawns_attacks();
+    info.pieceAttacks[WHITE][PAWN] = board.gen_white_pawns_attacks();
+    info.pieceAttacks[BLACK][PAWN] = board.gen_black_pawns_attacks();
 
     init_eval_info(board, info);
 
@@ -1000,7 +1111,7 @@ void evaluateInfo(const Board& board) {
     const Value whiteImbalances = evaluate_imbalances(board, WHITE);
     const Value blackImbalances = evaluate_imbalances(board, BLACK);
 
-    // Output evaluation
+    // Output evaluation terms to the console
     std::cout << "(White)" << std::endl;
     std::cout << "Material & Psqt : " << whiteMaterialPsqt.mg << " | " << whiteMaterialPsqt.eg << std::endl;
     std::cout << "Imbalance       : " << whiteImbalances.mg << " | " << whiteImbalances.eg << std::endl;

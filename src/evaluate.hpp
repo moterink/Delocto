@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,7 @@
 #include "move.hpp"
 #include <complex> // for std::abs
 
-// Values for pieces
+// Material values of pieces
 static const Value Material[6] = {
 
     V(  60,  100),
@@ -42,9 +42,12 @@ static const Value Material[6] = {
 
 };
 
-// Phases
-#define MG 0
-#define EG 1
+// Game Phases
+enum Phase : unsigned {
+
+    MG, EG
+
+};
 
 typedef struct {
 
@@ -65,6 +68,7 @@ typedef struct {
 
 } EvalInfo;
 
+// Return the scaled evaluation based on the calculated scale factor
 inline int scaled_eval(const int scale, const Value value) {
 
     return ((value.mg * (256 - scale)) + (value.eg * scale)) / 256;
@@ -79,6 +83,6 @@ extern void init_king_distance();
 extern void init_psqt();
 extern void init_eval();
 extern int evaluate(const Board& board);
-extern void evaluateInfo(const Board& board);
+extern void evaluate_info(const Board& board);
 
 #endif

@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -25,11 +25,13 @@
 #include "move.hpp"
 #include "search.hpp"
 
+// Maximum value of a move in the history table
 constexpr int HISTORY_VALUE_MAX = 0x4000;
 
-enum MovePickPhase : unsigned int {
+// Stages of the move picker
+enum MovePickPhase : unsigned {
 
-    TTMove, GenCaps, GoodCaps, FirstKiller, SecondKiller, CounterMove, GenQuiets, Quiets, LoosingCaps, TTMoveQS, GenEvasions, Evasions, GenCapsQS, CapsQS
+    TTMove, GenCaps, GoodCaps, FirstKiller, SecondKiller, CounterMove, GenQuiets, Quiets, LosingCaps, TTMoveQS, GenEvasions, Evasions, GenCapsQS, CapsQS
 
 };
 
@@ -46,19 +48,21 @@ class MovePicker {
         // Constructor for normal search
         MovePicker(const Board& b, SearchInfo * i, int plies, Move t) : board(b), info(i) {
 
+            // Set the killer moves
             killers[0] = info->killers[plies][0];
             killers[1] = info->killers[plies][1];
 
+            // If we do not have a move from the transposition table, skip to generating the captures
             if (t != MOVE_NONE) {
                 ttMove = t;
             } else {
                 phase = GenCaps;
             }
 
-
-            if (plies > 0 && info->currentmove[plies-1] != MOVE_NONE) {
-                unsigned prevSq = to_sq(info->currentmove[plies-1]);
-                counterMove = info->countermove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq];
+            // Get the counter move if available
+            if (plies > 0 && info->currentMove[plies-1] != MOVE_NONE) {
+                unsigned prevSq = to_sq(info->currentMove[plies-1]);
+                counterMove = info->counterMove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq];
             }
 
         }
@@ -71,6 +75,7 @@ class MovePicker {
                 ttMove = t != MOVE_NONE && (to_sq(lastMove) == to_sq(t)) ? t : MOVE_NONE;
             }
 
+            // If we do not have a transposition table move, skip to evasions or captures
             phase = TTMoveQS;
             if (ttMove == MOVE_NONE) {
                 if (board.checkers()) {
@@ -82,10 +87,9 @@ class MovePicker {
 
         }
 
-        void scoreCaptures();
-        void scoreQuiets();
-        void scoreEvasions();
-        void scoreQsCaptures();
+        void score_captures(MoveList& captures);
+        void score_quiets();
+        void score_evasions();
 
         Move pick();
 

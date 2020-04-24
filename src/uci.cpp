@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -25,13 +25,18 @@
 #include "evaluate.hpp"
 #include "timeman.hpp"
 
-static const uint64_t KING_START_SQ[2]       = { SQUARES[E1], SQUARES[E8] };
-static const uint64_t KING_CASTLE_SQUARES[2] = { (SQUARES[G1] | SQUARES[C1]), (SQUARES[G8] | SQUARES[C8]) };
+static const uint64_t KING_START_SQ[2]       = { SQUARES[SQUARE_E1], SQUARES[SQUARE_E8] };
+static const uint64_t KING_CASTLE_SQUARES[2] = { (SQUARES[SQUARE_G1] | SQUARES[SQUARE_C1]), (SQUARES[SQUARE_G8] | SQUARES[SQUARE_C8]) };
+
+unsigned ThreadsCount = 1;
+unsigned MoveOverhead = 100;
 
 TranspositionTable tTable;
 PawnTable pawnTable;
 MaterialTable materialTable;
 
+// This function takes a FEN and a principal variation string as an input and
+// plays the given sequence of moves on a board.
 static void play_sequence(Board& board, std::string fen, std::string input, std::string::size_type start) {
 
     input.append(" ");
@@ -62,15 +67,19 @@ static void play_sequence(Board& board, std::string fen, std::string input, std:
 
 }
 
+// Sets uo a new game on the given board; also clears all hash tables
 static void newgame(Board& board) {
 
-    board.set_fen(STARTFEN);
+    board.set_fen(INITIAL_POSITION_FEN);
     tTable.clear();
     pawnTable.clear();
     materialTable.clear();
 
 }
 
+// Runs a benchmark for 42 testing positions to retrieve a number of total visited
+// nodes. This number should stay consistent and can be used as a verification
+// of search/evaluation integrity
 static void benchmark() {
 
     Board board;
@@ -101,57 +110,68 @@ static void benchmark() {
 
 }
 
+// Send the engine identification and options to the console; end it with a "uciok"
 static void show_information() {
 
-    std::cout << "id name Delocto" << std::endl;
+    std::cout << "id name Delocto " << VERSION << std::endl;
     std::cout << "id author Moritz Terink" << std::endl << std::endl;
-    std::cout << "option name Hash type spin default " << DEFAULTHASHSIZE << " max " << MAXHASHSIZE << " min " << MINHASHSIZE << std::endl;
-    std::cout << "option name Threads type spin default " << DEFAULTTHREADS << " max " << MAXTHREADS << " min " << MINTHREADS << std::endl;
+    std::cout << "option name Hash type spin default " << TRANSPOSITION_TABLE_SIZE_DEFAULT << " max " << TRANSPOSITION_TABLE_SIZE_MAX << " min " << TRANSPOSITION_TABLE_SIZE_MIN << std::endl;
+    std::cout << "option name Threads type spin default " << THREADS_DEFAULT << " max " << THREADS_MAX << " min " << THREADS_MIN << std::endl;
+    std::cout << "option name MoveOverhead type spin default " << MOVE_OVERHEAD_DEFAULT << " max " << MOVE_OVERHEAD_MAX << " min " << MOVE_OVERHEAD_MIN << std::endl;
     std::cout << "uciok" << std::endl << std::endl;
 
 }
 
+// This function receives various information about the current search iteration and prints
+// information like current depth, selective depth, duration, score... to the console. It
+// also shows a principal variation (the suggested line of play)
 void send_info(const SearchInfo* info, const PvLine& pv, const long long duration) {
 
     std::string pvString;
     int value = info->value[info->depth];
 
+    // Connect the moves of the principal variation to a string
     for (unsigned int p = 0; p < pv.size; p++) {
         pvString += move_to_string(pv.line[p]) + " ";
     }
 
+    // Show depth and selective depth
     std::cout << "info depth " << info->depth << " seldepth " << info->selectiveDepth;
 
+    // Show the score (in centipawns) or if a mate was found, the plies until the mate
     if (std::abs(value) >= VALUE_MATE - MAX_DEPTH) {
         std::cout << " score mate " << ((value > 0 ? VALUE_MATE - value + 1 : -VALUE_MATE - value) / 2);
     } else {
         std::cout << " score cp " << value;
     }
 
+    // Show number of visited nodes, duration, nodes per second, and the principal variation
     std::cout << " nodes " << info->nodes << " time " << duration << " nps " << (duration != 0 ? info->nodes * 1000 / duration : info->nodes) << " pv " << pvString << std::endl;
 
 }
 
+// Show the best move for the current position in the console; if the position is mate or stalemate, the engine will output "none"
 void send_bestmove(const Move bestMove) {
 
     std::cout << "bestmove " << (bestMove != MOVE_NONE ? move_to_string(bestMove) : "none") << std::endl;
 
 }
 
-void uciloop(int argc, char* argv[]) {
+// The uci input loop. It scans the input for uci commands and executes them
+void get_uci_input(int argc, char* argv[]) {
 
     std::string input;
 
-    for (int i = 1; i < argc; i++) {
-        input += std::string() + argv[i] + " ";
+    // Feed optional program argument to the input
+    if (argc > 1) {
+        input += std::string() + argv[1];
     }
 
+    // Set the transposition table to the default size in Megabytes; can be changed through options later
+    tTable.set_size(TRANSPOSITION_TABLE_SIZE_DEFAULT);
+
+    // Initialize a chess board with the initial position
     Board board;
-
-    board.set_fen(STARTFEN);
-
-    tTable.setSize(DEFAULTHASHSIZE);
-
     newgame(board);
 
     do {
@@ -161,16 +181,22 @@ void uciloop(int argc, char* argv[]) {
 
         std::cout << std::flush;
 
+        // Show information about the engine
         if (input.compare("uci") == 0) {
             show_information();
+        // Reset the board tot the initial position
         } else if (input.compare("ucinewgame") == 0) {
             newgame(board);
+        // A sort of ping command sent by the user interface to check if the engine is still responsive
         } else if (input.compare("isready") == 0) {
             std::cout << "readyok" << std::endl;
+        // Set the board ot the initial position
         } else if (input.compare("position startpos") == 0) {
-            board.set_fen(STARTFEN);
+            board.set_fen(INITIAL_POSITION_FEN);
+        // Play all the moves from the initial position
         } else if (input.find("position startpos moves ") == 0) {
-            play_sequence(board, STARTFEN, input, 24);
+            play_sequence(board, INITIAL_POSITION_FEN, input, 24);
+        // Set the position to the given FEN; play all the moves on the board
         } else if (input.find("position fen ") == 0) {
             const std::string::size_type end = input.find("moves ");
             if (end != std::string::npos) {
@@ -179,15 +205,22 @@ void uciloop(int argc, char* argv[]) {
             } else {
                 board.set_fen(input.substr(13));
             }
+        // Set an option
         } else if (input.find("setoption name ") == 0) {
-            if (input.find("HashSize value ") == 15) {
-                tTable.setSize(std::stoi(input.substr(30)));
+            if (input.find("Hash value ") == 15) {
+                tTable.set_size(std::stoi(input.substr(26)));
                 tTable.clear();
+            } else if (input.find("Threads value ") == 15) {
+                ThreadsCount = std::stoi(input.substr(29));
+            } else if (input.find("MoveOverhead value ") == 15) {
+                MoveOverhead = std::stoi(input.substr(34));
             }
+        // Start the search
         } else if (input.find("go") == 0) {
             SearchLimits limits;
             std::string::size_type wtimestr, btimestr, wincstr, bincstr, movetimestr, infinitestr, depthstr;
 
+            // Information about white/black time, increments, fixed depth, etc.
             wtimestr = input.find("wtime");
             btimestr = input.find("btime");
             wincstr = input.find("winc");
@@ -216,13 +249,17 @@ void uciloop(int argc, char* argv[]) {
             }
 
             go(board, limits);
+        // Output an evaluation of the current position. Useful for debugging
         } else if (input.compare("eval") == 0) {
-            evaluateInfo(board);
+            evaluate_info(board);
+        // Run a perft test
         } else if (input.find("perft ") == 0) {
             unsigned depth = std::stoi(input.substr(6));
             perftTest(depth, board);
+        // Run a benchmark
         } else if (input.compare("bench") == 0) {
             benchmark();
+        // Quit the program
         } else if (input.compare("quit") == 0) {
             break;
         }

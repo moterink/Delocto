@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -28,15 +28,16 @@
 
 #define MOVE_NONE 0
 
-// Ordered this way for easy detection of promotion types(all proms have a 1 at first place in binary)
-#define NORMAL     0x2000
-#define ENPASSANT  0x4000
-#define CASTLING   0x6000
-#define QUEENPROM  0x7000
-#define ROOKPROM   0x5000
-#define BISHOPPROM 0x3000
-#define KNIGHTPROM 0x1000
+// Ordered this way for easy detection of promotion types(all promotions have a 1 at first place in binary)
+#define NORMAL           0x2000
+#define ENPASSANT        0x4000
+#define CASTLING         0x6000
+#define PROMOTION_QUEEN  0x7000
+#define PROMOTION_ROOK   0x5000
+#define PROMOTION_BISHOP 0x3000
+#define PROMOTION_KNIGHT 0x1000
 
+// Name strings for each square
 static const std::string SQUARE_NAMES[64] = {
 
     "h1", "g1", "f1", "e1", "d1", "c1", "b1", "a1",
@@ -50,12 +51,14 @@ static const std::string SQUARE_NAMES[64] = {
 
 };
 
+// Extracts move type from a Move object
 inline MoveType move_type(const Move move) {
 
     return move & 0x7000;
 
 }
 
+// Extracts the origin square from a Move object
 inline unsigned int from_sq(const Move move) {
 
     assert(sq_valid(move & 0x3f));
@@ -64,6 +67,7 @@ inline unsigned int from_sq(const Move move) {
 
 }
 
+// Extracts the target square from a Move object
 inline unsigned int to_sq(const Move move) {
 
     assert(sq_valid((move & 0xfc0) >> 6));
@@ -72,24 +76,28 @@ inline unsigned int to_sq(const Move move) {
 
 }
 
+// Constructs a Move object given a origin square, a target square and a move type
 inline Move make_move(const unsigned fromSq, const unsigned toSq, const MoveType type) {
 
     return fromSq | (toSq << 6) | type;
 
 }
 
+// Returns the promotion piece given a promotion move type
 inline Piecetype prom_piecetype(const MoveType mt) {
 
-    return Piecetype((mt / KNIGHTPROM + 1) / 2);
+    return Piecetype((mt / PROMOTION_KNIGHT + 1) / 2);
 
 }
 
+// Checks wether a given move is a promotion
 inline bool is_promotion(const Move move) {
 
     return move & 0x1000;
 
 }
 
+// Checks wether a given move is an en-passant capture
 inline bool is_ep(const Move move) {
 
     return move_type(move) == ENPASSANT;

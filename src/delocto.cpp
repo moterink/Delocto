@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -27,8 +27,6 @@
 #include "bitboards.hpp"
 #include "search.hpp"
 
-#define VERSION 0.6
-
 int main(int argc, char* argv[]) {
 
     // Init Zobrist Hash Keys
@@ -49,13 +47,11 @@ int main(int argc, char* argv[]) {
     // Initialize Search
     init_search();
 
+    // Show name, author and version in console
     std::cout << "Delocto " << VERSION << " by Moritz Terink" << std::endl << std::endl;
 
-    Board board;
-    board.set_fen("6r1/pk3p1p/3p4/1P2p3/1P1P4/PR3NP1/3K1P1P/7R w - - 0 2");
-    board.see(make_move(D4, E5, NORMAL));
-
-    uciloop(argc, argv);
+    // Start Universal Chess Interface (UCI) input loop
+    get_uci_input(argc, argv);
 
     return 0;
 

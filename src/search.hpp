@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -30,19 +30,24 @@
 #include "move.hpp"
 #include "movegen.hpp"
 
-#define DELTA_MARGIN 100
+// Margins for delta/futility pruning and razoring
+static const int DeltaMargin       = 100;
+static const int RazorMargin       = 300;
+static const int FutilityMargin[6] = { 0, 100, 200, 320, 450, 590 };
 
+// Types of nodes visited in search
 enum NodeType {
 
     PvNode, CutNode, AllNode
 
 };
 
+// A principal variation. Holds a list of all moves played in the current sequence
 class PvLine {
 
     public:
 
-        unsigned int size = 0;
+        unsigned size = 0;
         Move line[MAX_DEPTH];
 
         void merge(PvLine pv);
@@ -52,6 +57,8 @@ class PvLine {
 
 };
 
+// Search Limits given to the go() function; set time/movetime/depth limits
+// specified by the user
 typedef struct {
 
     long long moveTime = -1;
@@ -69,6 +76,8 @@ typedef struct {
 
 } SearchStats;
 
+// Various search information variables; shows status of current search, current iteration,
+// killer moves, history, bestmove and currentMove at given depth, evaluations, time management and more
 typedef struct {
 
     bool stopped = false;
@@ -76,10 +85,10 @@ typedef struct {
 
     Move killers[MAX_DEPTH + 1][2];
     int history[2][7][64];
-    Move countermove[2][7][64];
+    Move counterMove[2][7][64];
 
-    Move bestmove[MAX_DEPTH] = { MOVE_NONE };
-    Move currentmove[MAX_DEPTH] = { MOVE_NONE };
+    Move bestMove[MAX_DEPTH] = { MOVE_NONE };
+    Move currentMove[MAX_DEPTH] = { MOVE_NONE };
     int eval[MAX_DEPTH];
     int value[MAX_DEPTH];
 
@@ -91,25 +100,26 @@ typedef struct {
     long long maxTime = 0;
 
     int hashTableHits = 0;
-    int depth = 0;
-    int selectiveDepth = 0;
+    int depth = 0; // Absolute depth
+    int selectiveDepth = 0; // Selective depth; so quiecent search depth is included
 
     int pvStability = 0;
 
 } SearchInfo;
 
-// Piece Values for Delta Pruning in Quiescence search - 100 at end for enpassant capture, where tosq == PIECE_NONE
-static const int DeltaMaterial[7]  = { 100, 320, 330, 500, 950, 999999, 100 };
-static const int FutilityMargin[6] = { 0, 100, 200, 320, 450, 590 };
-static const int SeeMaterial[7]    = { 100, 320, 330, 500, 950, 999999, 0 };
-static const int RazorMargin[5]    = { 0, 300, 350, 430, 520 };
+// Piece Values for Static Exchange Evaluation
+static const int SeeMaterial[7] = { 100, 320, 330, 500, 950, 999999, 0 };
 
+// Convert a value for the transposition table, since if the value is a mate value,
+// the plies until mate have to be consistent
 inline int value_to_tt(int value, int plies) {
 
     return value >= VALUE_MATE_MAX ? value + plies : value <= VALUE_MATED_MAX ? value - plies : value;
 
 }
 
+// Adjust a potential mate value from the transposition table for the current number
+// of plies
 inline int value_from_tt(int value, int plies) {
 
     return value == VALUE_NONE ? VALUE_NONE : value >= VALUE_MATE_MAX ? value - plies : value <= VALUE_MATED_MAX ? value + plies : value;

@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -30,13 +30,19 @@
 #include "search.hpp"
 #include "perft.hpp"
 
-#define MAXHASHSIZE 160
-#define MINHASHSIZE 0
-#define DEFAULTHASHSIZE 160
-#define MAXTHREADS 1
-#define MINTHREADS 1
-#define DEFAULTTHREADS 1
+#define VERSION 0.6
 
+#define TRANSPOSITION_TABLE_SIZE_MAX 4096
+#define TRANSPOSITION_TABLE_SIZE_MIN 0
+#define TRANSPOSITION_TABLE_SIZE_DEFAULT 160
+#define THREADS_MAX 1
+#define THREADS_MIN 1
+#define THREADS_DEFAULT 1
+#define MOVE_OVERHEAD_DEFAULT 100
+#define MOVE_OVERHEAD_MAX 10000
+#define MOVE_OVERHEAD_MIN 0
+
+// Testing positions for benchmark
 static std::string BENCHMARK_FENS[42] = {
 
     "2kr1b1r/1pp2pp1/p1n1bq2/P2pp3/1P2Pn1p/2PP1N1P/1BQN1PP1/R3KB1R b KQ - 2 12",
@@ -84,25 +90,30 @@ static std::string BENCHMARK_FENS[42] = {
 
 };
 
-static const std::string PromotionChar = "qrbn";
+static const std::string PromotionChar = "nbrq";
 
+// Converts a promotion character to a MoveType
 inline MoveType char_to_promotion(const char c) {
 
-    return (PromotionChar.find(c) * 2 + 1) * QUEENPROM;
+    return (PromotionChar.find(c) * 2 + 1) * PROMOTION_KNIGHT;
 
 }
 
+// Converts a MoveType e.g PROMOTION_QUEEN to a character, e.g q, r, b, n
 inline char promotion_to_char(const MoveType mt) {
 
-    return PromotionChar[(mt / QUEENPROM) / 2];
+    return PromotionChar[(mt / PROMOTION_KNIGHT) / 2];
 
 }
 
+// Converts a move object to a string, e.g "a2a5"
 inline std::string move_to_string(const Move raw) {
 
     return (std::string() + SQUARE_NAMES[from_sq(raw)] + SQUARE_NAMES[to_sq(raw)]) + (is_promotion(raw) ? std::string(1, promotion_to_char(move_type(raw))) : "");
 
 }
+
+extern unsigned MoveOverhead;
 
 extern TranspositionTable tTable;
 extern PawnTable pawnTable;
@@ -110,6 +121,6 @@ extern MaterialTable materialTable;
 
 extern void send_info(const SearchInfo* info, const PvLine& pv, const long long duration);
 extern void send_bestmove(const Move bestMove);
-extern void uciloop(int argc, char* argv[]);
+extern void get_uci_input(int argc, char* argv[]);
 
 #endif

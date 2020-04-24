@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -42,12 +42,14 @@ static const unsigned int CastleMask[64] = {
 
 };
 
-// Reset board
+// Remove all pieces from the board and reset the game state
 void Board::clear() {
 
+    // Clear the state and move lists
     states.clear();
     moves.clear();
 
+    // Clear all bitboards
     bbColors[WHITE] = 0;
     bbColors[BLACK] = 0;
     bbColors[BOTH] = 0;
@@ -55,11 +57,13 @@ void Board::clear() {
     for (Color c = WHITE; c < BOTH; c++) {
         for (Piecetype pt = PAWN; pt < PIECE_NONE; pt++) {
             bbPieces[pt] = 0;
-            pieceCounts[c][pt] = 0;
+            pieceCounts[c][pt] = 0; // Reset the piece counters
         }
     }
+    // Clear the piece type array
     std::fill(pieceTypes, pieceTypes+64, PIECE_NONE);
 
+    // Reset the game state
     state.enPassant = SQUARE_NONE;
     state.castling = 0;
     state.fiftyMoves = 0;
@@ -72,47 +76,53 @@ void Board::clear() {
     state.kingBlockers[BLACK] = 0;
     state.checkers = 0;
 
+    // Reset the number of half moves played so far to 0
     ply = 0;
 
     stm = WHITE;
 
 }
 
-// Calculate hash, pawn and material key
+// Calculate position, pawn and material hash key
 void Board::calc_keys() {
 
     state.hashKey = 0;
     state.pawnKey = 0;
     state.materialKey = 0;
 
-    uint64_t temp = bbColors[BOTH];
+    uint64_t occupied = bbColors[BOTH];
 
-    while (temp) {
+    while (occupied) {
 
-        const unsigned sq  = pop_lsb(temp);
+        const unsigned sq  = pop_lsb(occupied);
         const Color color  = owner(sq);
         const Piecetype pt = pieceTypes[sq];
 
+        // Update the position hash key with the piece type and position
         hash_piece(color, pt, sq);
 
+        // If the piece is a pawn, update the pawn hash key
         if (pt == PAWN) {
             hash_pawn(color, sq);
         }
 
     }
 
+    // Generate the material hash key
     for (Color c = WHITE; c < BOTH; c++) {
         for (Piecetype pt = PAWN; pt < PIECE_NONE; pt++) {
             hash_material(c, pt);
         }
     }
 
+    // Update the position hash key with en-passant square, castling rights and the color to move
     hash_enPassant();
     hash_castling();
     hash_turn();
 
 }
 
+// Update the pieces blocking king attacks and get all pieces attacking the king
 void Board::update_check_info() {
 
     state.kingBlockers[WHITE] = get_slider_blockers(bbColors[BLACK], lsb_index(pieces(WHITE, KING)));
@@ -122,17 +132,21 @@ void Board::update_check_info() {
 
 }
 
+// Get a bitboard of all pieces blocking a sliding attack to a square
 uint64_t Board::get_slider_blockers(const uint64_t sliders, const unsigned sq) const {
 
+    // We first try to find all potential pinners by looking in all directions from the square
     uint64_t blockers = 0;
     uint64_t pinners  = ((BishopAttacks[sq] & (bbPieces[BISHOP] | bbPieces[QUEEN])) | (RookAttacks[sq] & (bbPieces[ROOK] | bbPieces[QUEEN]))) & sliders;
     uint64_t occupied = bbColors[BOTH] ^ pinners ^ SQUARES[sq];
 
+    // We loop over all potential pinners until there are no more left
     while (pinners) {
 
         const unsigned psq = pop_lsb(pinners);
         const uint64_t pin = RayTable[psq][sq] & occupied;
 
+        // If there are more than two pieces on the ray, they are not pinned
         if (popcount(pin) == 1) {
             blockers |= pin;
         }
@@ -143,27 +157,36 @@ uint64_t Board::get_slider_blockers(const uint64_t sliders, const unsigned sq) c
 
 }
 
+// Most Valuable Victim - Least Valuable Attacker
+// The function returns a score given a move which captures a piece or is en-passant
+// There are two arrays, MvvLvaVictim and MvvLvaAttacker, which are indexed by piece type
+// The formula is simple: MvvLvaVictim value minus MvvLvaAttacker value
+// The method encourages capturing major pieces with minor pieces/pawns
 int Board::mvvlva(const Move move) const {
 
+    // For en-passant moves, the captured piece is a pawn
     if (is_ep(move)) {
         return MvvLvaVictim[PAWN] - MvvLvaAttacker[PAWN];
     }
 
     int value = 0;
 
+    // For promotions, we add the piece value to the balance
     if (is_promotion(move)) {
         value += MvvLvaVictim[prom_piecetype(move_type(move))];
     }
 
+    // Subtract the value of the attacker from the value of the victim
     value += MvvLvaVictim[pieceTypes[to_sq(move)]] - MvvLvaAttacker[pieceTypes[from_sq(move)]];
 
     return value;
 
 }
 
-// Get board from fen string
+// Sets the current position to a given FEN string
 void Board::set_fen(std::string fen) {
 
+    // Clear the board
     clear();
 
     std::string nums = "12345678";
@@ -172,10 +195,13 @@ void Board::set_fen(std::string fen) {
     unsigned r = 0;
     unsigned f = 0;
 
+    // We loop over the FEN string to obtain the positions of the pieces until we encounter a space character
     for (i = 0; fen[i] != ' '; i++) {
 
+        // The current square index. Because of our board layout we start from the last square
         unsigned sq = 63 - square(f, r);
 
+        // A slash signifies that the current rank has finished
         if (fen[i] == '/') {
             f = 0;
             r++;
@@ -202,22 +228,30 @@ void Board::set_fen(std::string fen) {
 
             }
 
+            // Update the piece square table values and the material balances
             state.pst[color]      += PieceSquareTable[color][type][sq];
             state.material[color] += Material[type];
+
+            // Update the bitboards
             bbColors[color] |= SQUARES[sq];
             bbColors[BOTH]  |= SQUARES[sq];
             bbPieces[type]  |= SQUARES[sq];
+
             pieceTypes[sq] = type;
             pieceCounts[color][type]++;
+
             f++;
         }
 
     }
 
     ++i;
+
+    // Extract the color to move from the FEN string
     stm = (fen[i] == 'w') ? WHITE : BLACK;
     i += 2;
 
+    // Scan over the next part of the FEN string. It contains the castling rights
     while (fen[i] != ' ') {
 
         switch (fen[i]) {
@@ -235,6 +269,7 @@ void Board::set_fen(std::string fen) {
 
     ++i;
 
+    // The next part may either be a dash or a square name for the en-passant square
     state.enPassant = (fen[i] != '-') ? square(7 - (fen[i] - 'a'), fen[i + 1] - '1') : SQUARE_NONE;
 
     i += 2;
@@ -243,6 +278,7 @@ void Board::set_fen(std::string fen) {
         i++;
     }
 
+    // The final part of the FEN string is the number of half moves made since the last capture or pawn move
     if (fen.size() >= i && isdigit(fen[i])) {
         std::string cut = fen.substr(i);
         state.fiftyMoves = std::stoi(cut.substr(0, cut.find(" ")));
@@ -250,12 +286,13 @@ void Board::set_fen(std::string fen) {
         state.fiftyMoves = 0;
     }
 
+    // Update checkers and king blockers and calculate the hash keys
     update_check_info();
     calc_keys();
 
 }
 
-// Print board to screen for debuging purposals
+// Print the current position to screen for debuging purposals
 void Board::print() const {
 
     char labels[2][6] = { { 'P', 'N', 'B', 'R', 'Q', 'K' }, { 'p', 'n', 'b', 'r', 'q', 'k' } };
@@ -281,18 +318,22 @@ void Board::print() const {
 
 }
 
+// Adds a piece to the board given a square and a color
 void Board::add_piece(const Color color, const Piecetype pt, const unsigned sq) {
 
     hash_material(color, pt);
 
+    // Add the piece to the corresponding bitboards and increase the piece counter
     bbColors[color] |= SQUARES[sq];
     bbPieces[pt]    |= SQUARES[sq];
     pieceTypes[sq]  = pt;
     pieceCounts[color][pt]++;
 
+    // Update the material balance and the piece square table value
     state.material[color] += Material[pt];
     state.pst[color]      += PieceSquareTable[color][pt][sq];
 
+    // Update the hash keys
     hash_material(color, pt);
     hash_piece(color, pt, sq);
     if (pt == PAWN) {
@@ -301,21 +342,26 @@ void Board::add_piece(const Color color, const Piecetype pt, const unsigned sq) 
 
 }
 
+// Removes a piece from the board
 void Board::remove_piece(const unsigned sq) {
 
     const Color color  = owner(sq);
     const Piecetype pt = pieceTypes[sq];
 
+    // Update the material hash key
     hash_material(color, pt);
 
+    // Remove the piece from the bitboards and update the piece counts
     bbColors[color] ^= SQUARES[sq];
     bbPieces[pt]    ^= SQUARES[sq];
-    pieceTypes[sq]  = PIECE_NONE;
+    pieceTypes[sq]   = PIECE_NONE;
     pieceCounts[color][pt]--;
 
+    // Remove the piece value from the material balance and update the piece square table value
     state.material[color] -= Material[pt];
     state.pst[color]      -= PieceSquareTable[color][pt][sq];
 
+    // Update the hash keys and also the pawn hash key if the removed piece was a pawn
     hash_material(color, pt);
     hash_piece(color, pt, sq);
     if (pt == PAWN) {
@@ -324,25 +370,32 @@ void Board::remove_piece(const unsigned sq) {
 
 }
 
+// Move a piece on the board from one square to another
 void Board::move_piece(const unsigned fromSq, const unsigned toSq) {
 
     const Color color  = owner(fromSq);
     const Piecetype pt = pieceTypes[fromSq];
 
+    // First, remove the piece on the corresponding bitboards.
+    // Then, add it on the new square
     bbColors[color] ^= SQUARES[fromSq];
     bbPieces[pt]    ^= SQUARES[fromSq];
     bbColors[color] |= SQUARES[toSq];
     bbPieces[pt]    |= SQUARES[toSq];
 
+    // Update the piece types array to match the new position of the piece
     pieceTypes[fromSq] = PIECE_NONE;
     pieceTypes[toSq] = pt;
 
+    // Update the piece square table values
     state.pst[color] -= PieceSquareTable[color][pt][fromSq];
     state.pst[color] += PieceSquareTable[color][pt][toSq];
 
+    // Update the position hash key
     hash_piece(stm, pt, fromSq);
     hash_piece(stm, pt, toSq);
 
+    // If the moved piece was a pawn, also update the pawn hash key
     if (pt == PAWN) {
         hash_pawn(color, fromSq);
         hash_pawn(color, toSq);
@@ -350,62 +403,72 @@ void Board::move_piece(const unsigned fromSq, const unsigned toSq) {
 
 }
 
-bool Board::do_move(const Move move) {
+// Play a move on the board
+void Board::do_move(const Move move) {
 
     assert(move != MOVE_NONE);
 
-    const int fromSq        = from_sq(move);
-    const int toSq          = to_sq(move);
-    const MoveType moveType = move_type(move);
-    const Piecetype fromPt  = pieceTypes[fromSq];
-    const Piecetype toPt    = pieceTypes[toSq];
+    const int fromSq          = from_sq(move);
+    const int toSq            = to_sq(move);
+    const MoveType moveType   = move_type(move);
+    const Piecetype pieceType = pieceTypes[fromSq];
+    const Piecetype captured  = pieceTypes[toSq];
 
+    // Add the current game state to the list of previous states
     states.push_back(state);
     moves.push_back(move);
 
+    // Update position hash key for enPassant and castling
     hash_enPassant();
     hash_castling();
 
-    state.captured = toPt;
+    state.captured = captured;
     state.checkers = 0;
     state.enPassant = SQUARE_NONE;
     state.fiftyMoves++;
 
     // NOTE: no need to check if piece on square -> pieces[PIECE_NONE] is trash
 
-    if (toPt != PIECE_NONE) {
+    // If there is a piece on the target square, remove it and reset the fifty moves counter
+    if (captured != PIECE_NONE) {
         remove_piece(toSq);
         state.fiftyMoves = 0;
     }
 
+    // Move the piece to its destination square
     move_piece(fromSq, toSq);
 
     switch(moveType) {
 
         case NORMAL:
             {
-                // Update enpassant square
-                if (fromPt == PAWN) {
+
+                if (pieceType == PAWN) {
+                    // Reset the fifty moves counter if we move with a pawn
                     state.fiftyMoves = 0;
                     if (std::abs(fromSq - toSq) == 16) {
                         if (PawnAttacks[stm][fromSq + DIRECTIONS[stm][UP]] & pieces(!stm, PAWN)) {
+                            // Update the en-passant square
                             state.enPassant = fromSq + DIRECTIONS[stm][UP];
                             hash_enPassant();
                         }
                     }
                 }
 
+                // Update castling state
                 state.castling &= CastleMask[fromSq];
             }
             break;
 
         case CASTLING:
             {
-                const unsigned rookToSq   = toSq + ((toSq == G1 || toSq == G8) ?  1 : -1);
-                const unsigned rookFromSq = toSq + ((toSq == G1 || toSq == G8) ? -1 :  2);
+                const unsigned rookToSq   = toSq + ((toSq == SQUARE_G1 || toSq == SQUARE_G8) ?  1 : -1);
+                const unsigned rookFromSq = toSq + ((toSq == SQUARE_G1 || toSq == SQUARE_G8) ? -1 :  2);
 
+                // If we castle, we need to move the rook as well
                 move_piece(rookFromSq, rookToSq);
 
+                // Update castling state
                 state.castling &= CastleMask[fromSq];
             }
             break;
@@ -416,6 +479,7 @@ bool Board::do_move(const Move move) {
 
                 // NOTE: do not assign pawn to state.captured!!!
 
+                // Remove the pawn which has been captured en-passant
                 remove_piece(capSq);
                 state.fiftyMoves = 0;
             }
@@ -426,43 +490,51 @@ bool Board::do_move(const Move move) {
             {
                 const Piecetype promotionType = prom_piecetype(moveType);
 
+                // For promotions, we need to exchange the pawn for the piece specified in the move object
                 remove_piece(toSq);
                 add_piece(stm, promotionType, toSq);
 
+                // Reset the fifty moves counter since we moved with a pawn
                 state.fiftyMoves = 0;
             }
             break;
 
     }
 
+    // Update position hash key for castling rights
     hash_castling();
 
+    // Switch turn and update position hash key for turn
     hash_turn();
     stm = !stm;
     hash_turn();
 
+    // Update the combined colors bitboard
     bbColors[BOTH] = bbColors[WHITE] | bbColors[BLACK];
 
+    // Update the king blockers and checkers
     update_check_info();
 
+    // Increase the number of played half moves
     ply++;
-
-    return true;
 
 }
 
+// Undo the last move played on the board.
 void Board::undo_move() {
 
     assert(!moves.empty());
 
     const Move move = moves.back();
 
+    // Remove the last move from the move list
     moves.pop_back();
 
     const unsigned fromSq   = from_sq(move);
     const unsigned toSq     = to_sq(move);
     const MoveType moveType = move_type(move);
 
+    // Move the piece back to its original square
     move_piece(toSq, fromSq);
 
     if (state.captured != PIECE_NONE) {
@@ -474,14 +546,16 @@ void Board::undo_move() {
         case NORMAL: break;
         case CASTLING:
             {
-                const unsigned rookToSq   = toSq + ((toSq == G1 || toSq == G8) ?  1 : -1);
-                const unsigned rookFromSq = toSq + ((toSq == G1 || toSq == G8) ? -1 :  2);
+                // For castling, we need to move the rook back to its initial position
+                const unsigned rookToSq   = toSq + ((toSq == SQUARE_G1 || toSq == SQUARE_G8) ?  1 : -1);
+                const unsigned rookFromSq = toSq + ((toSq == SQUARE_G1 || toSq == SQUARE_G8) ? -1 :  2);
                 move_piece(rookToSq, rookFromSq);
             }
             break;
 
         case ENPASSANT:
             {
+                // For en-passants, we need to put back the captured pawn
                 const unsigned capSq = toSq + DIRECTIONS[!stm][DOWN];
                 add_piece(stm, PAWN, capSq);
             }
@@ -489,6 +563,7 @@ void Board::undo_move() {
 
         default:
             {
+                // For promotions, we need to exchange the piece for the pawn again
                 remove_piece(fromSq);
                 add_piece(!stm, PAWN, fromSq);
             }
@@ -496,23 +571,27 @@ void Board::undo_move() {
 
     }
 
+    // Update the combined colors bitboard
     bbColors[BOTH] = bbColors[WHITE] | bbColors[BLACK];
 
+    // Flip the turn
     stm = !stm;
 
+    // Decrease the number of half-moves played
     ply--;
 
+    // Revert to the previous board state
     state = states.back();
     states.pop_back();
 
 }
 
-// Make a null move on the board
+// Do a null move on the board
 void Board::do_nullmove() {
 
     states.push_back(state);
 
-    hash_enPassant(); // hashEnPassant checks for SQUARE_NONE
+    hash_enPassant(); // hash_EnPassant() checks for SQUARE_NONE
     state.enPassant = SQUARE_NONE;
 
     hash_turn();
@@ -525,7 +604,7 @@ void Board::do_nullmove() {
 
 }
 
-// Unmake a null move on the board
+// Undo a null move on the board
 void Board::undo_nullmove() {
 
     stm = !stm;
@@ -538,17 +617,21 @@ void Board::undo_nullmove() {
 
 }
 
-// Checks for threefold repetition and 50 move rule. Stalemate is settled by search
-bool Board::checkDraw() {
+// Checks for threefold repetition, 50 move rule and insufficient material.
+// Stalemate is settled by search.
+bool Board::check_draw() {
 
     if (state.fiftyMoves >= 100) {
         return true;
     }
 
+    // If there is insufficient mating material, the position is drawn
     if (is_material_draw()) {
         return true;
     }
 
+    // We count how often the hashkey of the current position has already occured
+    // in the game previously.
     unsigned count = 0;
     for (unsigned i = 0; i < states.size(); i++) {
         if (states[i].hashKey == state.hashKey) {
@@ -556,6 +639,7 @@ bool Board::checkDraw() {
         }
     }
 
+    // If the position has already occured twice before, this is a threefold repetition
     if (count >= 2) {
         return true;
     }
@@ -564,46 +648,66 @@ bool Board::checkDraw() {
 
 }
 
+// Checks wether a given move on the current board is pseudo-legal
+// A move is invalid if it violates the rules of chess, however, this
+// method does not check if the move is actually legal, meaning it does
+// not check wether the own king might be left in check.
 bool Board::is_valid(const Move move) const {
 
     const unsigned fromSq = from_sq(move);
     const unsigned toSq   = to_sq(move);
 
-    if (pieceTypes[fromSq] == PIECE_NONE || owner(fromSq) != stm || (SQUARES[toSq] & bbColors[stm])) {
+    // Move is illegal when there is no piece on the origin square, it's not the owners turn or it would capture a friendly piece
+    if (   pieceTypes[fromSq] == PIECE_NONE
+        || owner(fromSq) != stm
+        || (SQUARES[toSq] & bbColors[stm]))
+    {
         return false;
     }
 
     const MoveType moveType = move_type(move);
 
     if (moveType == NORMAL) {
-        if (SQUARES[fromSq] & bbPieces[PAWN]) {
-            // Push to 8th rank invalid -> would be promotion, so mtype can't be NORMAL
+
+        // Special rules for pawns
+        if (pieceTypes[fromSq] == PAWN) {
+
+            // Push to 8th rank invalid -> would be promotion, so move type can't be NORMAL
             if (relative_rank(stm, toSq) == 7) {
                 return false;
             }
-            if (!((SQUARES[toSq] & PawnAttacks[stm][fromSq]) & bbColors[!stm])
-               && !((fromSq + DIRECTIONS[stm][UP] == toSq) && pieceTypes[toSq] == PIECE_NONE)
-               && !(relative_rank(stm, fromSq) == 1 && (fromSq + 2 * DIRECTIONS[stm][UP] == toSq) && (pieceTypes[fromSq + DIRECTIONS[stm][UP]] == PIECE_NONE) && (pieceTypes[fromSq + 2 * DIRECTIONS[stm][UP]] == PIECE_NONE))) {
+
+            if (   !((SQUARES[toSq] & PawnAttacks[stm][fromSq]) & bbColors[!stm]) // If the pawn moves diagonally but there is no enemy piece, the move is not valid
+                && !((fromSq + DIRECTIONS[stm][UP] == toSq) && pieceTypes[toSq] == PIECE_NONE) // If the pawn pushes forward, there can be no piece in front of it
+                && !(    relative_rank(stm, fromSq) == 1  // For double pushes, there cannot be any piece one and two squares ahead
+                      && (fromSq + 2 * DIRECTIONS[stm][UP] == toSq)
+                      && (pieceTypes[fromSq +     DIRECTIONS[stm][UP]] == PIECE_NONE)
+                      && (pieceTypes[fromSq + 2 * DIRECTIONS[stm][UP]] == PIECE_NONE)))
+                {
                     return false;
-            }
-        } else if (!(SQUARES[toSq] & pseudo_bb(pieceTypes[fromSq], stm, fromSq))) {
+                }
+        // If the piece cannot move to the target square, the move is not valid
+        } else if (!(SQUARES[toSq] & piece_attacks(pieceTypes[fromSq], stm, fromSq))) {
             return false;
         }
+
     } else {
         if (moveType == CASTLING) {
-            if (is_castling_valid(castleByKingpos[toSq]) == false) {
-                return false;
-            }
+            return is_castling_valid(castleByKingpos[toSq]);
         }
 
         if (is_promotion(move)) {
-            if (!(SQUARES[fromSq] & bbPieces[PAWN]) || !(SQUARES[toSq] & PAWN_FINALRANK[stm]) || !(SQUARES[toSq] & generate_pawn_moves(stm, fromSq, bbColors[BOTH], bbColors[!stm]))) {
+            if (   !(pieceTypes[fromSq] == PAWN)
+                || !(SQUARES[toSq] & PAWN_FINALRANK[stm])
+                || !(SQUARES[toSq] & generate_pawn_moves(stm, fromSq, bbColors[BOTH], bbColors[!stm])))
+            {
                 return false;
             }
         }
 
         if (moveType == ENPASSANT) {
-            if (toSq != state.enPassant || !(SQUARES[fromSq] & bbPieces[PAWN])) {
+            if (   toSq != state.enPassant
+                || !(SQUARES[fromSq] & bbPieces[PAWN])) {
                 return false;
             }
         }
@@ -612,16 +716,20 @@ bool Board::is_valid(const Move move) const {
     if (checkers()) {
         if (SQUARES[fromSq] != pieces(stm, KING)) {
 
-            const unsigned ksq = lsb_index(pieces(stm, KING));
+            const unsigned kingSq = lsb_index(pieces(stm, KING));
 
+            // If there is more than one checker and we are not moving the king, this move cannot be valid
             if (popcount(checkers()) >= 2) {
                 return false;
             }
 
-            if (!(((RayTable[lsb_index(checkers())][ksq] | checkers())) & SQUARES[toSq])) {
+            // If the target square does not block a sliding attack or capture the checking piece, the move is invalid
+            if (!((RayTable[lsb_index(checkers())][kingSq] | checkers()) & SQUARES[toSq])) {
                 return false;
             }
 
+        // If we move the king and there are enemy attackers to the target square, the move is invalid
+        // We remove the king from occupied pieces so that a move by the king along the diagonal/file is also detected as invalid
         } else if (sq_attackers(!stm, toSq, (bbColors[BOTH] ^ SQUARES[fromSq])) & bbColors[!stm]) {
             return false;
         }

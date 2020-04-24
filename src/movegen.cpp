@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -25,16 +25,19 @@
 #include "board.hpp"
 #include "bitboards.hpp"
 
-static const uint64_t WKCAS_BLOCKERS = SQUARES[F1] | SQUARES[G1];
-static const uint64_t WQCAS_BLOCKERS = SQUARES[B1] | SQUARES[C1] | SQUARES[D1];
-static const uint64_t BKCAS_BLOCKERS = SQUARES[F8] | SQUARES[G8];
-static const uint64_t BQCAS_BLOCKERS = SQUARES[B8] | SQUARES[C8] | SQUARES[D8];
+// Blocking squares for the castling moves
+static const uint64_t WKCAS_BLOCKERS = SQUARES[SQUARE_F1] | SQUARES[SQUARE_G1];
+static const uint64_t WQCAS_BLOCKERS = SQUARES[SQUARE_B1] | SQUARES[SQUARE_C1] | SQUARES[SQUARE_D1];
+static const uint64_t BKCAS_BLOCKERS = SQUARES[SQUARE_F8] | SQUARES[SQUARE_G8];
+static const uint64_t BQCAS_BLOCKERS = SQUARES[SQUARE_B8] | SQUARES[SQUARE_C8] | SQUARES[SQUARE_D8];
 
-static const Move WKCAS_MOVE = make_move(E1, G1, CASTLING);
-static const Move WQCAS_MOVE = make_move(E1, C1, CASTLING);
-static const Move BKCAS_MOVE = make_move(E8, G8, CASTLING);
-static const Move BQCAS_MOVE = make_move(E8, C8, CASTLING);
+// Move objects for each castling
+static const Move WKCAS_MOVE = make_move(SQUARE_E1, SQUARE_G1, CASTLING);
+static const Move WQCAS_MOVE = make_move(SQUARE_E1, SQUARE_C1, CASTLING);
+static const Move BKCAS_MOVE = make_move(SQUARE_E8, SQUARE_G8, CASTLING);
+static const Move BQCAS_MOVE = make_move(SQUARE_E8, SQUARE_C8, CASTLING);
 
+// Appends the moves of a given move list to its own moves
 void MoveList::merge(MoveList list) {
 
     unsigned int lcount;
@@ -45,7 +48,8 @@ void MoveList::merge(MoveList list) {
 
 }
 
-unsigned int MoveList::find(const Move move) {
+// Returns the index of a given move; returns the list size if it was not found
+unsigned MoveList::find(const Move move) {
 
     for (unsigned int mcount = 0; mcount < size; mcount++) {
         if (moves[mcount] == move) {
@@ -56,6 +60,7 @@ unsigned int MoveList::find(const Move move) {
 
 }
 
+// Swaps the position of two moves given their indices
 void MoveList::swap(const unsigned int index1, const unsigned int index2) {
 
     Move move1 = moves[index1];
@@ -72,6 +77,7 @@ void MoveList::swap(const unsigned int index1, const unsigned int index2) {
 
 }
 
+// Picks the move in the list with the highest score and returns its index
 Move MoveList::pick() {
 
     if (size == 0) return MOVE_NONE;
@@ -91,6 +97,7 @@ Move MoveList::pick() {
 
 }
 
+// Prints all moves in the list
 void MoveList::print() {
 
     for (unsigned mcount = 0; mcount < size; mcount++) {
@@ -99,8 +106,10 @@ void MoveList::print() {
 
 }
 
+// Generates all pseudo-legal quiet promotions in a given position and adds them to the given move list
 static void gen_quietproms(const Board& board, MoveList& moveList, const Color color, const uint64_t targets) {
 
+    // Bitboard of all pawns for the given color which are one square away from promotion
     uint64_t pawns = board.pieces(color, PAWN) & PAWN_STARTRANK[!color];
 
     while (pawns) {
@@ -109,16 +118,17 @@ static void gen_quietproms(const Board& board, MoveList& moveList, const Color c
         const unsigned int tosq = fromsq + DIRECTIONS[color][UP];
 
         if (SQUARES[tosq] & targets) {
-            moveList.append(make_move(fromsq, tosq, QUEENPROM));
-            moveList.append(make_move(fromsq, tosq, ROOKPROM));
-            moveList.append(make_move(fromsq, tosq, BISHOPPROM));
-            moveList.append(make_move(fromsq, tosq, KNIGHTPROM));
+            moveList.append(make_move(fromsq, tosq, PROMOTION_QUEEN));
+            moveList.append(make_move(fromsq, tosq, PROMOTION_ROOK));
+            moveList.append(make_move(fromsq, tosq, PROMOTION_BISHOP));
+            moveList.append(make_move(fromsq, tosq, PROMOTION_KNIGHT));
         }
 
     }
 
 }
 
+// Generates all pseudo-legal promotions in a given position which capture a piece and adds them to the given move list
 static void gen_capproms(const Board& board, MoveList& moveList, const Color color, const uint64_t targets) {
 
     uint64_t pawns = board.pieces(color, PAWN) & PAWN_STARTRANK[!color];
@@ -132,10 +142,10 @@ static void gen_capproms(const Board& board, MoveList& moveList, const Color col
 
             const unsigned int tosq = pop_lsb(caps);
 
-            moveList.append(make_move(fromsq, tosq, QUEENPROM));
-            moveList.append(make_move(fromsq, tosq, ROOKPROM));
-            moveList.append(make_move(fromsq, tosq, BISHOPPROM));
-            moveList.append(make_move(fromsq, tosq, KNIGHTPROM));
+            moveList.append(make_move(fromsq, tosq, PROMOTION_QUEEN));
+            moveList.append(make_move(fromsq, tosq, PROMOTION_ROOK));
+            moveList.append(make_move(fromsq, tosq, PROMOTION_BISHOP));
+            moveList.append(make_move(fromsq, tosq, PROMOTION_KNIGHT));
 
         }
 
@@ -143,17 +153,19 @@ static void gen_capproms(const Board& board, MoveList& moveList, const Color col
 
 }
 
+// Generates the pseudo-legal en-passant captures (if possible) for a given position and adds them to the given move list
 static void gen_ep(const Board& board, MoveList& moveList, const Color color, const uint64_t targets) {
 
-    const unsigned epsq = board.enPassant();
+    const unsigned epSq = board.enPassant();
 
-    if (epsq != SQUARE_NONE && (SQUARES[epsq] & targets)) {
+    if (epSq != SQUARE_NONE && (SQUARES[epSq] & targets)) {
 
-        uint64_t pawns = PawnAttacks[!color][epsq] & board.pieces(color, PAWN);
+        // Bitboard of all friendly pawns attacking the en-passant square
+        uint64_t pawns = PawnAttacks[!color][epSq] & board.pieces(color, PAWN);
 
         while (pawns) {
 
-            moveList.append(make_move(pop_lsb(pawns), epsq, ENPASSANT));
+            moveList.append(make_move(pop_lsb(pawns), epSq, ENPASSANT));
 
         }
 
@@ -161,6 +173,9 @@ static void gen_ep(const Board& board, MoveList& moveList, const Color color, co
 
 }
 
+// Generates all pseudo-legal moves capturing pieces for a given color and adds them to the move list
+// For each piece, the method creates a bitboard with all possible target squares. It then loops over each
+// set bit on the bitboard and adds a move for each to the move list until there are not bits left on the bitboard.
 static void gen_piece_caps(const Board& board, MoveList& moveList, const Color color, uint64_t targets) {
 
     const unsigned sq = lsb_index(board.pieces(color, KING));
@@ -243,6 +258,7 @@ static void gen_piece_caps(const Board& board, MoveList& moveList, const Color c
 
 }
 
+// Same as the function above, only for quiet moves though
 static void gen_piece_quiets(const Board& board, MoveList& moveList, const Color color, const uint64_t targets) {
 
     const uint64_t pawns      = board.pieces(color, PAWN) & ~PAWN_STARTRANK[!color];
@@ -332,6 +348,7 @@ static void gen_piece_quiets(const Board& board, MoveList& moveList, const Color
 
 }
 
+// Returns true if the given castling is possible in the current position, false if not.
 bool Board::is_castling_valid(const unsigned flag) const {
 
     if (!checkers()) {
@@ -341,34 +358,34 @@ bool Board::is_castling_valid(const unsigned flag) const {
             case WKCASFLAG:
             {
                 return (   state.castling & WKCASFLAG
-                        && pieces(WHITE, KING) & SQUARES[E1]
-                        && pieces(WHITE, ROOK) & SQUARES[H1]
-                        && !getAllOccupancy(WKCAS_BLOCKERS));
+                        && pieces(WHITE, KING) & SQUARES[SQUARE_E1]
+                        && pieces(WHITE, ROOK) & SQUARES[SQUARE_H1]
+                        && !(pieces(BOTH) & WKCAS_BLOCKERS));
 
             }
             case WQCASFLAG:
             {
                 return (   state.castling & WQCASFLAG
-                        && pieces(WHITE, KING) & SQUARES[E1]
-                        && pieces(WHITE, ROOK) & SQUARES[A1]
-                        && !getAllOccupancy(WQCAS_BLOCKERS));
+                        && pieces(WHITE, KING) & SQUARES[SQUARE_E1]
+                        && pieces(WHITE, ROOK) & SQUARES[SQUARE_A1]
+                        && !(pieces(BOTH) & WQCAS_BLOCKERS));
 
 
             }
             case BKCASFLAG:
             {
                 return (   state.castling & BKCASFLAG
-                        && pieces(BLACK, KING) & SQUARES[E8]
-                        && pieces(BLACK, ROOK) & SQUARES[H8]
-                        && !getAllOccupancy(BKCAS_BLOCKERS));
+                        && pieces(BLACK, KING) & SQUARES[SQUARE_E8]
+                        && pieces(BLACK, ROOK) & SQUARES[SQUARE_H8]
+                        && !(pieces(BOTH) & BKCAS_BLOCKERS));
 
             }
             case BQCASFLAG:
             {
                 return (   state.castling & BQCASFLAG
-                        && pieces(BLACK, KING) & SQUARES[E8]
-                        && pieces(BLACK, ROOK) & SQUARES[A8]
-                        && !getAllOccupancy(BQCAS_BLOCKERS));
+                        && pieces(BLACK, KING) & SQUARES[SQUARE_E8]
+                        && pieces(BLACK, ROOK) & SQUARES[SQUARE_A8]
+                        && !(pieces(BOTH) & BQCAS_BLOCKERS));
             }
         }
     }
@@ -377,6 +394,7 @@ bool Board::is_castling_valid(const unsigned flag) const {
 
 }
 
+// Generates all castling moves for the given position or a given color and adds them to the move list
 static void gen_castlings(const Board& board, MoveList& moveList, const Color color) {
 
     if (color == WHITE) {
@@ -403,6 +421,7 @@ static void gen_castlings(const Board& board, MoveList& moveList, const Color co
 
 }
 
+// Generates all possible moves evading a check for the given color in the given position and adds all evasions to the move list
 void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& moveList, const Color color) {
 
     const unsigned ksq      = lsb_index(board.pieces(color, KING));
@@ -456,6 +475,8 @@ void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& moveLis
 
 }
 
+// Given a move list and a board, this function returns a new move list
+// containing only the legal moves of the original list
 MoveList gen_legals(const Board& board, const MoveList& moves) {
 
     MoveList legals;
@@ -474,6 +495,7 @@ MoveList gen_legals(const Board& board, const MoveList& moves) {
 
 }
 
+// Generates all possible pseudo-legal quiet moves in the given position for a given color
 MoveList gen_quiets(const Board& board, const Color color) {
 
     MoveList moveList;
@@ -491,6 +513,7 @@ MoveList gen_quiets(const Board& board, const Color color) {
 
 }
 
+// Generates all possible pseudo-legal moves capturing a piece in the given position for a given color
 MoveList gen_caps(const Board& board, const Color color) {
 
     MoveList moveList;
@@ -508,6 +531,7 @@ MoveList gen_caps(const Board& board, const Color color) {
 
 }
 
+// Generates all possible pseudo-legal moves for a given position for a given color
 MoveList gen_all(const Board& board, const Color color) {
 
     MoveList moveList;
@@ -519,7 +543,7 @@ MoveList gen_all(const Board& board, const Color color) {
 
 }
 
-// Check if move is giving check
+// Checks wether a move is giving check to the opponent's king
 bool Board::gives_check(const Move move) {
 
     const unsigned ksq    = lsb_index(pieces(!stm, KING));
@@ -563,7 +587,7 @@ bool Board::gives_check(const Move move) {
         return true;
     }
 
-    // Check for discovered checks by moving the piece
+    // Check for discovered checks from sliders which appear by moving the piece
     if (slider_attackers_discovered(stm, ksq, fromSq, toSq)) {
         return true;
     }

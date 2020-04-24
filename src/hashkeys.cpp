@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2019 Moritz Terink
+  Copyright (c) 2018-2020 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -23,13 +23,21 @@
 
 #include "hashkeys.hpp"
 
+// Hashkey arrays for generating a position hashkey
 uint64_t PieceHashKeys[2][7][64];
 uint64_t PawnHashKeys[2][64];
-uint64_t MaterialHashKeys[2][6][9];
+uint64_t MaterialHashKeys[2][6][11];
 uint64_t TurnHashKeys[2];
 uint64_t CastlingHashKeys[16];
 uint64_t EnPassantHashKeys[8];
 
+// Initialize the hash keys
+// For each color, we assign a hashkey for each square for each piece type
+// Also, we assign a second array with hashkeys for each pawn of both colors for each square
+// We also have hashkeys for the each possible configuration of material on the board
+// There are also hashkeys for each possible castling state and 8 hashkeys for each file where
+// there could be a potential en-passant square.
+// Furthermore, there are two additional hashkeys representing the current color to move
 void init_hashkeys() {
 
     for (unsigned c = WHITE; c < BOTH; c++) {
@@ -40,7 +48,7 @@ void init_hashkeys() {
             PawnHashKeys[c][sq] = rand64();
         }
         for (unsigned pt = PAWN; pt < PIECE_NONE; pt++) {
-            for (unsigned i = 0; i < 10; i++) {
+            for (unsigned i = 0; i < 11; i++) {
                 MaterialHashKeys[c][pt][i] = rand64();
             }
         }
@@ -59,15 +67,16 @@ void init_hashkeys() {
 
 }
 
-// Set hash table to size(in MB)
-void TranspositionTable::setSize(const int hashsize) {
+// Set hash table to a given size in megabytes
+void TranspositionTable::set_size(const unsigned hash) {
 
-    //delete[] table;
-    size = (MB * hashsize) / sizeof(TTEntry);
+    delete[] table;
+    size = (MB * hash) / sizeof(TTEntry);
     table = new TTEntry [size];
 
 }
 
+// Clears the material hash table
 void MaterialTable::clear() {
 
     MaterialEntry * entry;
@@ -79,6 +88,7 @@ void MaterialTable::clear() {
 
 }
 
+// Probes the material hash table and returns the corresponding entry
 MaterialEntry * MaterialTable::probe(const uint64_t key) {
 
     MaterialEntry * entry = &(table[key % size]);
@@ -91,12 +101,14 @@ MaterialEntry * MaterialTable::probe(const uint64_t key) {
 
 }
 
+// Stores a material imbalance evaluation in the material hash table given the masterial hash key
 void MaterialTable::store(const uint64_t key, const Value value) {
 
     table[key % size] = { key, value };
 
 }
 
+// Clears the pawn hash table
 void PawnTable::clear() {
 
     PawnEntry * entry;
@@ -111,6 +123,7 @@ void PawnTable::clear() {
 
 }
 
+// Probes the pawn hash table and returns the corresponding entry
 PawnEntry * PawnTable::probe(const uint64_t key) {
 
     PawnEntry * entry = &(table[key % size]);
@@ -123,12 +136,14 @@ PawnEntry * PawnTable::probe(const uint64_t key) {
 
 }
 
+// Stores a pawn structure evaluation value and several pawn related bitboards for a given pawn hash key
 void PawnTable::store(const uint64_t key, const Value value, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan) {
 
     table[key % size] = { key, value, pawnWAttacks, pawnBAttacks, passedPawns, pawnWAttacksSpan, pawnBAttacksSpan };
 
 }
 
+// Clears the transposition hash table
 void TranspositionTable::clear() {
 
     TTEntry * entry;
