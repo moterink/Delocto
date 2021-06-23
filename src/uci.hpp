@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -28,19 +28,20 @@
 #include "hashkeys.hpp"
 #include "move.hpp"
 #include "search.hpp"
+#include "thread.hpp"
 #include "perft.hpp"
 
 #define VERSION 0.6
 
-#define TRANSPOSITION_TABLE_SIZE_MAX 4096
-#define TRANSPOSITION_TABLE_SIZE_MIN 0
-#define TRANSPOSITION_TABLE_SIZE_DEFAULT 160
-#define THREADS_MAX 1
-#define THREADS_MIN 1
-#define THREADS_DEFAULT 1
-#define MOVE_OVERHEAD_DEFAULT 100
-#define MOVE_OVERHEAD_MAX 10000
-#define MOVE_OVERHEAD_MIN 0
+constexpr unsigned TRANSPOSITION_TABLE_SIZE_MAX = 4096;
+constexpr unsigned TRANSPOSITION_TABLE_SIZE_MIN = 0;
+constexpr unsigned TRANSPOSITION_TABLE_SIZE_DEFAULT = 160;
+constexpr unsigned THREADS_MAX = 4;
+constexpr unsigned THREADS_MIN = 1;
+constexpr unsigned THREADS_DEFAULT = 1;
+constexpr unsigned MOVE_OVERHEAD_DEFAULT = 100;
+constexpr unsigned MOVE_OVERHEAD_MAX = 10000;
+constexpr unsigned MOVE_OVERHEAD_MIN = 0;
 
 // Testing positions for benchmark
 static std::string BENCHMARK_FENS[42] = {
@@ -115,12 +116,12 @@ inline std::string move_to_string(const Move raw) {
 
 extern unsigned MoveOverhead;
 
-extern TranspositionTable tTable;
-extern PawnTable pawnTable;
-extern MaterialTable materialTable;
+extern ThreadPool Threads;
+extern TranspositionTable TTable;
 
-extern void send_info(const SearchInfo* info, const PvLine& pv, const long long duration);
+extern uint64_t benchmark();
+extern void send_info(const SearchInfo& info, const PvLine& pv, const Duration duration, const uint64_t nodes);
 extern void send_bestmove(const Move bestMove);
-extern void get_uci_input(int argc, char* argv[]);
+extern void uci_loop(int argc, char* argv[]);
 
 #endif

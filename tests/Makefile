@@ -17,17 +17,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-TARGET = delocto
+TARGET = tests
 
 CXXSTD = -std=c++17
 
-OPTIMIZEFLAGS = -mtune=native -march=native -DNDEBUG -O3
-DEBUGFLAGS = -g
+EXCLUDED := ../src/delocto.cpp
 
-SRC = *.cpp
+COMMON := $(filter-out $(EXCLUDED), $(wildcard ../src/*.cpp))
+
+SRC = $(COMMON) tests.cpp
 
 all:
-	$(CXX) $(CXXSTD) $(OPTIMIZEFLAGS) $(SRC) -o $(TARGET)
-
-debug:
-	$(CXX) $(CXXSTD) $(DEBUGFLAGS) $(SRC) -o $(TARGET)
+	$(CXX) $(CXXSTD) $(SRC) -o $(TARGET)

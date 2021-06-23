@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -25,19 +25,19 @@
 #include "uci.hpp"
 
 // Get the total time elapsed in milliseconds since a given timestamp
-long long get_time_elapsed(TimePoint start) {
+Duration get_time_elapsed(TimePoint start) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
 }
 
 // Initialize the time management given the search limits specified
 void init_time_management(const SearchLimits& limits, SearchInfo* info) {
 
-    // We have to variables, idealTime and maxTime
+    // We have two variables, idealTime and maxTime
     // Ideally, we want to search for about as long as the value of idealTime
     // However, if the principal variation or the score change often,
     // we extend the time we take to search the position. We will never go beyond
     // the maxTime value though
-    if (limits.moveTime >= 0) { // specific move time specified
+    if (limits.moveTime >= 0) { // Specific move time
         info->idealTime = limits.moveTime;
         info->maxTime   = limits.moveTime;
     } else if (limits.time >= 0) {
@@ -58,8 +58,8 @@ void update_time_managemement(SearchInfo* info) {
 
     if (info->depth > 5) {
 
-        const int value = info->value[info->depth];
-        const int lastValue = info->value[info->depth - 1];
+        const Value value     = info->value[info->depth];
+        const Value lastValue = info->value[info->depth - 1];
 
         // Increase the time we take to search if the value decreases across iterations
         if (lastValue > value + 10) info->idealTime *= 1.025;
@@ -89,9 +89,9 @@ bool is_time_exceeded(const SearchInfo* info) {
 // Check if we should stop the search and return the best move or continue with another iteration
 bool should_stop(const SearchInfo& info) {
 
-    const long long elapsed = get_time_elapsed(info.start);
+    const Duration elapsed = get_time_elapsed(info.start);
     // If the pv is unstable accross iterations, increase the time for searching
-    const long long ideal = info.idealTime * (1 + info.pvStability * 0.05);
+    const Duration ideal = info.idealTime * (1 + info.pvStability * 0.05);
     return elapsed >= std::min(ideal, info.maxTime);
 
 }

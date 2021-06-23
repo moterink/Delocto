@@ -1,1 +1,16 @@
 .DS_Store
+
+# visual studio code
+.vscode
+
+# build files
+src/delocto
+src/delocto.dSYM
+tests/tests
+tests/tests.dSYM
+
+# debug
+src/suppressions.txt
+
+# unit tests
+tests/catch.hpp

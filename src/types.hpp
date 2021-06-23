@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -93,6 +93,8 @@ static const uint64_t SQUARES[65] = {
 };
 
 // Indices for each square, SQUARE_NONE = 64
+constexpr unsigned SQUARE_COUNT = 64;
+
 enum Square : unsigned {
 
     SQUARE_H1, SQUARE_G1, SQUARE_F1, SQUARE_E1, SQUARE_D1, SQUARE_C1, SQUARE_B1, SQUARE_A1,
@@ -140,31 +142,35 @@ enum MoveGenType : unsigned {
 class Board;
 class MoveList;
 
-// Maximum Depth and Moves for search
-#define MAX_DEPTH 100
-#define MAX_MOVES 256
-
-// Values for mate, draw, infinte, unknown
-#define VALUE_MATE      50000
-#define VALUE_MATE_MAX  (VALUE_MATE - MAX_DEPTH)
-#define VALUE_MATED_MAX (MAX_DEPTH - VALUE_MATE)
-#define VALUE_INFINITE  100000
-#define VALUE_NONE      100001
-#define VALUE_DRAW      0
-
-#define DEPTH_NONE -36
-
+typedef int Value;
+typedef int Depth;
 typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::high_resolution_clock::time_point TimePoint;
+typedef long long Duration;
 
-// Value structure
+// Maximum Depth and Moves for search
+constexpr Depth DEPTH_MAX    = 100;
+constexpr Depth DEPTH_NONE   = -36;
+constexpr unsigned MAX_MOVES = 256;
+
+// Values for mate, draw, infinte, unknown
+// They need to be equal or below the numeric limit of int16_t,
+// because mate values need to fit into a transposition table entry
+constexpr Value VALUE_NONE      = 0x7FFF;
+constexpr Value VALUE_INFINITE  = VALUE_NONE - 1;
+constexpr Value VALUE_MATE      = VALUE_INFINITE - 1;
+constexpr Value VALUE_MATE_MAX  =  VALUE_MATE - DEPTH_MAX;
+constexpr Value VALUE_MATED_MAX = -VALUE_MATE + DEPTH_MAX;
+constexpr Value VALUE_DRAW      = 0;
+
+// EvalTerm structure
 // Consists of a value for the midgame and one for the endgame
 typedef struct {
 
     int mg = 0;
     int eg = 0;
 
-} Value;
+} EvalTerm;
 
 // Directions
 enum {
@@ -179,11 +185,15 @@ static const int DIRECTIONS[2][8] = {
 };
 
 // Colors
-enum Color : unsigned{
+constexpr unsigned COLOR_COUNT = 2;
+
+enum Color : unsigned {
     WHITE, BLACK, BOTH
 };
 
 // Piecetypes
+constexpr unsigned PIECETYPE_COUNT = 6;
+
 enum Piecetype : unsigned {
     PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, PIECE_NONE
 };
@@ -362,7 +372,7 @@ inline uint64_t most_forward(const Color color, const uint64_t bitboard) {
 
 }
 
-// Get most backward piece on file for the given color
+// Get most backward piece on bitboard for the given color
 inline uint64_t most_backward(const Color color, const uint64_t bitboard) {
 
     return (color == WHITE) ? lsb(bitboard) : msb(bitboard);
@@ -393,9 +403,9 @@ inline uint64_t shift_right(const uint64_t b, const Color color) {
 
 }
 
-inline Value V(const int mg, const int eg) {
+inline EvalTerm V(const Value mg, const Value eg) {
 
-    Value value;
+    EvalTerm value;
 
     value.mg = mg;
     value.eg = eg;
@@ -404,7 +414,11 @@ inline Value V(const int mg, const int eg) {
 
 }
 
-inline Value operator+=(Value& value, const Value value2) {
+inline bool operator==(const EvalTerm& value1, const EvalTerm& value2) {
+    return value1.mg == value2.mg && value1.eg == value2.eg;
+}
+
+inline EvalTerm operator+=(EvalTerm& value, const EvalTerm value2) {
 
     value.mg += value2.mg;
     value.eg += value2.eg;
@@ -412,7 +426,7 @@ inline Value operator+=(Value& value, const Value value2) {
 
 }
 
-inline Value operator-=(Value& value, const Value value2) {
+inline EvalTerm operator-=(EvalTerm& value, const EvalTerm value2) {
 
     value.mg -= value2.mg;
     value.eg -= value2.eg;
@@ -420,34 +434,34 @@ inline Value operator-=(Value& value, const Value value2) {
 
 }
 
-inline Value operator+(const Value value1, const Value value2) {
+inline EvalTerm operator+(const EvalTerm value1, const EvalTerm value2) {
 
-    Value value;
+    EvalTerm value;
     value.mg = value1.mg + value2.mg;
     value.eg = value1.eg + value2.eg;
     return value;
 
 }
 
-inline Value operator-(const Value value1, const Value value2) {
+inline EvalTerm operator-(const EvalTerm value1, const EvalTerm value2) {
 
-    Value value;
+    EvalTerm value;
     value.mg = value1.mg - value2.mg;
     value.eg = value1.eg - value2.eg;
     return value;
 
 }
 
-inline Value operator*(const Value value1, const int multiply) {
+inline EvalTerm operator*(const EvalTerm value1, const int multiply) {
 
-    Value value;
+    EvalTerm value;
     value.mg = value1.mg * multiply;
     value.eg = value1.eg * multiply;
     return value;
 
 }
 
-inline Value operator*=(Value& value, const int multiply) {
+inline EvalTerm operator*=(EvalTerm& value, const int multiply) {
 
     value.mg *= multiply;
     value.eg *= multiply;
@@ -455,9 +469,9 @@ inline Value operator*=(Value& value, const int multiply) {
 
 }
 
-inline Value operator/(const Value value1, const int divisor) {
+inline EvalTerm operator/(const EvalTerm value1, const int divisor) {
 
-    Value value;
+    EvalTerm value;
     value.mg = value1.mg / divisor;
     value.eg = value1.eg / divisor;
     return value;
@@ -483,7 +497,7 @@ inline Piecetype& operator++(Piecetype& pt, int) {
 }
 
 // Print a value to the console, showing the midgame and endgame terms
-inline std::ostream& operator<<(std::ostream& os, const Value& value) {
+inline std::ostream& operator<<(std::ostream& os, const EvalTerm& value) {
 
     return os << "MG: " << value.mg << " | EG: " << value.eg;
 

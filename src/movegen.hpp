@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,9 @@
 #include "move.hpp"
 #include "bitboards.hpp"
 
+// Maximum number of possible moves ever in a chess position
+constexpr unsigned MAX_MOVES_COUNT = 218;
+
 class MoveList {
 
     public:
@@ -35,8 +38,8 @@ class MoveList {
         unsigned size = 0;
         unsigned index = 0;
 
-        Move moves[250];
-        int values[250];
+        std::array<Move, MAX_MOVES_COUNT> moves;
+        std::array<int, MAX_MOVES_COUNT> scores;
 
         inline void append(Move move) {
             moves[size++] = move;
@@ -44,7 +47,7 @@ class MoveList {
 
         void merge(MoveList list);
         unsigned find(const Move move);
-        void swap(const unsigned int index1, const unsigned int index2);
+        void swap(const unsigned index1, const unsigned index2);
         Move pick();
         void print();
 
@@ -124,7 +127,7 @@ inline uint64_t get_queen_moves(const unsigned int sq, const uint64_t both, cons
 
 extern MoveList gen_quiets(const Board& board, const Color color);
 extern MoveList gen_caps(const Board& board, const Color color);
-extern void gen_evasions(const Board&board, const MoveGenType mtype, MoveList& moveList, const Color color);
+extern MoveList gen_evasions(const Board&board, const MoveGenType mtype);
 extern MoveList gen_all(const Board& board, const Color color);
 extern MoveList gen_legals(const Board& board, const MoveList& moves);
 

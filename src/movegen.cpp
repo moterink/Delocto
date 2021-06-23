@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -48,51 +48,32 @@ void MoveList::merge(MoveList list) {
 
 }
 
-// Returns the index of a given move; returns the list size if it was not found
-unsigned MoveList::find(const Move move) {
-
-    for (unsigned int mcount = 0; mcount < size; mcount++) {
-        if (moves[mcount] == move) {
-            return mcount;
-        }
-    }
-    return size;
-
-}
-
 // Swaps the position of two moves given their indices
-void MoveList::swap(const unsigned int index1, const unsigned int index2) {
+void MoveList::swap(const unsigned index1, const unsigned index2) {
 
-    Move move1 = moves[index1];
-    Move move2 = moves[index2];
-
-    int value1 = values[index1];
-    int value2 = values[index2];
-
-    moves[index1] = move2;
-    moves[index2] = move1;
-
-    values[index1] = value2;
-    values[index2] = value1;
+    std::iter_swap(moves.begin() + index1, moves.begin() + index2);
+    std::iter_swap(scores.begin() + index1, scores.begin() + index2);
 
 }
 
 // Picks the move in the list with the highest score and returns its index
 Move MoveList::pick() {
 
-    if (size == 0) return MOVE_NONE;
+    if (size == 0) {
+        return MOVE_NONE;
+    }
 
-    int bestvalue = values[index];
-    unsigned bestindex = index;
+    int bestScore = scores[index];
+    unsigned bestIndex = index;
 
-    for (unsigned mcount = index; mcount < size; mcount++) {
-        if (values[mcount] > bestvalue) {
-            bestvalue = values[mcount];
-            bestindex = mcount;
+    for (unsigned mIndex = index; mIndex < size; mIndex++) {
+        if (scores[mIndex] > bestScore) {
+            bestScore = scores[mIndex];
+            bestIndex = mIndex;
         }
     }
 
-    swap(index, bestindex);
+    swap(index, bestIndex);
     return moves[index];
 
 }
@@ -100,8 +81,8 @@ Move MoveList::pick() {
 // Prints all moves in the list
 void MoveList::print() {
 
-    for (unsigned mcount = 0; mcount < size; mcount++) {
-        print_move(moves[mcount]);
+    for (unsigned mIndex = 0; mIndex < size; mIndex++) {
+        print_move(moves[mIndex]);
     }
 
 }
@@ -156,7 +137,7 @@ static void gen_capproms(const Board& board, MoveList& moveList, const Color col
 // Generates the pseudo-legal en-passant captures (if possible) for a given position and adds them to the given move list
 static void gen_ep(const Board& board, MoveList& moveList, const Color color, const uint64_t targets) {
 
-    const unsigned epSq = board.enPassant();
+    const unsigned epSq = board.enpassant_square();
 
     if (epSq != SQUARE_NONE && (SQUARES[epSq] & targets)) {
 
@@ -422,8 +403,13 @@ static void gen_castlings(const Board& board, MoveList& moveList, const Color co
 }
 
 // Generates all possible moves evading a check for the given color in the given position and adds all evasions to the move list
-void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& moveList, const Color color) {
+MoveList gen_evasions(const Board& board, const MoveGenType mtype) {
 
+    assert(board.checkers());
+
+    MoveList moveList;
+
+    const Color color       = board.turn();
     const unsigned ksq      = lsb_index(board.pieces(color, KING));
     const uint64_t checkers = board.checkers();
     const uint64_t sliders  = checkers & ~(board.pieces(color, KNIGHT) | board.pieces(color, PAWN));
@@ -434,7 +420,7 @@ void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& moveLis
         while (kingMoves) {
             moveList.append(make_move(ksq, pop_lsb(kingMoves), NORMAL));
         }
-        return;
+        return moveList;
 
     }
 
@@ -452,7 +438,7 @@ void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& moveLis
             gen_capproms(board, moveList, color, checkers);
             gen_piece_caps(board, moveList, color, checkers);
             if (checkers & board.pieces(!color, PAWN)) {
-                gen_ep(board, moveList, color, SQUARES[board.enPassant()]);
+                gen_ep(board, moveList, color, SQUARES[board.enpassant_square()]);
             }
             break;
         }
@@ -464,7 +450,7 @@ void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& moveLis
             gen_capproms(board, moveList, color, checkers);
             gen_piece_caps(board, moveList, color, checkers);
             if (checkers & board.pieces(!color, PAWN)) {
-                gen_ep(board, moveList, color, SQUARES[board.enPassant()]);
+                gen_ep(board, moveList, color, SQUARES[board.enpassant_square()]);
             }
             break;
         }
@@ -472,6 +458,8 @@ void gen_evasions(const Board& board, const MoveGenType mtype, MoveList& moveLis
             assert(false);
 
     }
+
+    return moveList;
 
 }
 
@@ -501,7 +489,7 @@ MoveList gen_quiets(const Board& board, const Color color) {
     MoveList moveList;
 
     if (board.checkers()) {
-        gen_evasions(board, MOVES_QUIETS, moveList, color);
+        return gen_evasions(board, MOVES_QUIETS);
     } else {
         const uint64_t targets = ~board.pieces(BOTH);
         gen_quietproms(board, moveList, color, targets);
@@ -519,12 +507,12 @@ MoveList gen_caps(const Board& board, const Color color) {
     MoveList moveList;
 
     if (board.checkers()) {
-        gen_evasions(board, MOVES_CAPTURES, moveList, color);
+        return gen_evasions(board, MOVES_CAPTURES);
     } else {
         const uint64_t targets = board.pieces(!color);
         gen_capproms(board, moveList, color, targets);
         gen_piece_caps(board, moveList, color, targets);
-        gen_ep(board, moveList, color, SQUARES[board.enPassant()]);
+        gen_ep(board, moveList, color, SQUARES[board.enpassant_square()]);
     }
 
     return moveList;

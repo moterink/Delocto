@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,7 @@
 #include "types.hpp"
 #include "move.hpp"
 #include "search.hpp"
+#include "thread.hpp"
 
 // Maximum value of a move in the history table
 constexpr int HISTORY_VALUE_MAX = 0x4000;
@@ -39,36 +40,42 @@ class MovePicker {
 
     public:
 
+        const Thread *thread;
         const Board& board;
-        const SearchInfo * info;
+        const SearchInfo *info;
         unsigned phase = TTMove;
 
         Move counterMove = MOVE_NONE;
 
         // Constructor for normal search
-        MovePicker(const Board& b, SearchInfo * i, int plies, Move t) : board(b), info(i) {
+        MovePicker(const Thread *th, const Board& b, SearchInfo *i, Depth plies, Move t) : thread(th), board(b), info(i) {
 
             // Set the killer moves
-            killers[0] = info->killers[plies][0];
-            killers[1] = info->killers[plies][1];
+            killers[0] = thread->killers[plies][0];
+            killers[1] = thread->killers[plies][1];
 
             // If we do not have a move from the transposition table, skip to generating the captures
             if (t != MOVE_NONE) {
                 ttMove = t;
             } else {
                 phase = GenCaps;
+                /*TODO: if (board.checkers()) {
+                    phase = GenEvasions;
+                } else {
+                    phase = GenCaps;
+                }*/
             }
 
             // Get the counter move if available
             if (plies > 0 && info->currentMove[plies-1] != MOVE_NONE) {
                 unsigned prevSq = to_sq(info->currentMove[plies-1]);
-                counterMove = info->counterMove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq];
+                counterMove = thread->counterMove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq];
             }
 
         }
 
         // Constructor for quiescence search
-        MovePicker(const Board& b, SearchInfo * i, int plies, Move lastMove, Move t) : board(b), info(i) {
+        MovePicker(const Thread *th, const Board& b, SearchInfo * i, int plies, Move lastMove, Move t) : thread(th), board(b), info(i) {
 
             // Check if there is a hash move available and if it is a capture to the square of the last move
             if (plies > 0 && lastMove != MOVE_NONE) {
@@ -87,7 +94,7 @@ class MovePicker {
 
         }
 
-        void score_captures(MoveList& captures);
+        void score_captures();
         void score_quiets();
         void score_evasions();
 
@@ -97,12 +104,7 @@ class MovePicker {
 
         Move killers[2];
         Move ttMove = MOVE_NONE;
-        MoveList caps;
-        MoveList gcaps;
-        MoveList quiets;
-        MoveList lcaps;
         MoveList moves;
-        MoveList evasions;
-        MoveList qscaps;
+        MoveList badCaptures;
 
 };

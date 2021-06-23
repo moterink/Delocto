@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -24,16 +24,21 @@
 #ifndef SEARCH_H
 #define SEARCH_H
 
+#include <atomic>
 #include <chrono>
+
 #include "types.hpp"
 #include "board.hpp"
 #include "move.hpp"
 #include "movegen.hpp"
 
 // Margins for delta/futility pruning and razoring
-static const int DeltaMargin       = 100;
-static const int RazorMargin       = 300;
-static const int FutilityMargin[6] = { 0, 100, 200, 320, 450, 590 };
+static const Value DeltaMargin       = 100;
+static const Value RazorMargin       = 300;
+static const Value FutilityMargin[6] = { 0, 100, 200, 320, 450, 590 };
+
+// Piece Values for Static Exchange Evaluation
+static const Value SeeMaterial[7] = { 100, 320, 330, 500, 950, 999999, 0 };
 
 // Types of nodes visited in search
 enum NodeType {
@@ -48,7 +53,7 @@ class PvLine {
     public:
 
         unsigned size = 0;
-        Move line[MAX_DEPTH];
+        Move line[DEPTH_MAX];
 
         void merge(PvLine pv);
         void append(const Move move);
@@ -61,72 +66,49 @@ class PvLine {
 // specified by the user
 typedef struct {
 
-    long long moveTime = -1;
-    long long time = -1;
-    long long increment = 0;
+    Duration moveTime = -1;
+    Duration time = -1;
+    Duration increment = 0;
 
     bool infinite = false;
-    unsigned int depth = MAX_DEPTH;
+    Depth depth = DEPTH_MAX;
 
 } SearchLimits;
 
-typedef struct {
-
-    uint64_t totalNodes;
-
-} SearchStats;
-
 // Various search information variables; shows status of current search, current iteration,
 // killer moves, history, bestmove and currentMove at given depth, evaluations, time management and more
-typedef struct {
+class SearchInfo {
 
-    bool stopped = false;
-    uint64_t nodes = 0;
+    public:
+        
+        unsigned threadIndex;
+        bool isMainThread;
 
-    Move killers[MAX_DEPTH + 1][2];
-    int history[2][7][64];
-    Move counterMove[2][7][64];
+        std::array<Move, DEPTH_MAX> bestMove = { MOVE_NONE };
+        std::array<Move, DEPTH_MAX> currentMove = { MOVE_NONE };
+        std::array<Value, DEPTH_MAX> eval = { 0 };
+        std::array<Value, DEPTH_MAX> value = { 0 };
 
-    Move bestMove[MAX_DEPTH] = { MOVE_NONE };
-    Move currentMove[MAX_DEPTH] = { MOVE_NONE };
-    int eval[MAX_DEPTH];
-    int value[MAX_DEPTH];
+        TimePoint start;
 
-    TimePoint start;
+        bool limitTime = true;
 
-    bool limitTime = true;
+        Duration idealTime = 0;
+        Duration maxTime = 0;
 
-    long long idealTime = 0;
-    long long maxTime = 0;
+        unsigned hashTableHits = 0;
+        Depth depth = 0; // Absolute depth
+        Depth selectiveDepth = 0; // Selective depth; so quiecent search depth is included
+        std::atomic<uint64_t> nodes{0};
 
-    int hashTableHits = 0;
-    int depth = 0; // Absolute depth
-    int selectiveDepth = 0; // Selective depth; so quiecent search depth is included
+        int pvStability = 0;
 
-    int pvStability = 0;
+        void reset();
+        void clear_history();
+        void clear_killers();
 
-} SearchInfo;
-
-// Piece Values for Static Exchange Evaluation
-static const int SeeMaterial[7] = { 100, 320, 330, 500, 950, 999999, 0 };
-
-// Convert a value for the transposition table, since if the value is a mate value,
-// the plies until mate have to be consistent
-inline int value_to_tt(int value, int plies) {
-
-    return value >= VALUE_MATE_MAX ? value + plies : value <= VALUE_MATED_MAX ? value - plies : value;
-
-}
-
-// Adjust a potential mate value from the transposition table for the current number
-// of plies
-inline int value_from_tt(int value, int plies) {
-
-    return value == VALUE_NONE ? VALUE_NONE : value >= VALUE_MATE_MAX ? value - plies : value <= VALUE_MATED_MAX ? value + plies : value;
-
-}
+};
 
 extern void init_search();
-extern const SearchStats go(Board& board, const SearchLimits& limits);
 
 #endif

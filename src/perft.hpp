@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -29,15 +29,15 @@
 
 typedef struct {
 
-    unsigned depth = 0;
-    unsigned long divide[250] = { 0 };
-    unsigned long caps = 0;
-    unsigned long enpas = 0;
-    unsigned long castles = 0;
-    unsigned long proms = 0;
+    Depth depth = 0;
+    uint64_t divide[250] = { 0 };
+    uint64_t capturesCount = 0;
+    uint64_t enPassantCount = 0;
+    uint64_t castlesCount = 0;
+    uint64_t promotionsCount = 0;
 
 } PerftInfo;
 
-extern void perftTest(const unsigned depth, Board& board);
+extern uint64_t runPerft(const std::string fen, const unsigned depth);
 
 #endif

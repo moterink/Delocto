@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -51,8 +51,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Delocto " << VERSION << " by Moritz Terink" << std::endl << std::endl;
 
     // Start Universal Chess Interface (UCI) input loop
-    get_uci_input(argc, argv);
+    uci_loop(argc, argv);
 
-    return 0;
+    return EXIT_SUCCESS;
 
 }

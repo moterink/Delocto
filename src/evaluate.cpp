@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -25,11 +25,11 @@
 #include "movegen.hpp"
 #include "uci.hpp"
 
-Value PieceSquareTable[2][6][64];
+EvalTerm PieceSquareTable[2][6][64];
 
 // Piece Square Table Values
 // The values are mirrored for each color at execution time
-static const Value PstValues[6][32] = {
+static const EvalTerm PstValues[6][32] = {
 
     // Pawns
     {
@@ -136,12 +136,12 @@ static const int Imbalance[2][6][6] = {
 
 // Bitboards for outposts and boni for having minors on those squares or attacking them
 static const uint64_t OutpostSquares[2]     = { BB_RANK_3 | BB_RANK_4 | BB_RANK_5, BB_RANK_6 | BB_RANK_5 | BB_RANK_4 };
-static const Value OutpostBonus[2]          = { V(34, 11), V(17, 6) };
-static const Value OutpostReachableBonus[2] = { V(17,  6), V( 8, 3) };
+static const EvalTerm OutpostBonus[2]          = { V(34, 11), V(17, 6) };
+static const EvalTerm OutpostReachableBonus[2] = { V(17,  6), V( 8, 3) };
 
 // Mobilty Values
 // The more squares available to the piece, the higher the value
-static const Value Mobility[4][28] = {
+static const EvalTerm Mobility[4][28] = {
 
     // Knights
     { V(-29, -35), V(-22, -25), V(-5, -12), V(-2, -6), V(2, 4), V(6, 8), V(9, 11), V(12, 14), V(14, 15) },
@@ -155,47 +155,47 @@ static const Value Mobility[4][28] = {
 };
 
 // Pawns
-static const Value pawnDoubledPenalty           = V(8, 14);
-static const Value pawnIsolatedPenalty[2]       = { V(11, 12), V(5, 7) };
-static const Value pawnBackwardPenalty[2]       = { V(17, 11), V(10, 5) };
-static const Value pawnLeverBonus[8]            = { V(0, 0), V(0, 0), V(0, 0), V(0, 0), V(7, 6), V(13, 13), V(0, 0), V(0, 0) };
+static const EvalTerm pawnDoubledPenalty           = V(8, 14);
+static const EvalTerm pawnIsolatedPenalty[2]       = { V(11, 12), V(5, 7) };
+static const EvalTerm pawnBackwardPenalty[2]       = { V(17, 11), V(10, 5) };
+static const EvalTerm pawnLeverBonus[8]            = { V(0, 0), V(0, 0), V(0, 0), V(0, 0), V(7, 6), V(13, 13), V(0, 0), V(0, 0) };
 static const int pawnConnectedBonus[8] = {
 
     0, 3, 4, 6, 14, 23, 40, 0
 
 };
-static const Value pawnPhalanxBonus[2][8] = {
+static const EvalTerm pawnPhalanxBonus[2][8] = {
 
     { V(0, 0), V(8, 0), V(9, 0), V(16, 2), V(37, 18), V(57, 43), V(105, 105), V(0, 0) },
     { V(0, 0), V(4, 0), V(4, 0), V( 9, 1), V(18,  9), V(29, 21), V( 52,  52), V(0, 0) }
 
 };
-static const Value pawnSupportBonus             = V(6, 2);
-static const Value pawnPassedRankBonus[8]       = { V(0, 0), V(4, 13), V(8, 15), V(7, 19), V(29, 34), V(79, 83), V(130, 122), V(0, 0) };
-static const Value pawnPassedFilePenalty[8]     = { V(0, 0), V(5, 4), V(10, 8), V(15, 12), V(15, 12), V(10, 8), V(5, 4), V(0, 0) };
-static const Value pawnCandidateBonus[8]        = { V(0, 0), V(0, 0), V(5, 15),  V(10, 30), V(20, 45), V(30, 50),   V(40, 60),   V(0, 0) };
+static const EvalTerm pawnSupportBonus             = V(6, 2);
+static const EvalTerm pawnPassedRankBonus[8]       = { V(0, 0), V(4, 13), V(8, 15), V(7, 19), V(29, 34), V(79, 83), V(130, 122), V(0, 0) };
+static const EvalTerm pawnPassedFilePenalty[8]     = { V(0, 0), V(5, 4), V(10, 8), V(15, 12), V(15, 12), V(10, 8), V(5, 4), V(0, 0) };
+static const EvalTerm pawnCandidateBonus[8]        = { V(0, 0), V(0, 0), V(5, 15),  V(10, 30), V(20, 45), V(30, 50),   V(40, 60),   V(0, 0) };
 
-static const Value passedPawnNoAttacks          = V(16, 18);
-static const Value passedPawnSafePath           = V( 9, 11);
-static const Value passedPawnSafePush           = V( 4,  6);
-static const Value passedPawnBlockSqDefended    = V( 2,  3);
+static const EvalTerm passedPawnNoAttacks          = V(16, 18);
+static const EvalTerm passedPawnSafePath           = V( 9, 11);
+static const EvalTerm passedPawnSafePush           = V( 4,  6);
+static const EvalTerm passedPawnBlockSqDefended    = V( 2,  3);
 
 // Bishops
-static const Value bishopPawnsSameColorPenalty  = V( 1,  3);
-static const Value bishopCenterAlignBonus       = V(21,  0);
+static const EvalTerm bishopPawnsSameColorPenalty  = V( 1,  3);
+static const EvalTerm bishopCenterAlignBonus       = V(21,  0);
 
 // Minors
-static const Value OutpostReachable[2]          = { V(8, 0), V(4, 0) };
-static const Value minorPawnShield              = V(8, 1);
+static const EvalTerm OutpostReachable[2]          = { V(8, 0), V(4, 0) };
+static const EvalTerm minorPawnShield              = V(8, 1);
 
 // Rooks
-static const Value rookOpenFileBonus      = V(19,  9);
-static const Value rookSemiOpenFileBonus  = V( 6,  4);
-static const Value rookPawnAlignBonus     = V( 3, 12);
-static const Value rookTrappedPenalty     = V(22,  2);
+static const EvalTerm rookOpenFileBonus      = V(19,  9);
+static const EvalTerm rookSemiOpenFileBonus  = V( 6,  4);
+static const EvalTerm rookPawnAlignBonus     = V( 3, 12);
+static const EvalTerm rookTrappedPenalty     = V(22,  2);
 
 // Queens
-static const Value UnsafeQueen = V(23, 7);
+static const EvalTerm UnsafeQueen = V(23, 7);
 
 // King
 static const unsigned queenSafeCheckWeight       = 365;
@@ -210,9 +210,9 @@ static const unsigned kingKnightDefender         =  47;
 static const unsigned kingBishopDefender         =  18;
 static const unsigned kingNoQueenAttacker        = 410;
 static const unsigned attackerWeight[5]          = { 0, 36, 26, 21, 5 };
-static const Value kingPawnlessFlank             = V(8, 45);
-static const Value kingFlankAttack               = V(4,  0);
-static const Value kingProtectorDistancePenalty  = V(3,  4);
+static const EvalTerm kingPawnlessFlank             = V(8, 45);
+static const EvalTerm kingFlankAttack               = V(4,  0);
+static const EvalTerm kingProtectorDistancePenalty  = V(3,  4);
 
 static const int kingPawnShelterValues[4][8] = {
 
@@ -233,21 +233,21 @@ static const int kingPawnStormValues[4][8] = {
 };
 
 // Threats
-static const Value safePawnAttack          = V(85, 46);
-static const Value loosePawnWeight         = V(16, 28);
-static const Value HangingPiece            = V(32, 17);
-static const Value pawnPushThreat          = V(20, 12);
-static const Value pieceVulnerable         = V( 6,  0);
-static const Value mobilityRestriction     = V( 3,  3);
-static const Value KnightQueenAttackThreat = V( 8,  6);
-static const Value BishopQueenAttackThreat = V(28,  8);
-static const Value RookQueenAttackThreat   = V(28,  8);
-static const Value KingAttackThreat        = V(11, 42);
-static const Value minorAttackWeight[5] = {
-    V(0, 15), V(19, 20), V(28, 22), V(34, 55), V(30, 59)
+static const EvalTerm safePawnAttack          = V(85, 46);
+static const EvalTerm loosePawnWeight         = V(16, 28);
+static const EvalTerm HangingPiece            = V(32, 17);
+static const EvalTerm pawnPushThreat          = V(20, 12);
+static const EvalTerm pieceVulnerable         = V( 6,  0);
+static const EvalTerm mobilityRestriction     = V( 3,  3);
+static const EvalTerm KnightQueenAttackThreat = V( 8,  6);
+static const EvalTerm BishopQueenAttackThreat = V(28,  8);
+static const EvalTerm RookQueenAttackThreat   = V(28,  8);
+static const EvalTerm KingAttackThreat        = V(11, 42);
+static const EvalTerm minorAttackWeight[PIECETYPE_COUNT] = {
+    V(0, 15), V(19, 20), V(28, 22), V(34, 55), V(30, 59), V(0, 0)
 };
-static const Value rookAttackWeight[5] = {
-    V(0, 11), V(18, 34), V(16, 32), V(0, 17), V(25, 19)
+static const EvalTerm rookAttackWeight[PIECETYPE_COUNT] = {
+    V(0, 11), V(18, 34), V(16, 32), V( 0, 17), V(25, 19), V(0, 0)
 };
 
 // Tempo Bonus
@@ -277,7 +277,7 @@ void init_psqt() {
         for (unsigned sq = 0; sq < 32; sq++) {
             const unsigned r = sq / 4;
             const unsigned f = sq & 0x3;
-            Value value = PstValues[pt][sq];
+            EvalTerm value = PstValues[pt][sq];
 
             PieceSquareTable[WHITE][pt][8 * r + f]             = value;
             PieceSquareTable[WHITE][pt][8 * r + (7 - f)]       = value;
@@ -344,9 +344,9 @@ static void update_attack_info(Color color, Piecetype pt, uint64_t moves, EvalIn
 }
 
 // Evaluate all knights on the board for a given color
-static const Value evaluate_knights(const Board& board, const Color color, EvalInfo& info) {
+static const EvalTerm evaluate_knights(const Board& board, const Color color, EvalInfo& info) {
 
-    Value value;
+    EvalTerm value;
     uint64_t knights = board.pieces(color, KNIGHT);
     while (knights) {
 
@@ -382,9 +382,9 @@ static const Value evaluate_knights(const Board& board, const Color color, EvalI
 }
 
 // Evaluate all bishops on the board for a given color
-static const Value evaluate_bishops(const Board& board, const Color color, EvalInfo& info) {
+static const EvalTerm evaluate_bishops(const Board& board, const Color color, EvalInfo& info) {
 
-    Value value;
+    EvalTerm value;
 
     uint64_t bishops = board.pieces(color, BISHOP);
 
@@ -434,9 +434,9 @@ static const Value evaluate_bishops(const Board& board, const Color color, EvalI
 }
 
 // Evaluate all rooks on the board for a given color
-static const Value evaluate_rooks(const Board& board, const Color color, EvalInfo& info) {
+static const EvalTerm evaluate_rooks(const Board& board, const Color color, EvalInfo& info) {
 
-    Value value;
+    EvalTerm value;
 
     uint64_t rooks = board.pieces(color, ROOK);
     while (rooks) {
@@ -482,9 +482,9 @@ static const Value evaluate_rooks(const Board& board, const Color color, EvalInf
 }
 
 // Evaluate all queens on the board for a given color
-static const Value evaluate_queens(const Board& board, const Color color, EvalInfo& info) {
+static const EvalTerm evaluate_queens(const Board& board, const Color color, EvalInfo& info) {
 
-    Value value;
+    EvalTerm value;
 
     uint64_t queens = board.pieces(color, QUEEN);
     while (queens) {
@@ -510,9 +510,9 @@ static const Value evaluate_queens(const Board& board, const Color color, EvalIn
 }
 
 // Evaluate all pawns on the board for a given color
-static const Value evaluate_pawns(const Board& board, const Color color, EvalInfo& info) {
+static const EvalTerm evaluate_pawns(const Board& board, const Color color, EvalInfo& info) {
 
-    Value value;
+    EvalTerm value;
 
     const uint64_t ownPawns = board.pieces(color, PAWN);
     const uint64_t oppPawns = board.pieces(!color, PAWN);
@@ -623,9 +623,9 @@ static int evaluate_shelter_storm(const Board& board, const Color color, const u
 }
 
 // King Safety Evaluation
-static const Value evaluate_king_safety(const Board& board, const Color color, const EvalInfo& info) {
+static const EvalTerm evaluate_king_safety(const Board& board, const Color color, const EvalInfo& info) {
 
-    Value value = V(0, 0);
+    EvalTerm value = V(0, 0);
     // Evaluate pawn shelter and pawn storms
     int pawnValue = evaluate_shelter_storm(board, color, info.kingSq[color], -VALUE_INFINITE);
 
@@ -728,7 +728,7 @@ static const Value evaluate_king_safety(const Board& board, const Color color, c
     std::cout << "Mobility: " << (info.mobility[!color].mg - info.mobility[color].mg) << std::endl;
     std::cout << "Knight Defender: " << (kingKnightDefender * popcount(ring & info.attackedSquares[Knight(color)])) << std::endl;
     std::cout << "Bishop Defender: " << (kingBishopDefender * popcount(ring & info.attackedSquares[Bishop(color)])) << std::endl;
-    std::cout << "Pawn Value: " << pawnValue << ":" << (6 * pawnValue / 9) << std::endl;
+    std::cout << "Pawn EvalTerm: " << pawnValue << ":" << (6 * pawnValue / 9) << std::endl;
     std::cout << "Final: " << danger << ":" << std::max(0, (danger * danger / 2048)) << std::endl << std::endl;*/
 
     // We transform the king danger into a value which is subtracted from the king safety
@@ -750,9 +750,9 @@ static const Value evaluate_king_safety(const Board& board, const Color color, c
 }
 
 // Evaluate Passed Pawns on the board by a given color
-static const Value evaluate_passers(const Board& board, const Color color, const EvalInfo& info) {
+static const EvalTerm evaluate_passers(const Board& board, const Color color, const EvalInfo& info) {
 
-    Value value;
+    EvalTerm value;
 
     uint64_t passers = info.passedPawns & board.pieces(color);
 
@@ -765,12 +765,12 @@ static const Value evaluate_passers(const Board& board, const Color color, const
         const File f           = file(sq);
         const unsigned rfactor = (r - 2) * (r - 1) / 2;
 
-        // Add a bonus based on both king's distancte to the pawn
+        // Add a bonus based on both king's distance to the pawn
         value += V(0, ((5 * KingDistance[info.kingSq[!color]][blocksq]) - (2 * KingDistance[info.kingSq[color]][blocksq])) * rfactor);
 
         if (r > 2 && !(SQUARES[blocksq] & board.pieces(BOTH))) {
 
-            Value bonus = V(0, 0);
+            EvalTerm bonus = V(0, 0);
 
             uint64_t path     = FrontFileMask[color][sq];
             uint64_t behind   = FrontFileMask[!color][sq];
@@ -815,9 +815,9 @@ static const Value evaluate_passers(const Board& board, const Color color, const
 }
 
 // Evaluate all material imbalances on the board for the given color
-static const Value evaluate_imbalances(const Board& board, const Color color) {
+static const EvalTerm evaluate_imbalances(const Board& board, const Color color) {
 
-    Value value;
+    EvalTerm value;
 
     const unsigned pieceCounts[2][6] = {
         { board.piececount(WHITE, BISHOP) > 1, board.piececount(WHITE, PAWN), board.piececount(WHITE, KNIGHT), board.piececount(WHITE, BISHOP), board.piececount(WHITE, ROOK), board.piececount(WHITE, QUEEN) },
@@ -849,14 +849,14 @@ static const Value evaluate_imbalances(const Board& board, const Color color) {
 }
 
 // Evaluate all threats on the board for the given color
-static const Value evaluate_threats(const Board& board, const Color color, const EvalInfo& info) {
+static const EvalTerm evaluate_threats(const Board& board, const Color color, const EvalInfo& info) {
 
-    Value value;
+    EvalTerm value;
 
-    const uint64_t minorsAndMajors = board.pieces(!color) ^ board.pieces(!color, PAWN);
-    const uint64_t strongSquares   = info.pieceAttacks[!color][PAWN] | (info.multiAttacks[!color] & ~info.multiAttacks[color]);
-    const uint64_t defendedPieces  = minorsAndMajors & strongSquares;
-    const uint64_t weakPieces      = board.pieces(!color) & ~strongSquares & info.colorAttacks[color];
+    const uint64_t nonPawnPieces  = board.pieces(!color) ^ board.pieces(!color, PAWN); //board.minors_and_majors(!color);
+    const uint64_t strongSquares  = info.pieceAttacks[!color][PAWN] | (info.multiAttacks[!color] & ~info.multiAttacks[color]);
+    const uint64_t defendedPieces = nonPawnPieces & strongSquares;
+    const uint64_t weakPieces     = board.pieces(!color) & ~strongSquares & info.colorAttacks[color];
 
     // Evaluate minors and rooks attacking weak and defended pieces
     // Add a bigger bonus for pieces which are are close to our base
@@ -893,7 +893,7 @@ static const Value evaluate_threats(const Board& board, const Color color, const
         value += KingAttackThreat * popcount(weakPieces & info.pieceAttacks[color][KING]);
 
         // Bonus for unprotected weak pieces and weak pieces which are attacked multiple times by us
-        value += HangingPiece * popcount(weakPieces & (~info.colorAttacks[!color] | (minorsAndMajors & info.multiAttacks[color])));
+        value += HangingPiece * popcount(weakPieces & (~info.colorAttacks[!color] | (nonPawnPieces & info.multiAttacks[color])));
 
     }
 
@@ -904,14 +904,14 @@ static const Value evaluate_threats(const Board& board, const Color color, const
     const uint64_t safePawns   = board.pieces(color, PAWN) & safeSquares;
 
     // Bonus for safe pawns attacking minor and major pieces
-    value += safePawnAttack * popcount(generate_pawns_attacks(safePawns, color) & minorsAndMajors);
+    value += safePawnAttack * popcount(generate_pawns_attacks(safePawns, color) & nonPawnPieces);
 
     // Bonus for pawn pushes which attack enemy pieces
     uint64_t pawnPushes = shift_up(board.pieces(color, PAWN), color) & ~board.pieces(BOTH);
     pawnPushes |= shift_up(pawnPushes & PAWN_FIRST_PUSH_RANK[color], color) & ~board.pieces(BOTH);
     pawnPushes &= ~info.pieceAttacks[!color][PAWN] & safeSquares;
 
-    value += pawnPushThreat * popcount(generate_pawns_attacks(pawnPushes, color) & minorsAndMajors);
+    value += pawnPushThreat * popcount(generate_pawns_attacks(pawnPushes, color) & nonPawnPieces);
 
     // Evaluate possible safe attacks on queen
     uint64_t queens = board.pieces(!color, QUEEN);
@@ -975,9 +975,11 @@ static void init_eval_info(const Board& board, EvalInfo& info) {
 }
 
 // Evaluate the position statically
-int evaluate(const Board& board) {
+int evaluate(const Board& board, const unsigned threadIndex) {
 
-    Value value;
+    Thread* thread = Threads.get_thread(threadIndex);
+
+    EvalTerm value;
 
     EvalInfo info;
 
@@ -987,7 +989,7 @@ int evaluate(const Board& board) {
     }
 
     // Probe the pawn hash table
-    PawnEntry * pentry = pawnTable.probe(board.pawnkey());
+    PawnEntry * pentry = thread->pawnTable.probe(board.pawnkey());
     if (pentry != NULL) {
         value += pentry->value;
         info.passedPawns = pentry->passedPawns;
@@ -995,6 +997,7 @@ int evaluate(const Board& board) {
         info.pieceAttacks[BLACK][PAWN] = pentry->pawnBAttacks;
         info.pawnAttacksSpan[WHITE] = pentry->pawnWAttacksSpan;
         info.pawnAttacksSpan[BLACK] = pentry->pawnBAttacksSpan;
+        assert(pentry->value == (evaluate_pawns(board, WHITE, info) - evaluate_pawns(board, BLACK, info)));
     } else {
         // If there is no entry available, compute the pawn attacks
         info.pieceAttacks[WHITE][PAWN] = board.gen_white_pawns_attacks();
@@ -1014,8 +1017,8 @@ int evaluate(const Board& board) {
 
     // Pawns Evaluation (skip if we already have a value from the hash table)
     if (pentry == NULL) {
-        Value pawnValue = evaluate_pawns(board, WHITE, info) - evaluate_pawns(board, BLACK, info);
-        pawnTable.store(board.pawnkey(), pawnValue, info.pieceAttacks[WHITE][PAWN], info.pieceAttacks[BLACK][PAWN], info.passedPawns, info.pawnAttacksSpan[WHITE], info.pawnAttacksSpan[BLACK]);
+        EvalTerm pawnValue = evaluate_pawns(board, WHITE, info) - evaluate_pawns(board, BLACK, info);
+        thread->pawnTable.store(board.pawnkey(), pawnValue, info.pieceAttacks[WHITE][PAWN], info.pieceAttacks[BLACK][PAWN], info.passedPawns, info.pawnAttacksSpan[WHITE], info.pawnAttacksSpan[BLACK]);
         value += pawnValue;
     }
 
@@ -1047,14 +1050,17 @@ int evaluate(const Board& board) {
     value -= evaluate_threats(board, BLACK, info);
 
     // Imbalances
-    MaterialEntry * mentry = materialTable.probe(board.materialkey());
+    MaterialEntry * mentry = thread->materialTable.probe(board.materialkey());
     if (mentry != NULL) {
         value += mentry->value;
+        assert(mentry->value == (evaluate_imbalances(board, WHITE) - evaluate_imbalances(board, BLACK)));
     } else {
-        Value imbalanceValue = evaluate_imbalances(board, WHITE) - evaluate_imbalances(board, BLACK);
-        materialTable.store(board.materialkey(), imbalanceValue);
+        EvalTerm imbalanceValue = evaluate_imbalances(board, WHITE) - evaluate_imbalances(board, BLACK);
+        thread->materialTable.store(board.materialkey(), imbalanceValue);
         value += imbalanceValue;
     }
+
+    assert(std::abs(scaled_eval(board.scale(), value)) < VALUE_MATE_MAX);
 
     // Return the scaled evaluation and add a tempo bonus for the color to move
     // Also, invert the evaluation to match the perspective of the color to move
@@ -1067,7 +1073,7 @@ int evaluate(const Board& board) {
 // all evaluation terms to the console. Useful for debugging
 void evaluate_info(const Board& board) {
 
-    Value value;
+    EvalTerm value;
 
     EvalInfo info;
 
@@ -1077,39 +1083,39 @@ void evaluate_info(const Board& board) {
     init_eval_info(board, info);
 
     // Material
-    const Value whiteMaterialPsqt = board.material(WHITE) + board.pst(WHITE);
-    const Value blackMaterialPsqt = board.material(BLACK) + board.pst(BLACK);
+    const EvalTerm whiteMaterialPsqt = board.material(WHITE) + board.pst(WHITE);
+    const EvalTerm blackMaterialPsqt = board.material(BLACK) + board.pst(BLACK);
 
     // Pawns
-    const Value whitePawns = evaluate_pawns(board, WHITE, info);
-    const Value blackPawns = evaluate_pawns(board, BLACK, info);
+    const EvalTerm whitePawns = evaluate_pawns(board, WHITE, info);
+    const EvalTerm blackPawns = evaluate_pawns(board, BLACK, info);
 
     // Pieces
-    const Value whiteKnights = evaluate_knights(board, WHITE, info);
-    const Value whiteBishops = evaluate_bishops(board, WHITE, info);
-    const Value whiteRooks   = evaluate_rooks(board, WHITE, info);
-    const Value whiteQueens  = evaluate_queens(board, WHITE, info);
+    const EvalTerm whiteKnights = evaluate_knights(board, WHITE, info);
+    const EvalTerm whiteBishops = evaluate_bishops(board, WHITE, info);
+    const EvalTerm whiteRooks   = evaluate_rooks(board, WHITE, info);
+    const EvalTerm whiteQueens  = evaluate_queens(board, WHITE, info);
 
-    const Value blackKnights = evaluate_knights(board, BLACK, info);
-    const Value blackBishops = evaluate_bishops(board, BLACK, info);
-    const Value blackRooks   = evaluate_rooks(board, BLACK, info);
-    const Value blackQueens  = evaluate_queens(board, BLACK, info);
+    const EvalTerm blackKnights = evaluate_knights(board, BLACK, info);
+    const EvalTerm blackBishops = evaluate_bishops(board, BLACK, info);
+    const EvalTerm blackRooks   = evaluate_rooks(board, BLACK, info);
+    const EvalTerm blackQueens  = evaluate_queens(board, BLACK, info);
 
     // King Safety
-    const Value whiteKingSafety = evaluate_king_safety(board, WHITE, info);
-    const Value blackKingSafety = evaluate_king_safety(board, BLACK, info);
+    const EvalTerm whiteKingSafety = evaluate_king_safety(board, WHITE, info);
+    const EvalTerm blackKingSafety = evaluate_king_safety(board, BLACK, info);
 
     // Passed Pawns
-    const Value whitePassers = evaluate_passers(board, WHITE, info);
-    const Value blackPassers = evaluate_passers(board, BLACK, info);
+    const EvalTerm whitePassers = evaluate_passers(board, WHITE, info);
+    const EvalTerm blackPassers = evaluate_passers(board, BLACK, info);
 
     // Threats
-    const Value whiteThreats = evaluate_threats(board, WHITE, info);
-    const Value blackThreats = evaluate_threats(board, BLACK, info);
+    const EvalTerm whiteThreats = evaluate_threats(board, WHITE, info);
+    const EvalTerm blackThreats = evaluate_threats(board, BLACK, info);
 
     // Imbalances
-    const Value whiteImbalances = evaluate_imbalances(board, WHITE);
-    const Value blackImbalances = evaluate_imbalances(board, BLACK);
+    const EvalTerm whiteImbalances = evaluate_imbalances(board, WHITE);
+    const EvalTerm blackImbalances = evaluate_imbalances(board, BLACK);
 
     // Output evaluation terms to the console
     std::cout << "(White)" << std::endl;
@@ -1155,7 +1161,7 @@ void evaluate_info(const Board& board) {
     value += whiteThreats - blackThreats;
 
     int finalValue = scaled_eval(board.scale(), value);
-    int normalEval = evaluate(board);
+    int normalEval = evaluate(board, 0);
 
     if (std::abs(finalValue + (board.turn() == WHITE ? tempoBonus : -tempoBonus)) != std::abs(normalEval)) {
         std::cout << "ERROR: Difference between evaluation functions!!!" << std::endl;

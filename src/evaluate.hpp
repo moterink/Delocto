@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@
 #include <complex> // for std::abs
 
 // Material values of pieces
-static const Value Material[6] = {
+static const EvalTerm Material[6] = {
 
     V(  60,  100),
     V( 365,  405),
@@ -64,25 +64,25 @@ typedef struct {
     uint64_t weakPawns = 0;
     uint64_t passedPawns = 0;
     uint64_t pawnAttacksSpan[2] = { 0 };
-    Value mobility[2] = { V(0, 0), V(0, 0) };
+    EvalTerm mobility[2] = { V(0, 0), V(0, 0) };
 
 } EvalInfo;
 
 // Return the scaled evaluation based on the calculated scale factor
-inline int scaled_eval(const int scale, const Value value) {
+inline int scaled_eval(const int scale, const EvalTerm value) {
 
     return ((value.mg * (256 - scale)) + (value.eg * scale)) / 256;
 
 }
 
-extern Value PieceSquareTable[2][6][64];
+extern EvalTerm PieceSquareTable[2][6][64];
 
 extern int KingDistance[64][64];
 
 extern void init_king_distance();
 extern void init_psqt();
 extern void init_eval();
-extern int evaluate(const Board& board);
+extern int evaluate(const Board& board, const unsigned threadIndex);
 extern void evaluate_info(const Board& board);
 
 #endif

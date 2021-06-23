@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@
 #include "bitboards.hpp"
 
 // FEN string of the inital position in chess
-#define INITIAL_POSITION_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+static const std::string INITIAL_POSITION_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 typedef struct {
 
@@ -39,8 +39,8 @@ typedef struct {
     unsigned int enPassant = SQUARE_NONE; // En-passant square
     unsigned int fiftyMoves = 0; // Fifty moves counter
     Piecetype captured = PIECE_NONE; // Last captured piece, necessary for undoing a move
-    Value pst[2]; // Piece Square Table balances
-    Value material[2]; // Material balances
+    EvalTerm pst[2]; // Piece Square Table balances
+    EvalTerm material[2]; // Material balances
     uint64_t kingBlockers[2]; // Pieces blocking sliding attacks to the kings
     uint64_t checkers = 0; // Pieces attacking the king
     uint64_t hashKey = 0;
@@ -66,9 +66,6 @@ class Board {
 
     public:
 
-        // List of all played moves on the board
-        std::vector<Move> moves;
-
         inline Color turn() const { return stm; }
 
         inline uint64_t pieces(const Color color) const { return bbColors[color]; }
@@ -77,11 +74,12 @@ class Board {
 
         inline Color owner(const unsigned sq) const { return Color(!(bbColors[WHITE] & SQUARES[sq])); }
         inline Piecetype piecetype(const unsigned sq) const { return pieceTypes[sq]; }
+        inline bool is_sq_empty(const unsigned sq) const { return pieceTypes[sq] == PIECE_NONE; }
 
         inline uint64_t checkers() const { return state.checkers; }
         inline unsigned castleRights() const { return state.castling; }
 
-        inline unsigned enPassant() const { return state.enPassant; }
+        inline unsigned enpassant_square() const { return state.enPassant; }
 
         inline uint64_t hashkey() const { return state.hashKey; }
         inline uint64_t materialkey() const { return state.materialKey; }
@@ -90,14 +88,16 @@ class Board {
         inline unsigned plies() const { return ply; }
         inline void reset_plies() { ply = 0; }
 
-        inline Value material(const Color color) const { return state.material[color]; }
-        inline Value pst     (const Color color) const { return state.pst[color];      }
+        inline EvalTerm material(const Color color) const { return state.material[color]; }
+        inline EvalTerm pst     (const Color color) const { return state.pst[color];      }
 
         inline unsigned piececount(const Color color, const Piecetype pt) const { return pieceCounts[color][pt]; }
         inline unsigned scale() const;
 
         void set_fen(std::string fen);
-        void print() const;
+        std::string get_fen() const;
+        std::string to_string() const;
+        void print() const { std::cout << to_string(); }
 
         void do_move(const Move move);
         void undo_move();
@@ -116,7 +116,7 @@ class Board {
         int mvvlva(const Move move) const;
         int see(const Move move) const;
 
-        inline uint64_t minors_or_majors(const Color color) const;
+        inline uint64_t minors_and_majors(const Color color) const;
         inline uint64_t majors() const;
         inline uint64_t sliders(const Color color) const;
 
@@ -135,24 +135,27 @@ class Board {
         // Current board state
         StateInfo state;
 
+        // List of all played moves on the board
+        std::vector<Move> moves;
+
         // List of previous board states
         std::vector<StateInfo> states;
 
         // Bitboards for each piece type and each color
-        uint64_t bbColors[3];
-        uint64_t bbPieces[6];
+        std::array<uint64_t, COLOR_COUNT+1> bbColors;
+        std::array<uint64_t, PIECETYPE_COUNT> bbPieces;
 
         // Piecetypes
-        Piecetype pieceTypes[64];
+        std::array<Piecetype, SQUARE_COUNT> pieceTypes;
 
         // Piece type counts
-        unsigned pieceCounts[2][6];
+        std::array<std::array<unsigned, 6>,2> pieceCounts;
 
         // Color to move
         Color stm;
 
         // Number of half-moves played on the board so far
-        unsigned int ply = 0;
+        unsigned ply = 0;
 
         void clear();
 
@@ -201,7 +204,7 @@ inline bool Board::can_castle(const unsigned flag) const {
 }
 
 // Returns a bitboard of all minor and major pieces for a given color, essentially all pieces except pawns and the king
-inline uint64_t Board::minors_or_majors(const Color color) const {
+inline uint64_t Board::minors_and_majors(const Color color) const {
 
     return (bbPieces[KNIGHT] | bbPieces[BISHOP] | bbPieces[ROOK] | bbPieces[QUEEN]) & bbColors[color];
 
@@ -231,7 +234,8 @@ inline bool Board::is_capture(const Move move) const {
 // Check wether the given move is a dangerous pawn push for the current position
 inline bool Board::is_dangerous_pawn_push(const Move move) const {
 
-    return pieceTypes[from_sq(move)] == PAWN && relative_rank(stm, to_sq(move)) > 5;
+    // TODO: Fix -> Replace 5 with RANK_5!!
+    return pieceTypes[from_sq(move)] == PAWN && relative_rank(stm, to_sq(move)) > RANK_5;
 
 }
 

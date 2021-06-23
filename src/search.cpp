@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,10 @@
   SOFTWARE.
 */
 
+#include <fstream>
+
 #include "search.hpp"
+#include "thread.hpp"
 #include "evaluate.hpp"
 #include "hashkeys.hpp"
 #include "uci.hpp"
@@ -31,12 +34,12 @@
 // 2-dimensional array holding the number of plies to reduce the search
 // given the current depth and the number of moves which have already
 // been played.
-static int LMRTable[MAX_DEPTH][MAX_MOVES];
+static int LMRTable[DEPTH_MAX][MAX_MOVES];
 
 // Initializes search parameters which are computed at execution time
 void init_search() {
 
-    for (int d = 1; d < MAX_DEPTH; d++) {
+    for (int d = 1; d < DEPTH_MAX; d++) {
         for (int m = 1; m < MAX_MOVES; m++) {
             LMRTable[d][m] = 1 + log(d) * log(m) / 2;
         }
@@ -71,7 +74,7 @@ bool PvLine::compare(const PvLine& pv) const {
         return false;
     }
 
-    for (unsigned int pcount = 0; pcount < pv.size; pcount++) {
+    for (unsigned pcount = 0; pcount < pv.size; pcount++) {
         if (line[pcount] != pv.line[pcount]) return false;
     }
     return true;
@@ -82,19 +85,32 @@ bool PvLine::compare(const PvLine& pv) const {
 void PvLine::clear() {
 
     size = 0;
-    std::fill(line, line + MAX_DEPTH, MOVE_NONE);
+    std::fill(line, line + DEPTH_MAX, MOVE_NONE);
+
+}
+
+void SearchInfo::reset() {
+
+    hashTableHits = nodes = depth = selectiveDepth = pvStability = 0;
+    idealTime = maxTime = 0;
+    limitTime = true;
+
+    bestMove.fill(MOVE_NONE);
+    currentMove.fill(MOVE_NONE);
+    eval.fill(0);
+    value.fill(0);
 
 }
 
 // Resets history and counter move heuristics collected during
 // other iterations of search
-void clear_history(SearchInfo* info) {
+void Thread::clear_history() {
 
-    for (Color c = WHITE; c < BOTH; c++) {
-        for (Piecetype pt = PAWN; pt < PIECE_NONE+1; pt++) {
+    for (Color c = WHITE; c < COLOR_COUNT; c++) {
+        for (Piecetype pt = PAWN; pt < PIECETYPE_COUNT+1; pt++) {
             for (unsigned sq = 0; sq < 64; sq++) {
-                info->history[c][pt][sq] = 0;
-                info->counterMove[c][pt][sq] = MOVE_NONE;
+                history[c][pt][sq] = 0;
+                counterMove[c][pt][sq] = MOVE_NONE;
             }
         }
     }
@@ -102,12 +118,30 @@ void clear_history(SearchInfo* info) {
 }
 
 // Clear the killer moves found in previous iterations/runs of search
-void clear_killers(SearchInfo* info) {
+void Thread::clear_killers() {
 
-    for (int i = 0; i < MAX_DEPTH; i++) {
-        info->killers[i][0] = MOVE_NONE;
-        info->killers[i][1] = MOVE_NONE;
+    for (int i = 0; i < DEPTH_MAX; i++) {
+        killers[i][0] = MOVE_NONE;
+        killers[i][1] = MOVE_NONE;
     }
+
+}
+
+static Value get_draw_value(SearchInfo* info) {
+
+    return 1 - (info->nodes & 2);
+
+}
+
+static Value get_mated_value(Depth plies) {
+
+    return -VALUE_MATE + plies;
+
+}
+
+static Value get_mate_value(Depth plies) {
+
+    return VALUE_MATE - plies;
 
 }
 
@@ -117,7 +151,7 @@ static void check_finished(SearchInfo* info) {
     if (info->limitTime) {
 
         if (is_time_exceeded(info)) {
-            info->stopped = true;
+            Threads.stop_searching();
         }
 
     }
@@ -144,7 +178,7 @@ unsigned Board::least_valuable_piece(uint64_t attackers, const Color color) cons
 // by moving the piece to the target square. The function finished once the target square is
 // "quiet", meaning there are no more potential attackers to the square or one player has run
 // out of attacking pieces.
-int Board::see(const Move move) const {
+Value Board::see(const Move move) const {
 
     if (move_type(move) != NORMAL) {
         return 0;
@@ -172,7 +206,7 @@ int Board::see(const Move move) const {
 
     }
 
-    int value = 0;
+    Value value = 0;
 
     // Start the Static Exchange Evaluation Loop
     do {
@@ -209,19 +243,18 @@ int Board::see(const Move move) const {
 }
 
 // Update killer, counter move and history statistics for a quiet best move
-static void update_quiet_stats(const Board& board, SearchInfo *info, const int plies, const int depth, const MoveList& quiets, const Move bestMove) {
-
+static void update_quiet_stats(Thread *thread, const Board& board, SearchInfo *info, const Depth plies, const Depth depth, const MoveList& quiets, const Move bestMove) {
 
     // Set the move as new killer move for the current ply if it not already is
-    if (bestMove != info->killers[plies][0]) {
-        info->killers[plies][1] = info->killers[plies][0];
-        info->killers[plies][0] = bestMove;
+    if (bestMove != thread->killers[plies][0]) {
+        thread->killers[plies][1] = thread->killers[plies][0];
+        thread->killers[plies][0] = bestMove;
     }
 
     // If the previous search depth was not a null move search, set the counter move
     if (info->currentMove[plies-1] != MOVE_NONE) {
         const unsigned prevSq = to_sq(info->currentMove[plies-1]);
-        info->counterMove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq] = bestMove;
+        thread->counterMove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq] = bestMove;
     }
 
     // The history bonus should rise exponentially with depth
@@ -236,8 +269,8 @@ static void update_quiet_stats(const Board& board, SearchInfo *info, const int p
         Piecetype pt = board.piecetype(fromSq);
 
         int delta = (move == bestMove) ? bonus : -bonus;
-        int score = info->history[board.turn()][pt][toSq];
-        info->history[board.turn()][pt][toSq] += 32 * delta - score * std::abs(delta) / 512; // Formula for calculating new history score
+        int score = thread->history[board.turn()][pt][toSq];
+        thread->history[board.turn()][pt][toSq] += 32 * delta - score * std::abs(delta) / 512; // Formula for calculating new history score
     }
 
 }
@@ -246,46 +279,53 @@ static void update_quiet_stats(const Board& board, SearchInfo *info, const int p
 // This function uses the alpha-beta algorithm just like the search() method, however, it only
 // searches captures and evasions until the position is "quiet", meaning there are no more captures
 // or checks. This is important so the engine does not suffer from the horizon effect.
-static int qsearch(int alpha, int beta, int depth, int plies, Board& board, SearchInfo *info) {
+static Value qsearch(Value alpha, Value beta, Depth depth, Depth plies, Board& board, SearchInfo *info) {
 
     assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE && alpha < beta); // alpha and beta have to be within the given bounds; always alpha < beta!
 
     info->nodes++; // Increase the number of total nodes visited
     info->selectiveDepth = std::max(info->selectiveDepth, plies); // Set the current selective depth
 
-    if ((info->nodes & 1023) == 1023) {
+    if (info->isMainThread && (info->nodes & 1023) == 1023) {
         check_finished(info);
     }
 
     // Check if the search has been stopped or the current position is a draw
-    if (info->stopped || board.check_draw()) {
+    if (Threads.has_stopped() || board.check_draw()) {
         return VALUE_DRAW;
     }
 
+    #ifdef EXTLOG
+        std::cout << "QS:" << info->nodes << ":" << depth << ":" << alpha << ":" << beta << std::endl;
+    #endif
+
     const bool pvNode = (beta - alpha != 1); // Check if we are in a pv node (no zero window search)
-    Move ttMove = MOVE_NONE;
 
-    int bestValue, value, eval, deltaBase, deltaValue;
-    bool ttHit;
+    Thread *thread = Threads.get_thread(info->threadIndex);
+    Value bestValue, value, eval, deltaBase, deltaValue;
+    bool ttHit = false;
 
-    const int oldAlpha = alpha;
-    const bool inCheck = board.checkers();
-    const int ttDepth = (inCheck || depth >= 0) ? 0 : -1; // Set the depth for the transposition table entry (is constant because quiescent search depth is relative and would be invalid in further iterations)
+    const Value oldAlpha = alpha;
+    const bool inCheck   = board.checkers();
+    const Depth ttDepth  = (inCheck || depth >= 0) ? 0 : -1; // Set the depth for the transposition table entry (is constant because quiescent search depth is relative and would be invalid in further iterations)
 
     info->currentMove[plies] = MOVE_NONE;
 
     // Probe the Transposition Table
-    TTEntry * entry = tTable.probe(board.hashkey(), ttHit);
+    TTEntry * entry = TTable.probe(board.hashkey(), ttHit);
+    Move ttMove = MOVE_NONE;
 
-    if (!pvNode && ttHit && entry->depth >= ttDepth) {
+    if (   !pvNode
+        && ttHit
+        && entry->depth() >= ttDepth) {
 
-        const int ttValue = value_from_tt(entry->value, plies);
-        ttMove = entry->bestMove;
+        Value ttValue = value_from_tt(entry->value(), plies);
+        ttMove = entry->move();
 
         if (   ttValue != VALUE_NONE
-            && ((entry->flag == BOUND_EXACT)
-             || (entry->flag == BOUND_UPPER && ttValue <= alpha)
-             || (entry->flag == BOUND_LOWER && ttValue >= beta)))
+            && ((entry->bound() == BOUND_EXACT)
+             || (entry->bound() == BOUND_UPPER && ttValue <= alpha)
+             || (entry->bound() == BOUND_LOWER && ttValue >= beta)))
         {
             return ttValue;
         }
@@ -301,7 +341,30 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
 
         // Check if we can use the evaluation of the transposition table entry so we do not have
         // to recompute it
-        bestValue = eval = (ttHit && entry->eval != VALUE_NONE ? entry->eval : evaluate(board));
+        /* TODO: if (ttHit) {
+            eval = entry->eval();
+            if (eval == VALUE_NONE) {
+                eval = evaluate(board, info->threadIndex);
+            }
+        } else {
+            eval = evaluate(board, info->threadIndex);
+        }
+
+        info->eval[plies] = bestValue = eval;
+
+        if (bestValue >= beta) {
+            return bestValue;
+        }
+
+        if (pvNode && bestValue > alpha) {
+            alpha = bestValue;
+        }
+
+        deltaBase = bestValue + DeltaMargin;*/
+
+        // Check if we can use the evaluation of the transposition table entry so we do not have
+        // to recompute it
+        bestValue = eval = (ttHit && entry->eval() != VALUE_NONE ? entry->eval() : evaluate(board, info->threadIndex));
 
         if (bestValue >= beta) {
             return bestValue;
@@ -315,21 +378,23 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
 
     }
 
-    int moveCount = 0;
+    unsigned movesCount, playedCount;
+    movesCount = playedCount = 0;
     Move bestMove = MOVE_NONE;
     Move move = MOVE_NONE;
 
-    MovePicker picker(board, info, plies, info->currentMove[plies-1], ttMove);
+    MovePicker picker(thread, board, info, plies, info->currentMove[plies-1], ttMove);
 
     while ( (move = picker.pick()) != MOVE_NONE ) {
 
-        moveCount++;
+        movesCount++;
 
         const bool givesCheck = board.gives_check(move);
 
         // Delta pruning (futility pruning in quiescent search)
         if (   !inCheck
             && !givesCheck
+            //&& !is_ep(move)
             && !board.is_dangerous_pawn_push(move))
         {
 
@@ -357,9 +422,11 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
         }
 
         if (!board.is_legal(move)) {
-            moveCount--;
+            movesCount--;
             continue;
         }
+
+        playedCount++;
 
         board.do_move(move);
 
@@ -388,12 +455,12 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
     }
 
     // If we are in check and there are no legal moves, return a mate value
-    if (inCheck && moveCount == 0) {
-        return -VALUE_MATE + plies;
+    if (inCheck && playedCount == 0) {
+        return get_mated_value(plies);
     }
 
     // Store the value, evaluation and best move found in a transposition table entry
-    tTable.store(board.hashkey(), ttDepth, value_to_tt(bestValue, plies), eval, bestMove, bestValue >= beta ? BOUND_LOWER : pvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER);
+    TTable.store(board.hashkey(), ttDepth, value_to_tt(bestValue, plies), eval, bestMove, bestValue >= beta ? BOUND_LOWER : pvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER);
     return bestValue;
 
 }
@@ -401,360 +468,464 @@ static int qsearch(int alpha, int beta, int depth, int plies, Board& board, Sear
 // The main search function using an alpha-beta search algorithm. This is where the magic happens.
 // The function takes alpha and beta as parameters, with alpha being the lowest value we can expect and beta the highest.
 // Depth determines the number of plies we will look ahead, while plies represent the real number of moves actually played so far since depth can be increased/decreased dynamically during search
-static int search(int alpha, int beta, int depth, int plies, bool cutNode, Board& board, SearchInfo *info, PvLine& pv, bool pruning, Move excluded = MOVE_NONE) {
+static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutNode, Board& board, SearchInfo *info, PvLine& pv, bool pruning, Move excluded = MOVE_NONE) {
 
-    if ((info->nodes & 1023) == 1023) {
+    if (info->isMainThread && (info->nodes & 1023) == 1023) {
         check_finished(info);
     }
 
     // If we have gone this far in the search tree, do not look any further but descend into a quiescent search.
     // This means we will still look ahead until the position is "quiet"
     if (depth <= 0) {
-
         return qsearch(alpha, beta, 0, plies, board, info);
+    }
 
-    } else {
+    assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE && alpha < beta); // alpha and beta have to be within the given bounds; always alpha < beta!
+    assert(depth > 0 && depth <= DEPTH_MAX);
 
-        assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE && alpha < beta); // alpha and beta have to be within the given bounds; always alpha < beta!
-        assert(depth > 0 && depth <= MAX_DEPTH);
+    info->nodes++; // Increase the total number of nodes visited
+    info->selectiveDepth = std::max(info->selectiveDepth, plies + 1); // Update the selective depth
 
-        info->nodes++; // Increase the total number of nodes visited
-        info->selectiveDepth = std::max(info->selectiveDepth, plies); // Update the selective depth
+    const bool rootNode = (plies == 0); // Check if we are in the root node (the first node of the search tree)
+    const bool pvNode   = (beta - alpha != 1); // Check if we are in a pv node (no zero window search)
 
+    assert(!(pvNode && cutNode));
+
+    if (Threads.has_stopped() || board.check_draw()) {
+        return VALUE_DRAW;//get_draw_value(info);
+    }
+
+    /*if (!rootNode) {
         // Check if the search has been stopped or the current position is a draw
-        if (info->stopped || board.check_draw()) {
-            return VALUE_DRAW;
+        if (Threads.has_stopped() || board.check_draw()) {
+            return get_draw_value(info);
         }
 
-        const bool rootNode = (plies == 0); // Check if we are in the root node (the first node of the search tree)
-        const bool pvNode   = (beta - alpha != 1); // Check if we are in a pv node (no zero window search)
-
-        PvLine newpv;
-        MoveList quietMoves;
-        bool ttHit = false;
-        bool improving = false;
-        unsigned moveCount = 0;
-        int value, bestValue, eval;
-        int ttValue = VALUE_NONE;
-        value = bestValue = -VALUE_INFINITE;
-        eval = info->eval[plies] = VALUE_NONE;
-
-        info->currentMove[plies] = MOVE_NONE;
-        info->killers[plies + 1][0] = info->killers[plies + 1][1] = MOVE_NONE;
-
-        TTEntry * entry;
-        Move ttMove = MOVE_NONE;
-        Move bestMove = MOVE_NONE;
-
-        if (excluded == MOVE_NONE) { // Don't do transposition table probing during a singular search extension
-
-            entry = tTable.probe(board.hashkey(), ttHit);
-
-            if (ttHit) {
-
-                ttMove = entry->bestMove;
-                ttValue = value_from_tt(entry->value, plies);
-
-                if (!pvNode && entry->depth >= depth) {
-                    if ((entry->flag == BOUND_EXACT)
-                     || (entry->flag == BOUND_UPPER && ttValue <= alpha)
-                     || (entry->flag == BOUND_LOWER && ttValue >= beta)) {
-                        return ttValue;
-                    }
-                }
-
-            }
-
+        if (plies >= DEPTH_MAX) {
+            return evaluate(board, info->threadIndex);
         }
 
-        const bool inCheck = board.checkers();
-
-        // Static Evaluation of the current position
-        if (!inCheck) {
-
-            // Use the evaluation of the transposition table entry if available; otherwise calculate it and store it as a new entry
-            if (ttHit && entry->eval != VALUE_NONE) {
-                eval = info->eval[plies] = entry->eval;
-            } else {
-                eval = info->eval[plies] = evaluate(board);
-                tTable.store(board.hashkey(), DEPTH_NONE, VALUE_NONE, eval, MOVE_NONE, BOUND_NONE);
-            }
-
+        // Mate Distance Pruning
+        alpha = std::max(get_mated_value(plies), alpha);
+        beta  = std::min(get_mate_value(plies + 1), beta);
+        if (alpha >= beta) {
+            return alpha;
         }
 
-        if (pruning) {
+    }*/
+    
 
-            // Razoring
-            // If we are near the leaf nodes, and our static evaluation is less or equal to alpha by a margin,
-            // we can assume that moves in this position are not good enough to beat alpha. We go into
-            // quiescent search immediately to verify this.
-            if (   !rootNode
-                && depth == 1
-                && eval <= alpha - RazorMargin)
-            {
-                return qsearch(alpha, beta, 0, plies, board, info);
-            }
+    Thread *thread = Threads.get_thread(info->threadIndex);
+    PvLine newpv;
+    MoveList quietMoves;
+    bool ttHit = false;
+    bool improving = false;
+    unsigned movesCount, playedCount;
+    movesCount = playedCount = 0;
+    Value value, bestValue, ttValue, eval;
+    value = bestValue = -VALUE_INFINITE;
+    ttValue = eval = info->eval[plies] = VALUE_NONE;
 
-            // Null move pruning
-            // If we can give the opponent an extra move py passing this turn, the chance that the position
-            // is already way too good for us is very high,and we do not need to search it any further.
-            // We do a reduced search with a null window here to verify that we fail high. The reduction is
-            // dynamic
-            if (   !pvNode
-                && depth >= 2
-                && !inCheck
-                && board.minors_or_majors(board.turn())
-                && eval >= beta)
-            {
-                board.do_nullmove();
-                value = -search(-beta, -beta + 1, depth - (2 + (32 * depth + std::min(eval - beta, 512)) / 128), plies + 1, !cutNode, board, info, newpv, false);
-                board.undo_nullmove();
+    info->currentMove[plies] = MOVE_NONE;
+    thread->killers[plies + 1][0] = thread->killers[plies + 1][1] = MOVE_NONE;
 
-                if (value >= beta && std::abs(value) < VALUE_MATE_MAX) {
-                    return beta;
+    TTEntry * entry;
+    Move ttMove = MOVE_NONE;
+    Move bestMove = MOVE_NONE;
+
+    if (excluded == MOVE_NONE) { // Don't do transposition table probing during a singular search extension
+
+        entry = TTable.probe(board.hashkey(), ttHit);
+
+        if (ttHit) {
+
+            ttMove = entry->move();
+            ttValue = value_from_tt(entry->value(), plies);
+
+            if (!pvNode && entry->depth() >= depth) {
+                if ((entry->bound() == BOUND_EXACT)
+                    || (entry->bound() == BOUND_UPPER && ttValue <= alpha)
+                    || (entry->bound() == BOUND_LOWER && ttValue >= beta)) {
+                    return ttValue;
                 }
             }
 
         }
+
+    }
+
+    const bool inCheck = board.checkers();
+
+    // Static Evaluation of the current position
+    /* TODO: if (!inCheck) {
+
+        // Use the evaluation of the transposition table entry if available; otherwise calculate it and store it as a new entry
+        if (ttHit) {
+            eval = entry->eval();
+            if (eval == VALUE_NONE) {
+                eval = evaluate(board, info->threadIndex);
+            }
+            
+        } else {
+            eval = evaluate(board, info->threadIndex);
+            TTable.store(board.hashkey(), DEPTH_NONE, VALUE_NONE, eval, MOVE_NONE, BOUND_NONE);
+        }
+
+        info->eval[plies] = eval;
 
         // Check if the evaluation is improving since our last turn
         improving = plies >= 2 && (eval >= info->eval[plies - 2] || info->eval[plies - 2] == VALUE_NONE);
 
-        // Internal Iterative Deepening
-        // If we are in a pv node and do not have a best move from the transposition table,
-        // we do a reduced depth search to fill up the transposition table with entries to
-        // obtain a transposition table move for the current position to further imporove
-        // move ordering
-        if (   pvNode
-            && !inCheck
-            && ttMove == MOVE_NONE
-            && depth >= 6)
-        {
+    }*/
 
-            value = search(alpha, beta, depth - 2, plies + 1, cutNode, board, info, newpv, pruning);
+    // Static Evaluation of the current position
+    if (!inCheck) {
 
-            entry = tTable.probe(board.hashkey(), ttHit);
-
-            if (ttHit) {
-                ttMove = entry->bestMove;
-            }
+        // Use the evaluation of the transposition table entry if available; otherwise calculate it and store it as a new entry
+        if (ttHit && entry->eval() != VALUE_NONE) {
+            eval = info->eval[plies] = entry->eval();
+        } else {
+            eval = info->eval[plies] = evaluate(board, info->threadIndex);
+            TTable.store(board.hashkey(), DEPTH_NONE, VALUE_NONE, eval, MOVE_NONE, BOUND_NONE);
         }
-
-        // Initialize the move picker
-        MovePicker picker(board, info, plies, ttMove);
-
-        Move move;
-
-        while ( (move = picker.pick() ) != MOVE_NONE) {
-
-            // Skip excluded moves (from singular search)
-            if (move == excluded) {
-                continue;
-            }
-
-            // Flag the current move
-            bool capture = board.is_capture(move);
-            bool givesCheck = board.gives_check(move);
-            bool promotion = is_promotion(move);
-
-            // Add quiet moves to a list
-            if (!capture && !promotion) {
-                quietMoves.append(move);
-            }
-
-            // Quiet Move Pruning
-            // A move is considered quiet if it does not capture a piece, gives check or is a promtion.
-            if (   !capture
-                && !givesCheck
-                && !promotion)
-            {
-                // Futility Pruning
-                // If the static evaluation is below alpha by a given margin and we are not in check,
-                // prune the move.
-                if (   !pvNode
-                    && !inCheck
-                    && moveCount > 0
-                    && depth <= 5
-                    && eval + FutilityMargin[depth] <= alpha)
-                {
-                    continue;
-                }
-            }
-
-            moveCount++;
-
-            int reductions = 0;
-            int extensions = 0;
-
-            // Extensions
-
-            // Singular Extension Search
-            // If the current move is the transposition table move, and the move caused
-            // a fail high in a previous iteration, the move should probably be extended.
-            // To verify this, we do a reduced search with a null window
-            if (   depth >= 8
-                && move == ttMove
-                && excluded == MOVE_NONE // No recursive singular search
-                && !rootNode
-                && ttValue != VALUE_NONE
-                && entry->flag == BOUND_LOWER
-                && entry->depth >= depth - 3
-                && board.is_legal(move))
-            {
-                int rbeta = std::max(ttValue - 2 * depth, -VALUE_MATE);
-                value = search(rbeta - 1, rbeta, depth / 2, plies + 1, cutNode, board, info, newpv, false, move);
-                // All other moves failed low, so the move is singular
-                if (value < rbeta) {
-                    extensions = 1;
-                }
-            } else {
-                // Check Extension
-                if (inCheck && board.see(move) >= 0) {
-                    extensions = 1;
-                }
-            }
-
-            // Finally, check if the move is even legal.
-            // Since this is quite costly, we delay it until we really have to check,
-            // which is right before doing the move
-            if (!board.is_legal(move)) {
-                moveCount--;
-                continue;
-            }
-
-            // Play the move on the board
-            board.do_move(move);
-
-            info->currentMove[plies] = move;
-
-            newpv.size = 0;
-
-            // Late Move Reductions
-            // If a move is relatively far back in the move list, we can consider to do a reduced depth search
-            // because we usually have a relatively good move ordering. Certain circumstances can increase or
-            // decrease the amount of reduction. We only reduce quiet moves. We also do not reduce near the leaf nodes
-            // since this is quite risky because we might miss something.
-            if (moveCount > 1) {
-                if (   !capture
-                    && !givesCheck
-                    && !promotion
-                    && depth >= 3)
-                {
-
-                    // Base reduction based on current depth and move count
-                    reductions = LMRTable[depth][moveCount];
-
-                    // Decrease reduction for pv nodes since we want a relatively precise value for these types of nodes
-                    reductions -= pvNode;
-
-                    // Increase the reduction for cut nodes since the actual value is not that important
-                    reductions += cutNode;
-
-                    // Decrease reduction for killer and counter moves since they are usually good moves and cause a quick fail high which reduces the tree size
-                    reductions -= (move == info->killers[plies][0] || move == info->killers[plies][1] || move == picker.counterMove);
-
-                    // Decrease reduction if we are in check since the position might be very dynamic
-                    reductions -= inCheck;
-
-                    // Decrease the reduction based on the history score. If the move has proven to be quite good in previous iterations,
-                    // we should not reduce the search depth
-                    reductions -= std::min(1, info->history[!board.turn()][board.piecetype(to_sq(move))][to_sq(move)] / 512);
-
-                    // Do not reduce more than depth - 2, also do not extend
-                    reductions = std::max(0, std::min(reductions, depth - 2));
-
-                }
-
-                // Principal Variation Search
-                // We do a null window search here because we only want to know if the current move can beat alpha.
-                value = -search(-alpha - 1, -alpha, depth - 1 + extensions - reductions, plies + 1, true, board, info, newpv, pruning);
-                // Do a full depth search if the value did beat alpha since we might have missed something
-                if (value > alpha && reductions) {
-                    value = -search(-alpha - 1, -alpha, depth - 1 + extensions, plies + 1, !cutNode, board, info, newpv, pruning);
-                }
-                // If the full depth searched beat alpha again and is within alpha and beta, do a full window search to prove it
-                if (value > alpha && value < beta) {
-                    value = -search(-beta, -alpha, depth - 1 + extensions, plies + 1, false, board, info, newpv, pruning);
-                }
-
-            } else {
-
-                // If this is the first move to be searched in this node, search it with a full window and do not reduce it,
-                // since usually the first move is already the best
-                value = -search(-beta, -alpha, depth - 1 + extensions, plies + 1, (pvNode ? false : !cutNode), board, info, newpv, pruning);
-
-            }
-
-            // Undo the move.
-            board.undo_move();
-
-            // Abort if the search has been stopped
-            if (info->stopped) {
-                return VALUE_DRAW;
-            }
-
-            // If our last search increased found a higher value, assign it as the best value
-            if (value > bestValue) {
-                bestValue = value;
-                // If the value is above alpha, assign it as the new alpha.
-                // Also add the move to the principal variation.
-                if (value > alpha) {
-                    alpha = value;
-                    bestMove = move;
-                    pv.size = 0;
-                    pv.append(move);
-                    pv.merge(newpv);
-                    // If the value is above beta, we can expect this position will never occur because the opponent
-                    // will probably avoid it because he already has a better option at a higher depth. We can stop searching
-                    // this node.
-                    if (value >= beta) {
-                        break; // Beta cut-off
-                    }
-
-                }
-
-            }
-
-        }
-
-        // If there are no legal moves, check if we are checkmate or if the position is drawn
-        if (moveCount == 0) {
-            return excluded != MOVE_NONE ? alpha : inCheck ? -VALUE_MATE + plies : VALUE_DRAW;
-        }
-
-        // If we failed high, and the move is quiet, update the quiet move stats.
-        if (bestValue >= beta && !is_promotion(bestMove) && !board.is_capture(bestMove)) {
-            update_quiet_stats(board, info, plies, depth, quietMoves, bestMove);
-        }
-
-        if (excluded == MOVE_NONE) { // Do not store if we are in a singular search
-            // Store the value, the best move and the bound in the transposition table
-            tTable.store(board.hashkey(), depth, value_to_tt(bestValue, plies), eval, bestMove, bestValue >= beta ? BOUND_LOWER : pvNode && bestMove != MOVE_NONE ? BOUND_EXACT : BOUND_UPPER);
-        }
-        return bestValue;
 
     }
 
+    if (pruning) {
+
+        // Razoring
+        // If we are near the leaf nodes, and our static evaluation is less or equal to alpha by a margin,
+        // we can assume that moves in this position are not good enough to beat alpha. We go into
+        // quiescent search immediately to verify this.
+        if (   !rootNode
+            && depth == 1
+            && eval <= alpha - RazorMargin)
+        {
+            return qsearch(alpha, beta, 0, plies, board, info);
+        }
+
+        // Null move pruning
+        // If we can give the opponent an extra move py passing this turn, the chance that the position
+        // is already way too good for us is very high,and we do not need to search it any further.
+        // We do a reduced search with a null window here to verify that we fail high. The reduction is
+        // dynamic
+        if (   !pvNode
+            && depth >= 2
+            && !inCheck
+            && board.minors_and_majors(board.turn())
+            && eval >= beta)
+        {
+            board.do_nullmove();
+            value = -search(-beta, -beta + 1, depth - (2 + (32 * depth + std::min(eval - beta, 512)) / 128), plies + 1, !cutNode, board, info, newpv, false);
+            board.undo_nullmove();
+
+            if (value >= beta && std::abs(value) < VALUE_MATE_MAX) {
+                return beta;
+            }
+        }
+
+    }
+
+    
+    // Internal Iterative Deepening
+    // If we are in a pv node and do not have a best move from the transposition table,
+    // we do a reduced depth search to fill up the transposition table with entries to
+    // obtain a transposition table move for the current position to further imporove
+    // move ordering
+    if (   pvNode
+        && !inCheck
+        && ttMove == MOVE_NONE
+        && depth >= 6)
+    {
+
+        value = search(alpha, beta, depth - 2, plies + 1, cutNode, board, info, newpv, pruning);
+
+        entry = TTable.probe(board.hashkey(), ttHit);
+
+        if (ttHit) {
+            ttMove = entry->move();
+        }
+    }
+
+    // Initialize the move picker
+    MovePicker picker(thread, board, info, plies, ttMove);
+
+    Move move;
+    Depth newDepth;
+
+    while ( (move = picker.pick() ) != MOVE_NONE) {
+
+        // Skip excluded moves (from singular search)
+        if (move == excluded) {
+            continue;
+        }
+
+        // Flag the current move
+        bool capture    = board.is_capture(move);
+        bool givesCheck = board.gives_check(move);
+        bool promotion  = is_promotion(move);
+        bool quiet      = !capture && !promotion;
+
+        // Add quiet moves to a list
+        if (quiet) {
+            quietMoves.append(move);
+        }
+
+        // Quiet Move Pruning
+        // A move is considered quiet if it does not capture a piece, gives check or is a promotion.
+        if (   !capture
+            && !givesCheck
+            && !promotion)
+        {
+            // Futility Pruning
+            // If the static evaluation is below alpha by a given margin and we are not in check,
+            // prune the move.
+            if (   !pvNode
+                && !inCheck
+                && movesCount > 0
+                && depth <= 5
+                && eval + FutilityMargin[depth] <= alpha)
+            {
+                continue;
+            }
+        }
+
+        // TODO: newDepth = depth - 1;
+
+        movesCount++;
+
+        int reductions = 0;
+        int extensions = 0;
+
+        // Extensions
+
+        // Singular Extension Search
+        // If the current move is the transposition table move, and the move caused
+        // a fail high in a previous iteration, the move should probably be extended.
+        // To verify this, we do a reduced search with a null window
+        if (   depth >= 8
+            && move == ttMove
+            && excluded == MOVE_NONE // No recursive singular search
+            && !rootNode
+            && ttValue != VALUE_NONE
+            && entry->bound() == BOUND_LOWER
+            && entry->depth() >= depth - 3
+            && board.is_legal(move))
+        {
+            Value rbeta = std::max(ttValue - 2 * depth, -VALUE_MATE);
+            value = search(rbeta - 1, rbeta, depth / 2, plies + 1, cutNode, board, info, newpv, false, move);
+            // All other moves failed low, so the move is singular
+            if (value < rbeta) {
+                extensions = 1;
+            }
+        } else {
+            // Check Extension
+            if (inCheck && board.see(move) >= 0) {
+                extensions = 1;
+            }
+        }
+
+        // TODO: newDepth += extensions;
+
+        // Finally, check if the move is even legal.
+        // Since this is quite costly, we delay it until we really have to check,
+        // which is right before doing the move
+        if (!board.is_legal(move)) {
+            movesCount--;
+            continue;
+        }
+
+        playedCount++;
+
+        // Play the move on the board
+        board.do_move(move);
+
+        info->currentMove[plies] = move;
+
+        newpv.size = 0;
+
+        // Late Move Reductions
+        // If a move is relatively far back in the move list, we can consider to do a reduced depth search
+        // because we usually have a relatively good move ordering. Certain circumstances can increase or
+        // decrease the amount of reduction. We only reduce quiet moves. We also do not reduce near the leaf nodes
+        // since this is quite risky because we might miss something.
+        /* TODO: if (   movesCount > 1
+            && depth >= 3
+            && quiet)
+        {
+
+            // Base reduction based on current depth and move count
+            reductions = LMRTable[depth][movesCount];
+
+            // Decrease reduction for pv nodes since we want a relatively precise value for these types of nodes
+            reductions -= pvNode;
+
+            // Increase the reduction for cut nodes since the actual value is not that important
+            reductions += cutNode;
+
+            // Decrease reduction for killer and counter moves since they are usually good moves and cause a quick fail high which reduces the tree size
+            reductions -= (move == thread->killers[plies][0] || move == thread->killers[plies][1] || move == picker.counterMove);
+
+            // Decrease reduction if we are in check since the position might be very dynamic
+            reductions -= inCheck;
+
+            // Decrease the reduction based on the history score. If the move has proven to be quite good in previous iterations,
+            // we should not reduce the search depth
+            reductions -= std::min(1, thread->history[!board.turn()][board.piecetype(to_sq(move))][to_sq(move)] / 512);
+
+            // Do not reduce more than depth - 2, also do not extend
+            reductions = std::max(0, std::min(reductions, depth - 2));
+
+        }
+
+        // Principal Variation Search
+        // We do a null window search here because we only want to know if the current move can beat alpha.
+        if (reductions) {
+            value = -search(-alpha - 1, -alpha, newDepth - reductions, plies + 1, true, board, info, newpv, pruning);
+        }
+
+        // Do a full depth search if the value did beat alpha since we might have missed something
+        if ((reductions && value > alpha) || (!reductions && (!pvNode || playedCount > 1))) {
+            value = -search(-alpha - 1, -alpha, newDepth, plies + 1, !cutNode, board, info, newpv, pruning);
+        }
+
+        if (pvNode && (playedCount == 1 || (value > alpha && (rootNode || value < beta)))) {
+            value = -search(-beta, -alpha, newDepth, plies + 1, false, board, info, newpv, pruning);
+        }*/
+
+        // Late Move Reductions
+        // If a move is relatively far back in the move list, we can consider to do a reduced depth search
+        // because we usually have a relatively good move ordering. Certain circumstances can increase or
+        // decrease the amount of reduction. We only reduce quiet moves. We also do not reduce near the leaf nodes
+        // since this is quite risky because we might miss something.
+        if (movesCount > 1) {
+            if (   !capture
+                && !givesCheck
+                && !promotion
+                && depth >= 3)
+            {
+
+                // Base reduction based on current depth and move count
+                reductions = LMRTable[depth][movesCount];
+
+                // Decrease reduction for pv nodes since we want a relatively precise value for these types of nodes
+                reductions -= pvNode;
+
+                // Increase the reduction for cut nodes since the actual value is not that important
+                reductions += cutNode;
+
+                // Decrease reduction for killer and counter moves since they are usually good moves and cause a quick fail high which reduces the tree size
+                reductions -= (move == thread->killers[plies][0] || move == thread->killers[plies][1] || move == picker.counterMove);
+
+                // Decrease reduction if we are in check since the position might be very dynamic
+                reductions -= inCheck;
+
+                // Decrease the reduction based on the history score. If the move has proven to be quite good in previous iterations,
+                // we should not reduce the search depth
+                reductions -= std::min(1, thread->history[!board.turn()][board.piecetype(to_sq(move))][to_sq(move)] / 512);
+
+                // Do not reduce more than depth - 2, also do not extend
+                reductions = std::max(0, std::min(reductions, depth - 2));
+
+            }
+
+            // Principal Variation Search
+            // We do a null window search here because we only want to know if the current move can beat alpha.
+            value = -search(-alpha - 1, -alpha, depth - 1 + extensions - reductions, plies + 1, true, board, info, newpv, pruning);
+            // Do a full depth search if the value did beat alpha since we might have missed something
+            if (value > alpha && reductions) {
+                value = -search(-alpha - 1, -alpha, depth - 1 + extensions, plies + 1, !cutNode, board, info, newpv, pruning);
+            }
+            // If the full depth searched beat alpha again and is within alpha and beta, do a full window search to prove it
+            if (value > alpha && value < beta) {
+                value = -search(-beta, -alpha, depth - 1 + extensions, plies + 1, false, board, info, newpv, pruning);
+            }
+
+        } else {
+
+            // If this is the first move to be searched in this node, search it with a full window and do not reduce it,
+            // since usually the first move is already the best
+            value = -search(-beta, -alpha, depth - 1 + extensions, plies + 1, (pvNode ? false : !cutNode), board, info, newpv, pruning);
+
+        }
+
+        // Undo the move.
+        board.undo_move();
+
+        // Abort if the search has been stopped
+        if (Threads.has_stopped()) {
+            return VALUE_DRAW;
+        }
+
+        // If our last search increased found a higher value, assign it as the best value
+        if (value > bestValue) {
+            bestValue = value;
+            // If the value is above alpha, assign it as the new alpha.
+            // Also add the move to the principal variation.
+            if (value > alpha) {
+                alpha = value;
+                bestMove = move;
+                pv.size = 0;
+                pv.append(move);
+                pv.merge(newpv);
+                // If the value is above beta, we can expect this position will never occur because the opponent
+                // will probably avoid it because he already has a better option at a higher depth. We can stop searching
+                // this node.
+                if (value >= beta) {
+                    break; // Beta cut-off
+                }
+
+            }
+
+        }
+
+    }
+
+    // If there are no legal moves, check if we are checkmate or if the position is drawn
+    /* TODO: if (playedCount == 0) {
+        if (excluded != MOVE_NONE) {
+            return alpha;
+        }
+        if (inCheck) {
+            return get_mated_value(plies);
+        } else {
+            return get_draw_value(info);
+        }
+    }*/
+
+    // If there are no legal moves, check if we are checkmate or if the position is drawn
+    if (movesCount == 0) {
+        return excluded != MOVE_NONE ? alpha : inCheck ? -VALUE_MATE + plies : VALUE_DRAW;
+    }
+
+    // If we failed high, and the move is quiet, update the quiet move stats.
+    if (bestValue >= beta && !is_promotion(bestMove) && !board.is_capture(bestMove)) {
+        update_quiet_stats(thread, board, info, plies, depth, quietMoves, bestMove);
+    }
+
+    if (excluded == MOVE_NONE) { // Do not store if we are in a singular search
+        // Store the value, the best move and the bound in the transposition table
+        TTable.store(board.hashkey(), depth, value_to_tt(bestValue, plies), eval, bestMove, bestValue >= beta ? BOUND_LOWER : pvNode && bestMove != MOVE_NONE ? BOUND_EXACT : BOUND_UPPER);
+    }
+    return bestValue;
+
 }
 
-// Find the best move for the given position.
-// The search can be constrained by depth or time or nodes.
-const SearchStats go(Board& board, const SearchLimits& limits) {
+void Thread::search() {
 
-    SearchStats stats;
-    SearchInfo info;
+    const bool isMainThread = get_index() == 0;
 
     PvLine pv;
     pv.clear();
     Move bestMove = MOVE_NONE;
-    int value = 0;
+    Value value = 0;
+
+    info.threadIndex = get_index();
+    info.isMainThread = isMainThread;
 
     // Initialize the time management
     info.start = Clock::now();
     init_time_management(limits, &info);
-
-    clear_history(&info);
-    clear_killers(&info);
 
     // Iterative Deepening
     // We do not search to a fixed depth from the start, but rather increase it with every
@@ -762,7 +933,7 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
     // at lower depths we fill up the transposition table, history table...
     // This enables us to search higher depths much quicker and also enables us to dynamically
     // stop the search if we are low on time while still having a move to play in the position
-    for (unsigned depth = 1; depth < limits.depth; depth++) {
+    for (Depth depth = 1; depth < limits.depth; depth++) {
 
         pv.size = 0;
 
@@ -776,22 +947,27 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
         // since we can expect the values returned by search to be within a certain
         // window. If we do fail high/low though, we will increase the window and search
         // again.
+
         if (depth > 5) {
 
-            int window = 25 - std::min(depth / 3, 10u) + std::abs(value) / 25;
-            int alpha = value - window;
-            int beta = value + window;
+            /* TODO: Value window = 25;
+            Value alpha  = std::max(value - window, -VALUE_INFINITE);
+            Value beta   = std::min(value + window,  VALUE_INFINITE);*/
+
+            Value window = 25 - std::min((unsigned)depth / 3, 10u) + std::abs(value) / 25;
+            Value alpha = value - window;
+            Value beta = value + window;
 
             while (true) {
 
-                value = search(alpha, beta, depth, 0, false, board, &info, pv, true);
+                value = ::search(alpha, beta, depth, 0, false, board, &info, pv, true);
 
-                if (!info.stopped) {
+                if (!Threads.has_stopped()) {
                     if (value <= alpha) {
-                        beta = (alpha + beta) / 2;
-                        alpha = value - window;
+                        beta  = (alpha + beta) / 2;
+                        alpha = std::max(value - window, -VALUE_INFINITE);
                     } else if (value >= beta) {
-                        beta = value + window;
+                        beta = std::min(value + window, VALUE_INFINITE);
                     } else {
                         break; // Quit the aspiration window loop and continue with the next iteration
                     }
@@ -807,35 +983,36 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
             }
 
         } else {
-            value = search(-VALUE_INFINITE, VALUE_INFINITE, depth, 0, false, board, &info, pv, true);
+            value = ::search(-VALUE_INFINITE, VALUE_INFINITE, depth, 0, false, board, &info, pv, true);
         }
 
         info.value[depth] = value;
-        long long duration = get_time_elapsed(info.start);
+        Duration duration = get_time_elapsed(info.start);
 
         // Print the information returned from the previous iteration to the console
         // Update the time management and decide if we should do another iteration or
         // stop and report the best move
-        if (!info.stopped) {
-            // Drawn/mate positions return an empty pv
-            if (pv.size > 0) {
-
-                bestMove = pv.line[0];
-                info.bestMove[depth] = bestMove;
-                send_info(&info, pv, duration);
-
-            }  else {
-                send_info(&info, pv, duration);
-                break;
-            }
-
-            update_time_managemement(&info);
-
-            if (info.limitTime) {
-                if (should_stop(info)) {
+        if (!Threads.has_stopped()) {
+            // Only the main thread reports to UCI
+            if (isMainThread) {
+                // Drawn/mate positions return an empty pv
+                if (pv.size > 0) {
+                    bestMove = pv.line[0];
+                    info.bestMove[depth] = bestMove;
+                    send_info(info, pv, duration, Threads.get_nodes());
+                }  else {
                     break;
                 }
+
+                update_time_managemement(&info);
+
+                if (info.limitTime) {
+                    if (should_stop(info)) {
+                        break;
+                    }
+                }
             }
+            
         } else {
             // If the search has been aborted, break the search loop
             break;
@@ -843,11 +1020,12 @@ const SearchStats go(Board& board, const SearchLimits& limits) {
 
     }
 
-    // Print the best move found to the console
-    send_bestmove(bestMove);
-
-    stats.totalNodes = info.nodes;
-
-    return stats;
+    if (isMainThread) {
+        // Signal all other threads to stop searching
+        Threads.stop_searching();
+        // Print the best move found to the console
+        send_bestmove(bestMove);
+    }
+    
 
 }

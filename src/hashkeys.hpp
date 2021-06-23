@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -31,57 +31,96 @@
 // A megabyte
 #define MB 0x100000
 
+// Transpositon Table Bucket Size
+static constexpr unsigned TT_BUCKET_SIZE     = 3;
+static constexpr uint64_t TT_MASK_KEY        = 0xFFFF;
+static constexpr unsigned TT_MASK_BOUND      = 0x03;
+static constexpr unsigned TT_MASK_GENERATION = 0xFC;
+static constexpr unsigned TT_CYCLE           = std::numeric_limits<uint8_t>::max() + TT_MASK_BOUND + 1;
+
 // Hash flags
-enum HashFlag {
+enum TTBound : uint8_t {
 
     BOUND_NONE, BOUND_EXACT, BOUND_UPPER, BOUND_LOWER
 
 };
 
 // Hash entry
-typedef struct {
+struct TTEntry {
+
+    private: 
+        uint16_t key16;
+        uint8_t genBound8;
+        int8_t depth8;
+        int16_t value16;
+        int16_t eval16;
+        Move move16;
+
+    public:
+        uint16_t key()  const { return key16; }
+        Move move()     const { return move16; }
+        uint8_t generation() const { return genBound8 & TT_MASK_GENERATION; }
+        TTBound bound() const { return (TTBound)(genBound8 & TT_MASK_BOUND); }
+        Depth depth()   const { return (Depth)depth8; }
+        Value value()   const { return (Value)value16; }
+        Value eval()    const { return (Value)eval16; }
+
+        void replace(uint16_t key, uint8_t generation, TTBound bound, Depth depth, Value value, Value eval, Move move) {
+            key16     = key;
+            genBound8 = generation | bound;
+            depth8    = depth;
+            value16   = value;
+            eval16    = eval;
+            move16    = move;
+        }
+
+        void update_generation(const uint8_t generation) { genBound8 = generation | bound(); }
+
+
+};
+
+struct PawnEntry {
 
     uint64_t key;
-    int depth;
-    int flag;
-    int value;
-    int eval;
-    Move bestMove;
-
-} TTEntry;
-
-typedef struct {
-
-    uint64_t key;
-    Value value;
+    EvalTerm value;
     uint64_t pawnWAttacks;
     uint64_t pawnBAttacks;
     uint64_t passedPawns;
     uint64_t pawnWAttacksSpan;
     uint64_t pawnBAttacksSpan;
 
-} PawnEntry;
+};
 
-typedef struct {
+struct MaterialEntry {
 
     uint64_t key;
-    Value value;
+    EvalTerm value;
 
-} MaterialEntry;
+};
 
-// Transposition Table class
+// Transposition Table Class
 class TranspositionTable {
+
+    private:
+        
+        // Transposition Table Bucket
+        struct TTBucket {
+            TTEntry entries[TT_BUCKET_SIZE];
+        };
+
+        TTBucket *table;
+        unsigned bucketCount;
+
+        uint8_t generation; // Will start a new cycle at 0 when it exceeds the numeric limit
 
     public:
 
-        unsigned size;
-
-        TTEntry *table;
-
-        void set_size(const unsigned hashsize);
+        void set_size(const unsigned megabytes);
         void clear();
-        TTEntry * probe(const uint64_t key, bool& tthit);
-        void store(const uint64_t key, const int depth, const int value, const int eval, const Move bestMove, const int flag);
+        void new_search();
+        TTEntry * probe(const uint64_t key, bool& ttHit);
+        void store(const uint64_t key, const Depth depth, const Value value, const Value eval, const Move bestMove, const TTBound bound);
+        unsigned hashfull();
 
         ~TranspositionTable() {
             delete[] table;
@@ -99,10 +138,11 @@ class PawnTable {
 
         void clear();
         PawnEntry * probe(const uint64_t key);
-        void store(const uint64_t key, const Value value, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan);
+        void store(const uint64_t key, const EvalTerm value, const uint64_t pawnWAttacks, const uint64_t pawnBAttacks, const uint64_t passedPawns, const uint64_t pawnWAttacksSpan, const uint64_t pawnBAttacksSpan);
 
         PawnTable() {
             table = new PawnEntry [size];
+            clear();
         }
 
         ~PawnTable() {
@@ -121,10 +161,11 @@ class MaterialTable {
 
         void clear();
         MaterialEntry * probe(const uint64_t key);
-        void store(const uint64_t key, const Value value);
+        void store(const uint64_t key, const EvalTerm value);
 
         MaterialTable() {
             table = new MaterialEntry [size];
+            clear();
         }
 
         ~MaterialTable() {
@@ -133,16 +174,21 @@ class MaterialTable {
 
 };
 
-// Generate a random 64bit integer
-// Source: http://vigna.di.unimi.it/ftp/papers/xorshift.pdf
-static uint64_t x = 88172645463325252ULL;
+// Convert a value for the transposition table, since if the value is a mate value,
+// the plies until mate have to be consistent
+inline int value_to_tt(Value value, Depth plies) {
 
-static uint64_t rand64() {
+    assert(value != VALUE_NONE);
 
-    x ^= x >> 12;
-    x ^= x << 25;
-    x ^= x >> 27;
-    return x * 2685821657736338717LL;
+    return value >= VALUE_MATE_MAX ? value + plies : value <= VALUE_MATED_MAX ? value - plies : value;
+
+}
+
+// Adjust a potential mate value from the transposition table for the current number
+// of plies
+inline int value_from_tt(Value value, Depth plies) {
+
+    return value == VALUE_NONE ? VALUE_NONE : value >= VALUE_MATE_MAX ? value - plies : value <= VALUE_MATED_MAX ? value + plies : value;
 
 }
 

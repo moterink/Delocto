@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -24,10 +24,10 @@
 #include "movepick.hpp"
 
 // Score all the moves with the Most Valuable Victim - Least Valuable Attacker Heuristic
-void MovePicker::score_captures(MoveList& captures) {
+void MovePicker::score_captures() {
 
-    for (unsigned index = 0; index < captures.size; index++) {
-        captures.values[index] = board.mvvlva(captures.moves[index]);
+    for (unsigned index = 0; index < moves.size; index++) {
+        moves.scores[index] = board.mvvlva(moves.moves[index]);
     }
 
 }
@@ -35,8 +35,8 @@ void MovePicker::score_captures(MoveList& captures) {
 // Assign each move a score from the history table
 void MovePicker::score_quiets() {
 
-    for (unsigned index = 0; index < quiets.size; index++) {
-        quiets.values[index] = info->history[board.turn()][board.piecetype(from_sq(quiets.moves[index]))][to_sq(quiets.moves[index])];
+    for (unsigned index = 0; index < moves.size; index++) {
+        moves.scores[index] = thread->history[board.turn()][board.piecetype(from_sq(moves.moves[index]))][to_sq(moves.moves[index])];
     }
 
 }
@@ -44,11 +44,11 @@ void MovePicker::score_quiets() {
 // Assign each evasion a score
 void MovePicker::score_evasions() {
 
-    for (unsigned index = 0; index < evasions.size; index++) {
-        if (board.is_capture(evasions.moves[index])) {
-            evasions.values[index] = board.mvvlva(evasions.moves[index]);
+    for (unsigned index = 0; index < moves.size; index++) {
+        if (board.is_capture(moves.moves[index])) {
+            moves.scores[index] = board.mvvlva(moves.moves[index]);
         } else {
-            evasions.values[index] = info->history[board.turn()][board.piecetype(from_sq(evasions.moves[index]))][to_sq(evasions.moves[index])];
+            moves.scores[index] = thread->history[board.turn()][board.piecetype(from_sq(moves.moves[index]))][to_sq(moves.moves[index])];
         }
 
     }
@@ -68,11 +68,14 @@ Move MovePicker::pick() {
         case TTMoveQS:
 
             {
+                
                 ++phase;
 
                 // First, try the move from the transposition table. Check if it is valid in the current position
                 if (ttMove != MOVE_NONE && board.is_valid(ttMove)) {
                     return ttMove;
+                } else if (phase == GenEvasions) {
+                    return pick(); // If we are in QS search, skip to GenEvasions
                 }
 
             }
@@ -84,8 +87,8 @@ Move MovePicker::pick() {
                 ++phase;
 
                 // Generate all captures for the current position and score them
-                caps = gen_caps(board, board.turn());
-                score_captures(caps);
+                moves = gen_caps(board, board.turn());
+                score_captures();
 
             }
 
@@ -95,18 +98,19 @@ Move MovePicker::pick() {
 
             {
 
-                while (caps.index < caps.size) {
+                while (moves.index < moves.size) {
 
-                    Move best = caps.pick();
+                    Move best = moves.pick();
 
                     assert(best != MOVE_NONE);
 
                     // If the capture loses material, move to the next stage
-                    if (caps.values[caps.index] < 0) {
+                    if (moves.scores[moves.index] < 0) {
+                        badCaptures = moves;
                         break;
                     }
 
-                    caps.index++;
+                    moves.index++;
 
                     // The capture could be equal to the transposition table move
                     if (best != ttMove) {
@@ -157,7 +161,7 @@ Move MovePicker::pick() {
                 ++phase;
 
                 // Generate all quiet moves and assign them a value based on their history score
-                quiets = gen_quiets(board, board.turn());
+                moves = gen_quiets(board, board.turn());
                 score_quiets();
 
             }
@@ -166,12 +170,12 @@ Move MovePicker::pick() {
 
             {
 
-                while (quiets.index < quiets.size) {
+                while (moves.index < moves.size) {
 
                     // Pick the quiet move with the highest score
-                    Move best = quiets.pick();
+                    Move best = moves.pick();
                     assert(best != MOVE_NONE);
-                    ++quiets.index;
+                    ++moves.index;
 
                     // Make sure we have not tried this quiet move before
                     if (best != ttMove && best != killers[0] && best != killers[1] && best != counterMove) {
@@ -190,10 +194,10 @@ Move MovePicker::pick() {
 
                 // Next, we try captures which lose material in the next move.
                 // These moves are usually quite bad so we try them last
-                while (caps.index < caps.size) {
+                while (moves.index < moves.size) {
 
-                    Move best = caps.pick();
-                    caps.index++;
+                    Move best = moves.pick();
+                    moves.index++;
 
                     // TODO: Check if comparison with killer even necessary? killers are not captures!
                     if (best != ttMove && best != killers[0] && best != killers[1]) {
@@ -219,8 +223,16 @@ Move MovePicker::pick() {
 
                 // Generate all evasions (both quiet and captures, also in quiescence search)
                 // and score them with either mvv-lva or history values
-                gen_evasions(board, MOVES_ALL, evasions, board.turn());
+                moves = gen_evasions(board, MOVES_ALL);
                 score_evasions();
+                /*if (board.checkers()) {
+                    moves = gen_evasions(board, MOVES_ALL);
+                    score_evasions();
+                    ++phase;
+                } else {
+                    phase = GenCapsQS;
+                    return pick(); // Call pick() again for generating captures in quiescence
+                }*/
 
             }
 
@@ -228,12 +240,12 @@ Move MovePicker::pick() {
 
             {
 
-                while (evasions.index < evasions.size) {
+                while (moves.index < moves.size) {
 
                     // Pick the best evasion
-                    Move best = evasions.pick();
+                    Move best = moves.pick();
                     assert(best != MOVE_NONE);
-                    ++evasions.index;
+                    ++moves.index;
 
                     if (best != ttMove) {
                         return best;
@@ -253,8 +265,8 @@ Move MovePicker::pick() {
                 ++phase;
 
                 // Same as state GenCaps, only in quiescence search
-                qscaps = gen_caps(board, board.turn());
-                score_captures(qscaps);
+                moves = gen_caps(board, board.turn());
+                score_captures();
 
             }
 
@@ -262,12 +274,13 @@ Move MovePicker::pick() {
 
             {
 
-                if (qscaps.index >= qscaps.size)
+                if (moves.index >= moves.size) {
                     return MOVE_NONE;
+                }
 
                 // Pick the best move
-                Move best = qscaps.pick();
-                qscaps.index++;
+                Move best = moves.pick();
+                moves.index++;
                 return best;
 
             }

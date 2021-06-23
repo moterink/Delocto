@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,7 @@
 #include "hashkeys.hpp"
 
 #include <algorithm>
+#include <sstream>
 #include <ctype.h>
 
 static const unsigned int CastleMask[64] = {
@@ -42,6 +43,11 @@ static const unsigned int CastleMask[64] = {
 
 };
 
+static const char PieceToChar[COLOR_COUNT][PIECETYPE_COUNT] = {
+    { 'P', 'N', 'B', 'R', 'Q', 'K' },
+    { 'p', 'n', 'b', 'r', 'q', 'k' }
+};
+
 // Remove all pieces from the board and reset the game state
 void Board::clear() {
 
@@ -54,14 +60,14 @@ void Board::clear() {
     bbColors[BLACK] = 0;
     bbColors[BOTH] = 0;
 
-    for (Color c = WHITE; c < BOTH; c++) {
-        for (Piecetype pt = PAWN; pt < PIECE_NONE; pt++) {
+    for (Color c = WHITE; c < COLOR_COUNT; c++) {
+        for (Piecetype pt = PAWN; pt < PIECETYPE_COUNT; pt++) {
             bbPieces[pt] = 0;
             pieceCounts[c][pt] = 0; // Reset the piece counters
         }
     }
     // Clear the piece type array
-    std::fill(pieceTypes, pieceTypes+64, PIECE_NONE);
+    pieceTypes.fill(PIECE_NONE);
 
     // Reset the game state
     state.enPassant = SQUARE_NONE;
@@ -109,8 +115,8 @@ void Board::calc_keys() {
     }
 
     // Generate the material hash key
-    for (Color c = WHITE; c < BOTH; c++) {
-        for (Piecetype pt = PAWN; pt < PIECE_NONE; pt++) {
+    for (Color c = WHITE; c < COLOR_COUNT; c++) {
+        for (Piecetype pt = PAWN; pt < PIECETYPE_COUNT; pt++) {
             hash_material(c, pt);
         }
     }
@@ -279,11 +285,15 @@ void Board::set_fen(std::string fen) {
     }
 
     // The final part of the FEN string is the number of half moves made since the last capture or pawn move
+    // and the number of moves played on the board so far
     if (fen.size() >= i && isdigit(fen[i])) {
         std::string cut = fen.substr(i);
-        state.fiftyMoves = std::stoi(cut.substr(0, cut.find(" ")));
+        unsigned space = cut.find(" ");
+        state.fiftyMoves = std::stoi(cut.substr(0, space));
+        ply = std::stoi(cut.substr(space)) * 2 - 1;
     } else {
         state.fiftyMoves = 0;
+        ply = 0;
     }
 
     // Update checkers and king blockers and calculate the hash keys
@@ -292,29 +302,97 @@ void Board::set_fen(std::string fen) {
 
 }
 
-// Print the current position to screen for debuging purposals
-void Board::print() const {
+// Get a FEN string from the current piece setup on the board
+std::string Board::get_fen() const {
+
+    std::string fen;
+    unsigned emptySquaresCount = 0;
+
+    for (int rank = RANK_8; rank >= RANK_1; rank--) {
+        for (int file = FILE_A; file >= FILE_H; file--) {
+
+            const unsigned sq = square(file, rank);
+
+            if (is_sq_empty(sq)) {
+                emptySquaresCount++;
+                continue;
+            }
+            
+            if (emptySquaresCount > 0) {
+                fen += std::to_string(emptySquaresCount);
+                emptySquaresCount = 0;
+            }
+
+            fen += PieceToChar[owner(sq)][piecetype(sq)];
+
+        }
+
+        if (emptySquaresCount > 0) {
+            fen += std::to_string(emptySquaresCount);
+            emptySquaresCount = 0;
+        }
+
+        if (rank > RANK_1) {
+            fen += '/';
+        }
+
+    }
+
+    fen += stm == WHITE ? " w " : " b ";
+
+    if (state.castling == 0) {
+        fen += '-';
+    } else {
+        if (state.castling & WKCASFLAG) {
+            fen += 'K';
+        }
+        if (state.castling & WQCASFLAG) {
+            fen += 'Q';
+        }
+        if (state.castling & BKCASFLAG) {
+            fen += 'k';
+        }
+        if (state.castling & BQCASFLAG) {
+            fen += 'q';
+        }
+    }
+
+    unsigned epSq = enpassant_square();
+
+    fen += ' ' + (epSq != SQUARE_NONE ? SQUARE_NAMES[epSq] : "-") + ' ';
+
+    fen += std::to_string(state.fiftyMoves) + ' ' + std::to_string(ply / 2 + 1);
+
+    return fen;
+
+}
+
+// Convert the current position to a string for debuging purposals
+std::string Board::to_string() const {
+
+    std::stringstream ss;
 
     char labels[2][6] = { { 'P', 'N', 'B', 'R', 'Q', 'K' }, { 'p', 'n', 'b', 'r', 'q', 'k' } };
     unsigned r  = 0;
     unsigned sq = 0;
 
     while (sq != SQUARE_NONE) {
-
         if (rank(sq) != r) {
-            std::cout << std::endl;
+            ss << std::endl;
             r++;
         }
 
         if (pieceTypes[sq] != PIECE_NONE) {
-            std::cout << labels[owner(sq)][pieceTypes[sq]] << ' ';
+            ss << labels[owner(sq)][pieceTypes[sq]] << ' ';
         } else {
-            std::cout << ". ";
+            ss << ". ";
         }
         sq++;
     }
 
-    std::cout << std::endl << std::endl;
+    ss << std::endl;
+
+    return ss.str();
 
 }
 
@@ -407,6 +485,9 @@ void Board::move_piece(const unsigned fromSq, const unsigned toSq) {
 void Board::do_move(const Move move) {
 
     assert(move != MOVE_NONE);
+
+    assert(is_valid(move));
+    assert(is_legal(move));
 
     const int fromSq          = from_sq(move);
     const int toSq            = to_sq(move);
@@ -706,10 +787,7 @@ bool Board::is_valid(const Move move) const {
         }
 
         if (moveType == ENPASSANT) {
-            if (   toSq != state.enPassant
-                || !(SQUARES[fromSq] & bbPieces[PAWN])) {
-                return false;
-            }
+            return toSq == state.enPassant && (SQUARES[fromSq] & bbPieces[PAWN]);
         }
     }
 

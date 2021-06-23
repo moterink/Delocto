@@ -1,6 +1,6 @@
 /*
   Delocto Chess Engine
-  Copyright (c) 2018-2020 Moritz Terink
+  Copyright (c) 2018-2021 Moritz Terink
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -27,7 +27,7 @@
 #include "types.hpp"
 #include "search.hpp"
 
-extern long long get_time_elapsed(TimePoint start);
+extern Duration get_time_elapsed(TimePoint start);
 extern void init_time_management(const SearchLimits& limits, SearchInfo* info);
 extern void update_time_managemement(SearchInfo* info);
 extern bool is_time_exceeded(const SearchInfo* info);
