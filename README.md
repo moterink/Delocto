@@ -1,4 +1,4 @@
-# Delocto [![Travis (.com)](https://img.shields.io/travis/com/moterink/Delocto?style=flat-square)](https://travis-ci.com/github/moterink/Delocto)
+# Delocto [![Travis (.com)](https://img.shields.io/github/workflow/status/moterink/Delocto/Delocto?style=flat-square)](https://github.com/moterink/Delocto/actions)
 
 Delocto is a chess engine which can be used for playing chess games and analyzing chess positions.
 

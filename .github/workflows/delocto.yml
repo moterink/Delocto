@@ -1,0 +1,81 @@
+name: Delocto
+
+on:
+  push:
+    branches: master
+
+  workflow_dispatch:
+    inputs: ~
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    env:
+      COMPILER_PACKAGE: ${{ matrix.config.compiler_package }}
+      CXX: ${{ matrix.config.compiler }}
+      EXECUTABLE: ${{ matrix.config.executable }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+        #  - {
+        #      name: "Windows Latest GCC++",
+        #      os: windows-latest,
+        #      compiler: g++,
+        #      executable: delocto.exe
+        #    }
+          - {
+              name: "Ubuntu Latest GCC",
+              os: ubuntu-latest,
+              compiler_package: gcc,
+              compiler: g++,
+              executable: ./delocto
+            }
+          - {
+              name: "Ubuntu Latest Clang",
+              os: ubuntu-latest,
+              compiler_package: clang,
+              compiler: clang++,
+              executable: ./delocto
+            }
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Download dependencies
+        run: |
+          sudo apt update
+          sudo apt install $COMPILER_PACKAGE
+      
+      - name: Print env
+        run: |
+          echo Trigger: ${{ github.event_name }}
+          $CXX -v
+
+      - name: Build Executable
+        run: |
+          make
+
+      - name: Benchmark
+        run: |
+          BENCHMARK=$($EXECUTABLE bench | grep 'Nodes searched (total)' | grep -Eo '[0-9]+')
+          COMMIT_BENCHMARK=$(echo "${{ github.event.head_commit.message }}" | grep -Eo '[Bb]ench(mark)?:\s[0-9]+$' | grep -Eo '[0-9]+')
+          echo Benchmark: $BENCHMARK
+          echo Reference: $COMMIT_BENCHMARK
+          if [[ $BENCHMARK != $COMMIT_BENCHMARK ]]; then
+            echo Incorrect benchmark!
+            exit 1
+          else
+            echo Matching benchmark!
+          fi
+
+      - name: Unit Tests
+        working-directory: tests
+        run: |
+          curl https://raw.githubusercontent.com/catchorg/Catch2/v2.x/single_include/catch2/catch.hpp --output catch.hpp
+          make
+          ./tests

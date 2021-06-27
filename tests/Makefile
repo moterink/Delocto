@@ -27,5 +27,7 @@ COMMON := $(filter-out $(EXCLUDED), $(wildcard ../src/*.cpp))
 
 SRC = $(COMMON) tests.cpp
 
+FLAGS = -pthread
+
 all:
-	$(CXX) $(CXXSTD) $(SRC) -o $(TARGET)
+	$(CXX) $(CXXSTD) $(FLAGS) $(SRC) -o $(TARGET)
