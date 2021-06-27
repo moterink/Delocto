@@ -32,7 +32,7 @@ constexpr int HISTORY_VALUE_MAX = 0x4000;
 // Stages of the move picker
 enum MovePickPhase : unsigned {
 
-    TTMove, GenCaps, GoodCaps, FirstKiller, SecondKiller, CounterMove, GenQuiets, Quiets, LosingCaps, TTMoveQS, GenEvasions, Evasions, GenCapsQS, CapsQS
+    TTMove, GenCaps, GoodCaps, FirstKiller, SecondKiller, CounterMove, GenQuiets, Quiets, LosingCaps, TTMoveEvasions, GenEvasions, Evasions, TTMoveQS, GenCapsQS, CapsQS
 
 };
 
@@ -54,16 +54,13 @@ class MovePicker {
             killers[0] = thread->killers[plies][0];
             killers[1] = thread->killers[plies][1];
 
-            // If we do not have a move from the transposition table, skip to generating the captures
+            phase = board.checkers() ? TTMoveEvasions : TTMove;
+
+            // If we do not have a move from the transposition table, skip to evasions or captures
             if (t != MOVE_NONE) {
                 ttMove = t;
             } else {
-                phase = GenCaps;
-                /*TODO: if (board.checkers()) {
-                    phase = GenEvasions;
-                } else {
-                    phase = GenCaps;
-                }*/
+                ++phase;
             }
 
             // Get the counter move if available
@@ -83,13 +80,11 @@ class MovePicker {
             }
 
             // If we do not have a transposition table move, skip to evasions or captures
-            phase = TTMoveQS;
+            phase = board.checkers() ? TTMoveEvasions : TTMoveQS;
+
+            // If we do not have a move from the transposition table, skip to evasions or captures
             if (ttMove == MOVE_NONE) {
-                if (board.checkers()) {
-                    phase = GenEvasions;
-                } else {
-                    phase = GenCapsQS;
-                }
+                ++phase;
             }
 
         }

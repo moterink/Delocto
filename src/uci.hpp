@@ -34,7 +34,7 @@
 #define VERSION 0.6
 
 constexpr unsigned TRANSPOSITION_TABLE_SIZE_MAX = 4096;
-constexpr unsigned TRANSPOSITION_TABLE_SIZE_MIN = 0;
+constexpr unsigned TRANSPOSITION_TABLE_SIZE_MIN = 1;
 constexpr unsigned TRANSPOSITION_TABLE_SIZE_DEFAULT = 160;
 constexpr unsigned THREADS_MAX = 4;
 constexpr unsigned THREADS_MIN = 1;

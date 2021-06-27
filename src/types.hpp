@@ -165,12 +165,12 @@ constexpr Value VALUE_DRAW      = 0;
 
 // EvalTerm structure
 // Consists of a value for the midgame and one for the endgame
-typedef struct {
+struct EvalTerm {
 
     int mg = 0;
     int eg = 0;
 
-} EvalTerm;
+};
 
 // Directions
 enum {

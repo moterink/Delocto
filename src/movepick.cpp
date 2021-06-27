@@ -66,6 +66,7 @@ Move MovePicker::pick() {
         // Transposition Table Move
         case TTMove:
         case TTMoveQS:
+        case TTMoveEvasions:
 
             {
                 
@@ -74,8 +75,8 @@ Move MovePicker::pick() {
                 // First, try the move from the transposition table. Check if it is valid in the current position
                 if (ttMove != MOVE_NONE && board.is_valid(ttMove)) {
                     return ttMove;
-                } else if (phase == GenEvasions) {
-                    return pick(); // If we are in QS search, skip to GenEvasions
+                } else {
+                    return pick(); // Skip to next stage if no ttMove available
                 }
 
             }
@@ -219,20 +220,14 @@ Move MovePicker::pick() {
 
             {
 
-                ++phase;
-
                 // Generate all evasions (both quiet and captures, also in quiescence search)
                 // and score them with either mvv-lva or history values
+                assert(board.checkers());
+                
+                ++phase;
+
                 moves = gen_evasions(board, MOVES_ALL);
                 score_evasions();
-                /*if (board.checkers()) {
-                    moves = gen_evasions(board, MOVES_ALL);
-                    score_evasions();
-                    ++phase;
-                } else {
-                    phase = GenCapsQS;
-                    return pick(); // Call pick() again for generating captures in quiescence
-                }*/
 
             }
 
@@ -253,7 +248,7 @@ Move MovePicker::pick() {
 
                 }
 
-                // Do not continue with captures in quiescence search; all captures evading check have already been searched in Evasions
+                // Do not continue with any other stages; all moves evading check have already been searched here
                 return MOVE_NONE;
 
             }

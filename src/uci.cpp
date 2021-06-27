@@ -218,7 +218,7 @@ bool parse_uci_input(std::string input, Board& board) {
     // Set an option
     } else if (input.find("setoption name ") == 0) {
         if (input.find("Hash value ") == 15) {
-            TTable.set_size(std::stoi(input.substr(26)));
+            TTable.set_size(std::max(1, std::stoi(input.substr(26))));
             TTable.clear();
         } else if (input.find("Threads value ") == 15) {
             ThreadsCount = std::stoi(input.substr(29));

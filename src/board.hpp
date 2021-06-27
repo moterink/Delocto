@@ -33,7 +33,7 @@
 // FEN string of the inital position in chess
 static const std::string INITIAL_POSITION_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-typedef struct {
+struct StateInfo {
 
     unsigned int castling = 0; // Castling rights
     unsigned int enPassant = SQUARE_NONE; // En-passant square
@@ -47,7 +47,7 @@ typedef struct {
     uint64_t pawnKey = 0;
     uint64_t materialKey = 0;
 
-}StateInfo;
+};
 
 static const int MvvLvaVictim[5]   = { 100, 200, 300, 400, 500 };
 static const int MvvLvaAttacker[6] = { 1, 2, 3, 4, 5, 0 };

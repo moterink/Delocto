@@ -49,7 +49,7 @@ enum Phase : unsigned {
 
 };
 
-typedef struct {
+struct EvalInfo {
 
     uint64_t mobilityArea[2] = { 0 };
     uint64_t pieceAttacks[2][6] = { { 0, 0, 0, 0, 0, 0 }, { 0, 0, 0, 0, 0, 0 } };
@@ -66,7 +66,7 @@ typedef struct {
     uint64_t pawnAttacksSpan[2] = { 0 };
     EvalTerm mobility[2] = { V(0, 0), V(0, 0) };
 
-} EvalInfo;
+};
 
 // Return the scaled evaluation based on the calculated scale factor
 inline int scaled_eval(const int scale, const EvalTerm value) {

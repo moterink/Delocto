@@ -28,14 +28,14 @@
 
 // A Magic object, containing the magic number, the magic shift,
 // the attack mask and all attack bitboards for every magic index
-typedef struct {
+struct Magic {
 
     uint64_t magic;
     uint64_t mask;
     uint64_t shift;
     uint64_t *attacks;
 
-} Magic;
+};
 
 extern Magic BishopMagics[64];
 extern Magic RookMagics[64];

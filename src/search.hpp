@@ -64,7 +64,7 @@ class PvLine {
 
 // Search Limits given to the go() function; set time/movetime/depth limits
 // specified by the user
-typedef struct {
+struct SearchLimits {
 
     Duration moveTime = -1;
     Duration time = -1;
@@ -73,7 +73,7 @@ typedef struct {
     bool infinite = false;
     Depth depth = DEPTH_MAX;
 
-} SearchLimits;
+};
 
 // Various search information variables; shows status of current search, current iteration,
 // killer moves, history, bestmove and currentMove at given depth, evaluations, time management and more

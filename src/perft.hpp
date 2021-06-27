@@ -27,7 +27,7 @@
 #include "types.hpp"
 #include "board.hpp"
 
-typedef struct {
+struct PerftInfo {
 
     Depth depth = 0;
     uint64_t divide[250] = { 0 };
@@ -36,7 +36,7 @@ typedef struct {
     uint64_t castlesCount = 0;
     uint64_t promotionsCount = 0;
 
-} PerftInfo;
+};
 
 extern uint64_t runPerft(const std::string fen, const unsigned depth);
 
