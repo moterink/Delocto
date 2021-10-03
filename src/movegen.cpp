@@ -360,7 +360,9 @@ MoveList gen_evasions(const Board& board, const MoveGenType mtype) {
 
     if (popcount(checkers) >= 2) {
 
-        Bitboard kingMoves = KingAttacks[ksq] & ((mtype == MOVES_QUIETS) ? ~board.pieces(BOTH) : board.pieces(!color));
+        Bitboard kingMoves = KingAttacks[ksq] & ((mtype == MOVES_QUIETS) ? ~board.pieces(BOTH)
+                                                                         : (mtype == MOVES_CAPTURES) ? board.pieces(!color)
+                                                                         : ~board.pieces(color));
         while (kingMoves) {
             moveList.append(make_move(ksq, pop_lsb(kingMoves), NORMAL));
         }

@@ -269,14 +269,19 @@ Move MovePicker::pick() {
 
             {
 
-                if (moves.index >= moves.size) {
-                    return MOVE_NONE;
+                while (moves.index < moves.size) {
+
+                    Move best = moves.pick();
+                    assert(best != MOVE_NONE);
+                    ++moves.index;
+
+                    if (best != ttMove) {
+                        return best;
+                    }
+
                 }
 
-                // Pick the best move
-                Move best = moves.pick();
-                moves.index++;
-                return best;
+                return MOVE_NONE;
 
             }
 

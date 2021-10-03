@@ -29,13 +29,9 @@
 #include "timeman.hpp"
 #include "thread.hpp"
 
-static void clear_hash() {
-    TTable.clear();
-}
-
 SpinOption   ThreadsOption      = SpinOption("Threads", 1, 1, 4);
 SpinOption   HashOption         = SpinOption("Hash", 64, 1, 4096);
-ButtonOption ClearHashOption    = ButtonOption("Clear Hash", clear_hash);
+ButtonOption ClearHashOption    = ButtonOption("Clear Hash", [] { TTable.clear(); });
 SpinOption   MoveOverheadOption = SpinOption("MoveOverhead", 100, 0, 10000);
 SpinOption   MultiPVOption      = SpinOption("MultiPV", 1, 1, 100);
 
