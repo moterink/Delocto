@@ -39,6 +39,8 @@
 #include <cmath>
 #include <chrono>
 
+#define VERSION 0.6
+
 // Indices for ranks
 enum Rank : int {
 
@@ -53,32 +55,35 @@ enum File : int {
 
 };
 
+
+typedef uint64_t Bitboard;
+
 // Bitboards for ranks
-static const uint64_t BB_RANK_1 = 0xFF;
-static const uint64_t BB_RANK_2 = BB_RANK_1 << 8;
-static const uint64_t BB_RANK_3 = BB_RANK_1 << 16;
-static const uint64_t BB_RANK_4 = BB_RANK_1 << 24;
-static const uint64_t BB_RANK_5 = BB_RANK_1 << 32;
-static const uint64_t BB_RANK_6 = BB_RANK_1 << 40;
-static const uint64_t BB_RANK_7 = BB_RANK_1 << 48;
-static const uint64_t BB_RANK_8 = BB_RANK_1 << 56;
+constexpr Bitboard BB_RANK_1 = 0xFF;
+constexpr Bitboard BB_RANK_2 = BB_RANK_1 << 8;
+constexpr Bitboard BB_RANK_3 = BB_RANK_1 << 16;
+constexpr Bitboard BB_RANK_4 = BB_RANK_1 << 24;
+constexpr Bitboard BB_RANK_5 = BB_RANK_1 << 32;
+constexpr Bitboard BB_RANK_6 = BB_RANK_1 << 40;
+constexpr Bitboard BB_RANK_7 = BB_RANK_1 << 48;
+constexpr Bitboard BB_RANK_8 = BB_RANK_1 << 56;
 
 // Bitboards for files
-static const uint64_t BB_FILE_H = 0x101010101010101;
-static const uint64_t BB_FILE_G = BB_FILE_H << 1;
-static const uint64_t BB_FILE_F = BB_FILE_H << 2;
-static const uint64_t BB_FILE_E = BB_FILE_H << 3;
-static const uint64_t BB_FILE_D = BB_FILE_H << 4;
-static const uint64_t BB_FILE_C = BB_FILE_H << 5;
-static const uint64_t BB_FILE_B = BB_FILE_H << 6;
-static const uint64_t BB_FILE_A = BB_FILE_H << 7;
+constexpr Bitboard BB_FILE_H = 0x101010101010101;
+constexpr Bitboard BB_FILE_G = BB_FILE_H << 1;
+constexpr Bitboard BB_FILE_F = BB_FILE_H << 2;
+constexpr Bitboard BB_FILE_E = BB_FILE_H << 3;
+constexpr Bitboard BB_FILE_D = BB_FILE_H << 4;
+constexpr Bitboard BB_FILE_C = BB_FILE_H << 5;
+constexpr Bitboard BB_FILE_B = BB_FILE_H << 6;
+constexpr Bitboard BB_FILE_A = BB_FILE_H << 7;
 
 // Arrays of bitboards for ranks and files so they can be accessed numerically
-static const uint64_t RANKS[8] = { BB_RANK_1, BB_RANK_2, BB_RANK_3, BB_RANK_4, BB_RANK_5, BB_RANK_6, BB_RANK_7, BB_RANK_8 };
-static const uint64_t FILES[8] = { BB_FILE_H, BB_FILE_G, BB_FILE_F, BB_FILE_E, BB_FILE_D, BB_FILE_C, BB_FILE_B, BB_FILE_A };
+constexpr Bitboard RANKS[8] = { BB_RANK_1, BB_RANK_2, BB_RANK_3, BB_RANK_4, BB_RANK_5, BB_RANK_6, BB_RANK_7, BB_RANK_8 };
+constexpr Bitboard FILES[8] = { BB_FILE_H, BB_FILE_G, BB_FILE_F, BB_FILE_E, BB_FILE_D, BB_FILE_C, BB_FILE_B, BB_FILE_A };
 
 // Bitboards for each square
-static const uint64_t SQUARES[65] = {
+constexpr Bitboard SQUARES[65] = {
 
     0x1,               0x2,               0x4,               0x8,               0x10,               0x20,               0x40,               0x80,
     0x100,             0x200,             0x400,             0x800,             0x1000,             0x2000,             0x4000,             0x8000,
@@ -95,7 +100,9 @@ static const uint64_t SQUARES[65] = {
 // Indices for each square, SQUARE_NONE = 64
 constexpr unsigned SQUARE_COUNT = 64;
 
-enum Square : unsigned {
+typedef int Square;
+
+enum : int {
 
     SQUARE_H1, SQUARE_G1, SQUARE_F1, SQUARE_E1, SQUARE_D1, SQUARE_C1, SQUARE_B1, SQUARE_A1,
     SQUARE_H2, SQUARE_G2, SQUARE_F2, SQUARE_E2, SQUARE_D2, SQUARE_C2, SQUARE_B2, SQUARE_A2,
@@ -110,26 +117,10 @@ enum Square : unsigned {
 };
 
 // Bitboards for white, black and all squares on the board
-static const uint64_t WHITE_SQUARES = 0xaa55aa55aa55aa55;
-static const uint64_t BLACK_SQUARES = 0x55aa55aa55aa55aa;
-static const uint64_t ALL_SQUARES   = WHITE_SQUARES | BLACK_SQUARES;
+constexpr Bitboard SQUARES_WHITE = 0xaa55aa55aa55aa55;
+constexpr Bitboard SQUARES_BLACK = 0x55aa55aa55aa55aa;
+constexpr Bitboard SQUARES_ALL   = SQUARES_WHITE | SQUARES_BLACK;
 
-// Flags for the castling rights
-#define WKCASFLAG 1
-#define WQCASFLAG 2
-#define BKCASFLAG 4
-#define BQCASFLAG 8
-
-// Masks which extract castling rights based on the color
-#define WHITE_CASTLE_MASK  3
-#define BLACK_CASTLE_MASK 12
-#define ALL_CASTLE_MASK   15
-
-static const uint64_t CASTLE_MASKS[2]   = { WHITE_CASTLE_MASK, BLACK_CASTLE_MASK };
-static const uint64_t CASTLE_SQUARES[4] = { SQUARE_G1, SQUARE_C1, SQUARE_G8, SQUARE_C8 };
-static const uint64_t CASTLE_FLAGS[4]   = { WKCASFLAG, WQCASFLAG, BKCASFLAG, BQCASFLAG };
-
-typedef unsigned Direction;
 typedef uint16_t Move;
 typedef uint16_t MoveType;
 
@@ -148,10 +139,9 @@ typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::high_resolution_clock::time_point TimePoint;
 typedef long long Duration;
 
-// Maximum Depth and Moves for search
+// Maximum depth and moves for search
 constexpr Depth DEPTH_MAX    = 100;
 constexpr Depth DEPTH_NONE   = -36;
-constexpr unsigned MAX_MOVES = 256;
 
 // Values for mate, draw, infinte, unknown
 // They need to be equal or below the numeric limit of int16_t,
@@ -173,15 +163,15 @@ struct EvalTerm {
 };
 
 // Directions
-enum {
-    LEFT, UP, RIGHT, DOWN, LEFTUP, LEFTDOWN, RIGHTUP, RIGHTDOWN
-};
-
-static const int DIRECTIONS[2][8] = {
-
-    { 1,   8, -1, -8,  9, -7,  7, -9 },
-    { -1, -8,  1,  8, -9,  7, -7,  9 }
-
+enum : int {
+    LEFT      =  1,
+    UP        =  8,
+    RIGHT     = -1,
+    DOWN      = -8,
+    LEFTUP    =  9,
+    LEFTDOWN  = -7,
+    RIGHTUP   =  7,
+    RIGHTDOWN = -9
 };
 
 // Colors
@@ -215,10 +205,10 @@ static const int bitIndex64[64] = {
 static const uint64_t debruijn64 = 0x03f79d71b4cb0a89;
 
 // Central files bitboards on the board
-static const uint64_t CENTRAL_FILES = BB_FILE_D | BB_FILE_E;
+constexpr Bitboard CENTRAL_FILES = BB_FILE_D | BB_FILE_E;
 
 // Adjacent files bitboards array, accessed by file index
-static const uint64_t ADJ_FILES[8] = {
+constexpr Bitboard ADJ_FILES[8] = {
 
     BB_FILE_G,
     BB_FILE_F | BB_FILE_H,
@@ -232,7 +222,7 @@ static const uint64_t ADJ_FILES[8] = {
 };
 
 // Bitboards for the king flank given a file index
-static const uint64_t KING_FLANK[8] = {
+constexpr Bitboard KING_FLANK[8] = {
 
     BB_FILE_F | BB_FILE_G | BB_FILE_H,
     BB_FILE_E | BB_FILE_F | BB_FILE_G | BB_FILE_H,
@@ -246,158 +236,161 @@ static const uint64_t KING_FLANK[8] = {
 };
 
 // Base ranks (first 3 ranks) for a given color
-static const uint64_t COLOR_BASE_RANKS[2] = {
+constexpr Bitboard COLOR_BASE_RANKS[COLOR_COUNT] = {
 
     BB_RANK_1 | BB_RANK_2 | BB_RANK_3, BB_RANK_8 | BB_RANK_7 | BB_RANK_6
 
 };
 
 // 4 central squares bitboard (D4, D5, E4, E5)
-static const uint64_t CENTRAL_SQUARES = SQUARES[SQUARE_D4] | SQUARES[SQUARE_D5] | SQUARES[SQUARE_E4] | SQUARES[SQUARE_E5];
+constexpr Bitboard CENTRAL_SQUARES = SQUARES[SQUARE_D4] | SQUARES[SQUARE_D5] | SQUARES[SQUARE_E4] | SQUARES[SQUARE_E5];
 
 // Start rank bitboards of the pawns
-static const uint64_t PAWN_STARTRANK[2] = {
+constexpr Bitboard PAWN_STARTRANK[COLOR_COUNT] = {
 
     BB_RANK_2, BB_RANK_7
 
 };
 
 // Bitboards for the first rank pawns can reach
-static const uint64_t PAWN_FIRST_PUSH_RANK[2] = {
+constexpr Bitboard PAWN_FIRST_PUSH_RANK[COLOR_COUNT] = {
 
     BB_RANK_3, BB_RANK_6
 
 };
 
 // Bitboards for the ranks pawns have to reach in order to be promoted
-static const uint64_t PAWN_FINALRANK[2] = {
+constexpr Bitboard PAWN_FINALRANK[COLOR_COUNT] = {
 
     BB_RANK_8, BB_RANK_1
 
 };
 
-static std::map<unsigned int, unsigned int> castleByKingpos = { {SQUARE_G1, WKCASFLAG}, {SQUARE_C1, WQCASFLAG}, {SQUARE_G8, BKCASFLAG}, {SQUARE_C8, BQCASFLAG} };
-
 // Get least significant set bit in unsigned 64bit integer
-inline unsigned int lsb_index(const uint64_t bit) {
+inline Square lsb_index(const Bitboard b) {
 
-    return bitIndex64[((bit & -bit) * debruijn64) >> 58];
+    return static_cast<Square>(bitIndex64[((b & -b) * debruijn64) >> 58]);
 
 }
 
-inline unsigned int msb_index(const uint64_t bit) {
+inline Square msb_index(const Bitboard bit) {
 
     // __builtin_clzll returns undefined behaviour if bit is 0!
 
-    return 63 - __builtin_clzll(bit);
+    return static_cast<Square>(63 - __builtin_clzll(bit));
 
 }
 
 // Get least significant set bit in unsigned 64bit integer
-inline uint64_t lsb(const uint64_t bit) {
+inline Bitboard lsb(const Bitboard b) {
 
-    return bit & -bit;
+    return b & -b;
 
 }
 
 // Get most significant set bit in unsigned 64bit integer
-inline uint64_t msb(const uint64_t bit) {
+inline uint64_t msb(const Bitboard b) {
 
     // __builtin_clzll returns undefined behaviour if bit is 0!
+    assert(b != 0);
 
-    return SQUARES[63 - __builtin_clzll(bit)];
+    return SQUARES[63 - __builtin_clzll(b)];
 
 }
 
 // Remove least significant set bit in unsigned 64bit integer
-inline unsigned pop_lsb(uint64_t& bit) {
+inline Square pop_lsb(Bitboard& bit) {
 
-   const unsigned index = lsb_index(bit);
-   bit ^= (1ull << index);
-   return index;
+   const Square sq = lsb_index(bit);
+   bit ^= (1ull << sq);
+   return sq;
 
 }
 
 // Count set bits in unsigned 64bit integer
-inline int popcount(const uint64_t bit) {
+inline int popcount(const Bitboard b) {
 
-    return __builtin_popcountll(bit);
+    return __builtin_popcountll(b);
 
 }
 
 // Check if a square is still on the board
-inline bool sq_valid(const int sq) {
+inline bool sq_valid(const Square sq) {
 
     return (sq >= 0 && sq < 64);
 
 }
 
 // Get rank index (0-7) of given square index
-inline Rank rank(const unsigned sq) {
+inline Rank rank(const Square sq) {
 
     return Rank(sq >> 3);
 
 }
 
 // Get file index (0-7) of given square index
-inline File file(const unsigned sq) {
+inline File file(const Square sq) {
 
     return File(sq & 7);
 
 }
 
-inline unsigned square(const unsigned file, const unsigned rank) {
+inline Square square(const unsigned file, const unsigned rank) {
 
-    return file + (rank * 8);
+    return static_cast<Square>(file + (rank * 8));
 
 }
 
 // Get relative rank index for given color of given square index
-inline Rank relative_rank(const Color color, const unsigned sq) {
+inline Rank relative_rank(const Color color, const Square sq) {
 
     return Rank((color == WHITE) ? rank(sq) : 7 - rank(sq));
 
 }
 
-inline unsigned relative_square(const Color color, const unsigned sq) {
+inline Square relative_square(const Color color, const Square sq) {
 
-    return (color == WHITE) ? sq : 63 - sq;
+    return static_cast<Square>(color == WHITE ? sq : 63 - sq);
 
 }
 
 // Get most forward piece on bitboard for the given color
-inline uint64_t most_forward(const Color color, const uint64_t bitboard) {
+inline Bitboard most_forward(const Color color, const Bitboard bitboard) {
 
     return (color == WHITE) ? msb(bitboard) : lsb(bitboard);
 
 }
 
 // Get most backward piece on bitboard for the given color
-inline uint64_t most_backward(const Color color, const uint64_t bitboard) {
+inline Bitboard most_backward(const Color color, const Bitboard bitboard) {
 
     return (color == WHITE) ? lsb(bitboard) : msb(bitboard);
 
 }
 
-inline uint64_t shift_up(const uint64_t b, const Color color) {
+inline const int direction(const Color color, const int direction) {
+    return direction * (color == WHITE ? 1 : -1);
+}
+
+inline Bitboard shift_up(const Bitboard b, const Color color) {
 
     return (color == WHITE) ? b << 8 : b >> 8;
 
 }
 
-inline uint64_t shift_down(const uint64_t b, const Color color) {
+inline Bitboard shift_down(const Bitboard b, const Color color) {
 
     return (color == WHITE) ? b >> 8 : b << 8;
 
 }
 
-inline uint64_t shift_left(const uint64_t b, const Color color) {
+inline Bitboard shift_left(const Bitboard b, const Color color) {
 
     return (color == WHITE) ? b << 1 : b >> 1;
 
 }
 
-inline uint64_t shift_right(const uint64_t b, const Color color) {
+inline Bitboard shift_right(const Bitboard b, const Color color) {
 
     return (color == WHITE) ? b >> 1 : b << 1;
 

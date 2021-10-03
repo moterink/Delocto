@@ -27,7 +27,7 @@
 
 // Directions of movement for bishops and rooks
 constexpr int BishopDirections[4] = { LEFTUP, LEFTDOWN, RIGHTUP, RIGHTDOWN };
-constexpr int RookDirections[4]   = { LEFT, RIGHT, UP, DOWN };
+constexpr int RookDirections[4]   = {   LEFT,    RIGHT,      UP,      DOWN };
 
 // Magic numbers from Ethereal chess engine
 constexpr uint64_t Magics[2][64] = {
@@ -64,29 +64,29 @@ Magic RookMagics[64];
 uint64_t BishopMagicAttacks[0x1480];
 uint64_t RookMagicAttacks[0x19000];
 
-uint64_t PawnAttacksSpan[2][64]; // The adjacent files to a pawn for each color and every square
-uint64_t KingShelterSpan[2][64]; // The three (or two on the edge) files ahead of the king
-uint64_t KingRing[2][64]; // The squares surrounding the king. On the edge, an additional rank/file is added
-uint64_t RayTable[64][64]; // The line intersecting two squares, excluding the start square
-uint64_t LineTable[64][64]; // The line intersecting two squares
+Bitboard PawnAttacksSpan[2][64]; // The adjacent files to a pawn for each color and every square
+Bitboard KingShelterSpan[2][64]; // The three (or two on the edge) files ahead of the king
+Bitboard KingRing[2][64]; // The squares surrounding the king. On the edge, an additional rank/file is added
+Bitboard RayTable[64][64]; // The line intersecting two squares, excluding the start square
+Bitboard LineTable[64][64]; // The line intersecting two squares
 
 // Attack Bitboards
-uint64_t PawnAttacks[2][64];
-uint64_t KnightAttacks[64];
-uint64_t BishopAttacks[64];
-uint64_t RookAttacks[64];
-uint64_t QueenAttacks[64];
-uint64_t KingAttacks[64];
+Bitboard PawnAttacks[2][64];
+Bitboard KnightAttacks[64];
+Bitboard BishopAttacks[64];
+Bitboard RookAttacks[64];
+Bitboard QueenAttacks[64];
+Bitboard KingAttacks[64];
 
 // Mask Bitboards
-uint64_t FrontFileMask[2][64]; // Squares in front of each square until the board edge
-uint64_t PassedPawnMask[2][64]; // The three (or two on the edge) files ahead of the square
-uint64_t BackwardPawnMask[2][64]; // The adjacent files to a pawn with the squares left and right included
+Bitboard FrontFileMask[2][64]; // Squares in front of each square until the board edge
+Bitboard PassedPawnMask[2][64]; // The three (or two on the edge) files ahead of the square
+Bitboard BackwardPawnMask[2][64]; // The adjacent files to a pawn with the squares left and right included
 
 // Get a bitboard of all squares a slider can move to  from a given square
-uint64_t get_slider_attacks(const unsigned sq, const uint64_t occupied, const int directions[4]) {
+Bitboard get_slider_attacks(const Square sq, const Bitboard occupied, const int directions[4]) {
 
-    uint64_t attacks = 0;
+    Bitboard attacks = 0;
 
     // Move into every direction until we encounter a piece
     for (unsigned d = 0; d < 4; d++) {
@@ -94,7 +94,7 @@ uint64_t get_slider_attacks(const unsigned sq, const uint64_t occupied, const in
         int nsq = sq;
         while (true) {
             int lsq = nsq;
-            nsq += DIRECTIONS[WHITE][directions[d]];
+            nsq += direction(WHITE, directions[d]);
             // Check if the square is still on the board and that we did not go beyond the board edge
             if (sq_valid(nsq) && KingDistance[lsq][nsq] == 1) {
                 // Add the square to the bitboard. We do not care about the color of the piece, since we
@@ -123,11 +123,11 @@ int get_magic_index(const uint64_t occupied, Magic *table) {
 }
 
 // Initialize the attack table for a given square so we can look up the pseudo-legal moves later
-void init_magics(const unsigned sq, Magic *table, const uint64_t magic, const int directions[4]) {
+void init_magics(const Square sq, Magic *table, const uint64_t magic, const int directions[4]) {
 
     // Board edge
-    const uint64_t edge = ((BB_RANK_1 | BB_RANK_8) & ~RANKS[rank(sq)]) | ((BB_FILE_A | BB_FILE_H) & ~FILES[file(sq)]);
-    uint64_t occupied   = 0;
+    const Bitboard edge = ((BB_RANK_1 | BB_RANK_8) & ~RANKS[rank(sq)]) | ((BB_FILE_A | BB_FILE_H) & ~FILES[file(sq)]);
+    Bitboard occupied   = 0;
 
     table[sq].magic = magic; // Magic number
     table[sq].mask  = get_slider_attacks(sq, 0, directions) & ~edge; // All squares this piece can reach with no pieces on the board, excluding the edge
@@ -154,7 +154,7 @@ void init_magics(const unsigned sq, Magic *table, const uint64_t magic, const in
 void init_attacks() {
 
     // Loop over every square on the board
-    for (unsigned sq = 0; sq < 64; sq++) {
+    for (Square sq = 0; sq < 64; sq++) {
 
         // Pawns only attack the two diagonal squares ahead of them
         PawnAttacks[WHITE][sq] = ((SQUARES[sq] & ~BB_FILE_A) << 9) | ((SQUARES[sq] & ~BB_FILE_H) << 7);
@@ -192,7 +192,7 @@ void init_bitboards() {
     BishopMagics[0].attacks = BishopMagicAttacks;
     RookMagics[0].attacks   = RookMagicAttacks;
 
-    for (unsigned sq = 0; sq < 64; sq++) {
+    for (Square sq = 0; sq < 64; sq++) {
 
         init_magics(sq, BishopMagics, Magics[0][sq], BishopDirections);
         init_magics(sq, RookMagics, Magics[1][sq], RookDirections);
@@ -202,9 +202,9 @@ void init_bitboards() {
     // Initialize attack bitboards
     init_attacks();
 
-    for (unsigned int sq = 0; sq < 64; sq++) {
+    for (Square sq = 0; sq < 64; sq++) {
 
-        uint64_t pawnsFrontW = 0, pawnsFrontB = 0, kingsFrontW = 0, kingsFrontB = 0;
+        Bitboard pawnsFrontW = 0, pawnsFrontB = 0, kingsFrontW = 0, kingsFrontB = 0;
 
         for (int i = 1; i < 6; i++) {
             pawnsFrontW |= SQUARES[sq] << (i * 8);
@@ -236,14 +236,14 @@ void init_bitboards() {
         }
 
         for (unsigned i = 1; i < 8; i++) {
-            uint64_t nsq = (SQUARES[sq] << (8 * i));
+            Bitboard nsq = (SQUARES[sq] << (8 * i));
             FrontFileMask[WHITE][sq] |= nsq;
             if (nsq & BB_RANK_8)
                 break;
         }
 
         for (unsigned i = 1; i < 8; i++) {
-            uint64_t nsq = (SQUARES[sq] >> (8 * i));
+            Bitboard nsq = (SQUARES[sq] >> (8 * i));
             FrontFileMask[BLACK][sq] |= nsq;
             if (nsq & BB_RANK_1)
                 break;
@@ -251,12 +251,12 @@ void init_bitboards() {
 
     }
 
-    for (unsigned int sq1 = 0; sq1 < 64; sq1++) {
+    for (Square sq1 = 0; sq1 < 64; sq1++) {
 
-        const uint64_t bishopPseudoBB = BishopAttacks[sq1];
-        const uint64_t rookPseudoBB   = RookAttacks[sq1];
+        const Bitboard bishopPseudoBB = BishopAttacks[sq1];
+        const Bitboard rookPseudoBB   = RookAttacks[sq1];
 
-        for (unsigned int sq2 = 0; sq2 < 64; sq2++) {
+        for (Square sq2 = 0; sq2 < 64; sq2++) {
 
             if (bishopPseudoBB & SQUARES[sq2]) {
                 RayTable[sq1][sq2]  = (gen_bishop_moves(sq1, SQUARES[sq2], SQUARES[sq2]) & gen_bishop_moves(sq2, SQUARES[sq1], SQUARES[sq1])) | SQUARES[sq2];

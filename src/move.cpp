@@ -29,15 +29,15 @@
 // A move is legal if it does not leave the own king in check
 bool Board::is_legal(const Move move) const {
 
-    const int toSq   = to_sq(move);
-    const int fromSq = from_sq(move);
-    const int kSq    = lsb_index(pieces(stm, KING));
+    const Square toSq   = to_sq(move);
+    const Square fromSq = from_sq(move);
+    const Square kSq    = lsb_index(pieces(stm, KING));
 
     // An en-passant capture is illegal, if the capturing pawn is pinned,
     // or if the captured pawn reveals a sliding attacker which attacks the king
     if (move_type(move) == ENPASSANT) {
-        const unsigned capSq = toSq + DIRECTIONS[stm][DOWN];
-        uint64_t occupied = (bbColors[BOTH] ^ SQUARES[fromSq] ^ SQUARES[capSq]) | SQUARES[toSq];
+        const Square capSq = toSq + direction(stm, DOWN);
+        Bitboard occupied = (bbColors[BOTH] ^ SQUARES[fromSq] ^ SQUARES[capSq]) | SQUARES[toSq];
         return !slider_attackers(kSq, occupied, !stm);
     }
 
@@ -74,7 +74,7 @@ void print_move(const Move move) {
 }
 
 // Print a bitboard to the console
-void print_bitboard(const uint64_t bitboard) {
+void print_bitboard(const Bitboard bitboard) {
 
     int lcount, bcount;
 

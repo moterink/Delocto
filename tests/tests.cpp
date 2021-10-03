@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
     init_eval();
     init_search();
 
-    TTable.set_size(TRANSPOSITION_TABLE_SIZE_DEFAULT);
+    TTable.set_size(HashOption.get_default());
 
     int result = Catch::Session().run( argc, argv );
 
@@ -57,7 +57,8 @@ int main(int argc, char* argv[]) {
 
 }
 
-TEST_CASE("Move do/undo Consistency") {
+// When doing and then undoing a move on a board, the fens have to match
+TEST_CASE("Move do/undo consistency") {
     Board board;
     board.set_fen(INITIAL_POSITION_FEN);
     board.do_move(make_move(SQUARE_E2, SQUARE_E4, NORMAL));
@@ -65,48 +66,116 @@ TEST_CASE("Move do/undo Consistency") {
     REQUIRE(board.get_fen() == INITIAL_POSITION_FEN);
 }
 
-TEST_CASE("Check Check Detection") {
+// A position where the king is in check should return a bitboard with checkers
+TEST_CASE("Check detection") {
+    static const std::string fens[] = {
+        "6k1/6pp/8/8/8/8/5pPP/6K1 w - - 0 1",
+        "6k1/6pp/8/8/8/8/4n1PP/6K1 w - - 0 1",
+        "6k1/6pp/1b6/8/8/8/6PP/6K1 w - - 0 1",
+        "6k1/6pp/8/8/8/8/6PP/1r4K1 w - - 0 1",
+        "6k1/6pp/8/2q5/8/8/6PP/6K1 w - - 0 1",
+        "6k1/5Ppp/8/8/8/8/6PP/6K1 b - - 0 1",
+        "6k1/4N1pp/8/8/8/8/6PP/6K1 b - - 0 1",
+        "6k1/6pp/8/8/8/1B6/6PP/6K1 b - - 0 1",
+        "1R4k1/6pp/8/8/8/8/6PP/6K1 b - - 0 1",
+        "6k1/6pp/8/8/2Q5/8/6PP/6K1 b - - 0 1"
+    };
+
     Board board;
-    board.set_fen("4k3/8/8/q7/8/8/8/4K3 w - - 0 1");
-    REQUIRE(board.checkers() != 0);
+    for (const std::string fen : fens) {
+        DYNAMIC_SECTION("FEN: " << fen) {
+            board.set_fen(fen);
+            REQUIRE(board.checkers());
+        }
+    }
+    
 }
 
-TEST_CASE("Stalemate Detection") {
+// A draw by insufficient material has to be detected
+TEST_CASE("Material draw detection") {
+    static const std::string fens[] = {
+        "4k3/8/8/8/8/8/8/4K1N1 w - - 0 1",
+        "4k3/8/8/8/8/8/8/4KB2 w - - 0 1",
+        "4k1n1/8/8/8/8/8/8/4K3 b - - 0 1",
+        "4kb2/8/8/8/8/8/8/4K3 b - - 0 1"
+    };
+
+    Board board;
+    for (const std::string fen : fens) {
+        DYNAMIC_SECTION("FEN: " << fen) {
+            board.set_fen(fen);
+            REQUIRE(board.check_draw() == true);
+        }
+    }
+}
+
+// A draw by 50-move rule has to be detected
+TEST_CASE("Draw by 50-move rule detection") {
+    Board board;
+    board.set_fen("k7/8/K7/8/8/8/8/2R5 b - - 100 100");
+    REQUIRE(board.check_draw() == true);
+}
+
+// A mate position should return zero legal moves
+TEST_CASE("Mate detection") {
+    static const std::string fens[] = {
+        "7k/6pp/8/8/8/8/6PP/1r5K w - - 0 1",
+        "1R5k/6pp/8/8/8/8/6PP/7K b - - 0 1",
+        "7k/7p/8/3b4/8/8/7P/1r4QK w - - 0 1",
+        "1R4qk/7p/8/4B3/8/8/7P/7K b - - 0 1",
+        "7k/7p/7r/8/8/6n1/6P1/6QK w - - 0 1",
+        "6qk/6p1/6N1/8/8/7R/7P/7K b - - 0 1"
+    };
+
+    Board board;
+    for (const std::string fen : fens) {
+        DYNAMIC_SECTION("FEN: " << fen) {
+            board.set_fen(fen);
+            MoveList moves = gen_legals(board, gen_all(board, BLACK));
+            REQUIRE(moves.size == 0);
+        }
+    }
+    
+}
+
+// A stalemate position should return zero legal moves
+TEST_CASE("Stalemate detection") {
     Board board;
     board.set_fen("k7/8/K7/8/8/8/1R6/8 b - - 0 1");
     MoveList moves = gen_legals(board, gen_all(board, BLACK));
     REQUIRE(moves.size == 0);
 }
 
-TEST_CASE("Material Draw Detection") {
+// Two evaluation calls for the same position need to return the same value
+TEST_CASE("Evaluation consistency") {
+    static const std::string fens[] = {
+        "q3kb1Q/3p1pr1/p3p2B/1p1bP3/2rN4/P1P2p2/1P4PP/R3R1K1 b - - 1 24",
+        "1k1r3r/ppqn1p2/2pbpn1p/P2pN3/1P1P1P2/2PBP2p/6PP/R1BQ2K1 w - - 0 16",
+        "r3kb1r/1p1n1pp1/p1p1pnp1/2Pp4/1P1P1P2/2N1P3/1P1B2PP/R3KB1R b KQkq - 0 14",
+        "r1bqk2r/p5pp/2pbp3/5pB1/3P4/5N2/PP3PPP/R2Q1RK1 b kq - 3 12"
+    };
+
     Board board;
-    board.set_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
-    REQUIRE(board.check_draw() == true);
+    for (const std::string fen : fens) {
+        DYNAMIC_SECTION("FEN: " << fen) {
+            board.set_fen(fen);
+            const Value value1 = evaluate(board, 0);
+            const Value value2 = evaluate(board, 0);
+            REQUIRE(value1 == value2);
+        }
+    }
 }
 
-TEST_CASE("Draw by 50-move rule Detection") {
-    Board board;
-    board.set_fen("k7/8/K7/8/8/8/8/2R5 b - - 100 100");
-    REQUIRE(board.check_draw() == true);
-}
-
-TEST_CASE("Mate Detection") {
-    Board board;
-    board.set_fen("k1R5/8/K7/8/8/8/8/8 b - - 0 1");
-    MoveList moves = gen_legals(board, gen_all(board, BLACK));
-    REQUIRE(moves.size == 0);
-}
-
-// Check if 2 consecutive run benchmarks are returning the same number of nodes
-TEST_CASE("Benchmark Consistency") {
+// Two consecutive run benchmarks should return the same number of nodes
+TEST_CASE("Benchmark consistency") {
     uint64_t bench1 = benchmark();
     uint64_t bench2 = benchmark();
     BenchmarkResult = bench1;
     REQUIRE(bench1 == bench2);
 }
 
-// Run various perfts to ensure move generator legality
-TEST_CASE("Check Perft Results") {
+// Run multiple perfts to ensure move generator legality
+TEST_CASE("Check perft results") {
     std::string fen1 = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     std::string fen2 = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
     std::string fen3 = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1";

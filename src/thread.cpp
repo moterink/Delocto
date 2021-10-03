@@ -123,11 +123,11 @@ Thread::Thread(const unsigned threadIndex) {
 }
 
 // Set search limits and the current position
-void Thread::initialize(const Board& b, const SearchLimits& searchLimits) {
+void Thread::initialize(const Board& b, const SearchLimits& limits) {
 
     board = b;
-    limits = searchLimits;
     info.reset();
+    info.limits = limits;
     // TODO: This seems to positively affect strength - why??
     clear_history();
     clear_killers();

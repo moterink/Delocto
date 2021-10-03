@@ -34,21 +34,25 @@
 // 2-dimensional array holding the number of plies to reduce the search
 // given the current depth and the number of moves which have already
 // been played.
-static int LMRTable[DEPTH_MAX][MAX_MOVES];
+static int LMRTable[DEPTH_MAX][MOVES_MAX_COUNT];
 
 // Initializes search parameters which are computed at execution time
 void init_search() {
 
     for (int d = 1; d < DEPTH_MAX; d++) {
-        for (int m = 1; m < MAX_MOVES; m++) {
+        for (int m = 1; m < MOVES_MAX_COUNT; m++) {
             LMRTable[d][m] = 1 + log(d) * log(m) / 2;
         }
     }
 
 }
 
-// Merge two principal variations
-void PvLine::merge(PvLine pv) {
+// Update a principal variations
+void PrincipalVariation::update(const Move bestMove, const PrincipalVariation& pv) {
+
+    size = 0;
+    line[size] = bestMove;
+    ++size;
 
     unsigned i;
     for (i = 0; i < pv.size; i++) {
@@ -58,45 +62,14 @@ void PvLine::merge(PvLine pv) {
 
 }
 
-// Add a move to a principal variation
-void PvLine::append(const Move move) {
-
-    line[size] = move;
-    ++size;
-
-}
-
-// Compare two principal variations
-bool PvLine::compare(const PvLine& pv) const {
-
-    // If the lenght is different, the variations cannot be the same
-    if (pv.size > size) {
-        return false;
-    }
-
-    for (unsigned pcount = 0; pcount < pv.size; pcount++) {
-        if (line[pcount] != pv.line[pcount]) return false;
-    }
-    return true;
-
-}
-
-// Reset a principal variation
-void PvLine::clear() {
-
-    size = 0;
-    std::fill(line, line + DEPTH_MAX, MOVE_NONE);
-
-}
-
 void SearchInfo::reset() {
 
-    hashTableHits = nodes = depth = selectiveDepth = pvStability = 0;
+    hashTableHits = nodes = depth = selectiveDepth = pvStability = multiPv = 0;
     idealTime = maxTime = 0;
-    limitTime = true;
 
     bestMove.fill(MOVE_NONE);
     currentMove.fill(MOVE_NONE);
+    multiPvMoves.fill(MOVE_NONE);
     eval.fill(0);
     value.fill(0);
 
@@ -148,22 +121,20 @@ static Value get_mate_value(Depth plies) {
 // Check it the allocated time for the current search is up
 static void check_finished(SearchInfo* info) {
 
-    if (info->limitTime) {
-
-        if (is_time_exceeded(info)) {
-            Threads.stop_searching();
-        }
-
+    if (   ((info->limits.time || info->limits.moveTime) && is_time_exceeded(info))
+        || (info->limits.nodes && Threads.get_nodes() >= info->limits.nodes))
+    {
+        Threads.stop_searching();
     }
 
 }
 
 // Get the locations of the least valuable piece of a given set of attackers for a given color
 // If no attacker was found, return SQUARE_NONE
-unsigned Board::least_valuable_piece(uint64_t attackers, const Color color) const {
+unsigned Board::least_valuable_piece(Bitboard attackers, const Color color) const {
 
     for (Piecetype pt = PAWN; pt <= KING; pt++) {
-        uint64_t subset = attackers & pieces(color, pt);
+        Bitboard subset = attackers & pieces(color, pt);
         if (subset) {
             return lsb_index(subset);
         }
@@ -184,16 +155,16 @@ Value Board::see(const Move move) const {
         return 0;
     }
 
-    unsigned fromSq = from_sq(move);
-    unsigned toSq   = to_sq(move);
+    Square fromSq = from_sq(move);
+    Square toSq   = to_sq(move);
 
     Color color = !stm;
 
-    uint64_t mayXray   = bbPieces[PAWN] | bbPieces[BISHOP] | bbPieces[ROOK] | bbPieces[QUEEN]; // pieces which may reveal a slider once removed from the board
-    uint64_t occupied  = bbColors[BOTH];
-    uint64_t attackers = sq_attackers(WHITE, toSq, occupied) | sq_attackers(BLACK, toSq, occupied); // all attackers to the target square
+    Bitboard mayXray   = bbPieces[PAWN] | bbPieces[BISHOP] | bbPieces[ROOK] | bbPieces[QUEEN]; // pieces which may reveal a slider once removed from the board
+    Bitboard occupied  = bbColors[BOTH];
+    Bitboard attackers = sq_attackers(WHITE, toSq, occupied) | sq_attackers(BLACK, toSq, occupied); // all attackers to the target square
 
-    unsigned attacker = fromSq;
+    Square attacker = fromSq;
     Piecetype victim = PIECE_NONE;
 
     // If the move is a capture; set the initial victim piece type
@@ -253,7 +224,7 @@ static void update_quiet_stats(Thread *thread, const Board& board, SearchInfo *i
 
     // If the previous search depth was not a null move search, set the counter move
     if (info->currentMove[plies-1] != MOVE_NONE) {
-        const unsigned prevSq = to_sq(info->currentMove[plies-1]);
+        const Square prevSq = to_sq(info->currentMove[plies-1]);
         thread->counterMove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq] = bestMove;
     }
 
@@ -264,14 +235,26 @@ static void update_quiet_stats(Thread *thread, const Board& board, SearchInfo *i
     // Increase the value of the best move found and decrease it for all other moves
     for (unsigned i = 0; i < quiets.size; i++) {
         Move move = quiets.moves[i];
-        unsigned fromSq = from_sq(move);
-        unsigned toSq = to_sq(move);
+        Square fromSq = from_sq(move);
+        Square toSq = to_sq(move);
         Piecetype pt = board.piecetype(fromSq);
 
         int delta = (move == bestMove) ? bonus : -bonus;
         int score = thread->history[board.turn()][pt][toSq];
         thread->history[board.turn()][pt][toSq] += 32 * delta - score * std::abs(delta) / 512; // Formula for calculating new history score
     }
+
+}
+
+static bool multipv_move_played(const SearchInfo* info, const Move move) {
+
+    for (unsigned moveIndex = 0; moveIndex < info->multiPv; moveIndex++) {
+        if (info->multiPvMoves[moveIndex] == move) {
+            return true;
+        }
+    }
+
+    return false;
 
 }
 
@@ -294,10 +277,6 @@ static Value qsearch(Value alpha, Value beta, Depth depth, Depth plies, Board& b
     if (Threads.has_stopped() || board.check_draw()) {
         return VALUE_DRAW;
     }
-
-    #ifdef EXTLOG
-        std::cout << "QS:" << info->nodes << ":" << depth << ":" << alpha << ":" << beta << std::endl;
-    #endif
 
     const bool pvNode = (beta - alpha != 1); // Check if we are in a pv node (no zero window search)
 
@@ -461,6 +440,9 @@ static Value qsearch(Value alpha, Value beta, Depth depth, Depth plies, Board& b
 
     // Store the value, evaluation and best move found in a transposition table entry
     TTable.store(board.hashkey(), ttDepth, value_to_tt(bestValue, plies), eval, bestMove, bestValue >= beta ? BOUND_LOWER : pvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER);
+    
+    assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
+    
     return bestValue;
 
 }
@@ -468,7 +450,7 @@ static Value qsearch(Value alpha, Value beta, Depth depth, Depth plies, Board& b
 // The main search function using an alpha-beta search algorithm. This is where the magic happens.
 // The function takes alpha and beta as parameters, with alpha being the lowest value we can expect and beta the highest.
 // Depth determines the number of plies we will look ahead, while plies represent the real number of moves actually played so far since depth can be increased/decreased dynamically during search
-static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutNode, Board& board, SearchInfo *info, PvLine& pv, bool pruning, Move excluded = MOVE_NONE) {
+static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutNode, Board& board, SearchInfo *info, PrincipalVariation& pv, bool pruning, Move excluded = MOVE_NONE) {
 
     if (info->isMainThread && (info->nodes & 1023) == 1023) {
         check_finished(info);
@@ -516,7 +498,7 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
     
 
     Thread *thread = Threads.get_thread(info->threadIndex);
-    PvLine newpv;
+    PrincipalVariation newPv;
     MoveList quietMoves;
     bool ttHit = false;
     bool improving = false;
@@ -616,11 +598,21 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
             && eval >= beta)
         {
             board.do_nullmove();
-            value = -search(-beta, -beta + 1, depth - (2 + (32 * depth + std::min(eval - beta, 512)) / 128), plies + 1, !cutNode, board, info, newpv, false);
+            value = -search(-beta, -beta + 1, depth - (2 + (32 * depth + std::min(eval - beta, 512)) / 128), plies + 1, !cutNode, board, info, newPv, false);
             board.undo_nullmove();
 
-            if (value >= beta && std::abs(value) < VALUE_MATE_MAX) {
-                return beta;
+            if (value >= beta) {
+
+                // We cannot trust mate values from null move search
+                if (value >= VALUE_MATE_MAX) {
+                    value = beta;
+                }
+
+                // Only return if there is no mate at higher depth
+                if (std::abs(beta) < VALUE_MATE_MAX) {
+                    return value;
+                }
+
             }
         }
 
@@ -638,7 +630,7 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
         && depth >= 6)
     {
 
-        value = search(alpha, beta, depth - 2, plies + 1, cutNode, board, info, newpv, pruning);
+        value = search(alpha, beta, depth - 2, plies + 1, cutNode, board, info, newPv, pruning);
 
         entry = TTable.probe(board.hashkey(), ttHit);
 
@@ -656,9 +648,8 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
     while ( (move = picker.pick() ) != MOVE_NONE) {
 
         // Skip excluded moves (from singular search)
-        if (move == excluded) {
-            continue;
-        }
+        if (move == excluded) continue;
+        if (rootNode && multipv_move_played(info, move)) continue;
 
         // Flag the current move
         bool capture    = board.is_capture(move);
@@ -713,7 +704,7 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
             && board.is_legal(move))
         {
             Value rbeta = std::max(ttValue - 2 * depth, -VALUE_MATE);
-            value = search(rbeta - 1, rbeta, depth / 2, plies + 1, cutNode, board, info, newpv, false, move);
+            value = search(rbeta - 1, rbeta, depth / 2, plies + 1, cutNode, board, info, newPv, false, move);
             // All other moves failed low, so the move is singular
             if (value < rbeta) {
                 extensions = 1;
@@ -742,7 +733,15 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
 
         info->currentMove[plies] = move;
 
-        newpv.size = 0;
+        newPv.reset();
+
+        // Report the current move searched at main thread after a fixed amount of time
+        if (   rootNode
+            && info->isMainThread
+            && get_time_elapsed(info->start) > 5000)
+        {
+            send_currmove(move, playedCount);
+        }
 
         // Late Move Reductions
         // If a move is relatively far back in the move list, we can consider to do a reduced depth search
@@ -781,16 +780,16 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
         // Principal Variation Search
         // We do a null window search here because we only want to know if the current move can beat alpha.
         if (reductions) {
-            value = -search(-alpha - 1, -alpha, newDepth - reductions, plies + 1, true, board, info, newpv, pruning);
+            value = -search(-alpha - 1, -alpha, newDepth - reductions, plies + 1, true, board, info, newPv, pruning);
         }
 
         // Do a full depth search if the value did beat alpha since we might have missed something
         if ((reductions && value > alpha) || (!reductions && (!pvNode || playedCount > 1))) {
-            value = -search(-alpha - 1, -alpha, newDepth, plies + 1, !cutNode, board, info, newpv, pruning);
+            value = -search(-alpha - 1, -alpha, newDepth, plies + 1, !cutNode, board, info, newPv, pruning);
         }
 
         if (pvNode && (playedCount == 1 || (value > alpha && (rootNode || value < beta)))) {
-            value = -search(-beta, -alpha, newDepth, plies + 1, false, board, info, newpv, pruning);
+            value = -search(-beta, -alpha, newDepth, plies + 1, false, board, info, newPv, pruning);
         }*/
 
         // Late Move Reductions
@@ -831,21 +830,21 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
 
             // Principal Variation Search
             // We do a null window search here because we only want to know if the current move can beat alpha.
-            value = -search(-alpha - 1, -alpha, depth - 1 + extensions - reductions, plies + 1, true, board, info, newpv, pruning);
+            value = -search(-alpha - 1, -alpha, depth - 1 + extensions - reductions, plies + 1, true, board, info, newPv, pruning);
             // Do a full depth search if the value did beat alpha since we might have missed something
             if (value > alpha && reductions) {
-                value = -search(-alpha - 1, -alpha, depth - 1 + extensions, plies + 1, !cutNode, board, info, newpv, pruning);
+                value = -search(-alpha - 1, -alpha, depth - 1 + extensions, plies + 1, !cutNode, board, info, newPv, pruning);
             }
             // If the full depth searched beat alpha again and is within alpha and beta, do a full window search to prove it
             if (value > alpha && value < beta) {
-                value = -search(-beta, -alpha, depth - 1 + extensions, plies + 1, false, board, info, newpv, pruning);
+                value = -search(-beta, -alpha, depth - 1 + extensions, plies + 1, false, board, info, newPv, pruning);
             }
 
         } else {
 
             // If this is the first move to be searched in this node, search it with a full window and do not reduce it,
             // since usually the first move is already the best
-            value = -search(-beta, -alpha, depth - 1 + extensions, plies + 1, (pvNode ? false : !cutNode), board, info, newpv, pruning);
+            value = -search(-beta, -alpha, depth - 1 + extensions, plies + 1, (pvNode ? false : !cutNode), board, info, newPv, pruning);
 
         }
 
@@ -865,9 +864,7 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
             if (value > alpha) {
                 alpha = value;
                 bestMove = move;
-                pv.size = 0;
-                pv.append(move);
-                pv.merge(newpv);
+                pv.update(bestMove, newPv);
                 // If the value is above beta, we can expect this position will never occur because the opponent
                 // will probably avoid it because he already has a better option at a higher depth. We can stop searching
                 // this node.
@@ -903,29 +900,40 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
         update_quiet_stats(thread, board, info, plies, depth, quietMoves, bestMove);
     }
 
-    if (excluded == MOVE_NONE) { // Do not store if we are in a singular search
-        // Store the value, the best move and the bound in the transposition table
+    // Store the depth, value, evaluation, best move and bound in the transposition table
+    // Do not store if we are in a singular search or if we would overwrite an entry from
+    // the first move we played in multiPV mode
+    if (excluded == MOVE_NONE && !(rootNode && info->multiPv > 0)) {
         TTable.store(board.hashkey(), depth, value_to_tt(bestValue, plies), eval, bestMove, bestValue >= beta ? BOUND_LOWER : pvNode && bestMove != MOVE_NONE ? BOUND_EXACT : BOUND_UPPER);
     }
+
+    assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
+
     return bestValue;
 
 }
 
 void Thread::search() {
 
-    const bool isMainThread = get_index() == 0;
-
-    PvLine pv;
-    pv.clear();
-    Move bestMove = MOVE_NONE;
-    Value value = 0;
-
-    info.threadIndex = get_index();
-    info.isMainThread = isMainThread;
-
     // Initialize the time management
     info.start = Clock::now();
-    init_time_management(limits, &info);
+    init_time_management(&info);
+
+    const bool isMainThread = get_index() == 0;
+
+    PrincipalVariation pv;
+    Move bestMove = MOVE_NONE;
+    Value value, alpha, beta, delta;
+    value = 0;
+    alpha = -VALUE_INFINITE;
+    beta  = VALUE_INFINITE;
+
+    info.threadIndex  = get_index();
+    info.isMainThread = isMainThread;
+
+    // Adjust multiPv to maximum number of legal moves in root position
+    MoveList rootMoves  = gen_legals(board, gen_all(board, board.turn()));
+    info.limits.multiPv = std::min(info.limits.multiPv, rootMoves.size);
 
     // Iterative Deepening
     // We do not search to a fixed depth from the start, but rather increase it with every
@@ -933,89 +941,97 @@ void Thread::search() {
     // at lower depths we fill up the transposition table, history table...
     // This enables us to search higher depths much quicker and also enables us to dynamically
     // stop the search if we are low on time while still having a move to play in the position
-    for (Depth depth = 1; depth < limits.depth; depth++) {
-
-        pv.size = 0;
-
-        board.reset_plies();
+    for (Depth depth = 1; depth <= info.limits.depth && !Threads.has_stopped(); depth++) {
 
         info.depth = depth;
-        info.selectiveDepth = 0;
 
-        // Aspiration Windows
-        // We do not have to do a search with a full window at a certain point,
-        // since we can expect the values returned by search to be within a certain
-        // window. If we do fail high/low though, we will increase the window and search
-        // again.
+        // Multiple Prinicipal Variations
+        // We search as many principal variations as specifified by the user
+        // A variation always starts with a different root move, the best variation
+        // will be first, the second best second, and so on
+        for (unsigned multiPv = 0; multiPv < info.limits.multiPv && !Threads.has_stopped(); multiPv++) {
 
-        if (depth > 5) {
+            board.reset_plies();
 
-            /* TODO: Value window = 25;
-            Value alpha  = std::max(value - window, -VALUE_INFINITE);
-            Value beta   = std::min(value + window,  VALUE_INFINITE);*/
+            info.selectiveDepth = 0;
+            info.multiPv = multiPv;
 
-            Value window = 25 - std::min((unsigned)depth / 3, 10u) + std::abs(value) / 25;
-            Value alpha = value - window;
-            Value beta = value + window;
+            delta = 25;
+
+            // Aspiration Windows
+            // We do not have to do a search with a full window at a certain point,
+            // since we can expect the values returned by search to be within a certain
+            // window. If we do fail high/low though, we will increase the window and search
+            // again.
+            if (depth > 5) {
+
+                alpha = std::max(value - delta, -VALUE_INFINITE);
+                beta  = std::min(value + delta,  VALUE_INFINITE);
+
+            }
 
             while (true) {
 
+                pv.reset();
+
                 value = ::search(alpha, beta, depth, 0, false, board, &info, pv, true);
 
-                if (!Threads.has_stopped()) {
-                    if (value <= alpha) {
-                        beta  = (alpha + beta) / 2;
-                        alpha = std::max(value - window, -VALUE_INFINITE);
-                    } else if (value >= beta) {
-                        beta = std::min(value + window, VALUE_INFINITE);
-                    } else {
-                        break; // Quit the aspiration window loop and continue with the next iteration
-                    }
+                if (Threads.has_stopped()) {
+                    break;
+                }
 
-                    // Increase the window size if we have failed high/low
-                    window += window / 4;
+                if (   isMainThread
+                    && info.limits.multiPv == 1
+                    && (value <= alpha || value >= beta)
+                    && get_time_elapsed(info.start) > 3000)
+                {
+                    send_pv(info, value, pv, Threads.get_nodes(), alpha, beta);
+                }
 
-                    pv.clear();
+                if (value <= alpha) {
+                    beta  = (alpha + beta) / 2;
+                    alpha = std::max(value - delta, -VALUE_INFINITE);
+                } else if (value >= beta) {
+                    beta = std::min(value + delta, VALUE_INFINITE);
                 } else {
-                    break;
+                    break; // Quit the aspiration window loop and continue with the next iteration
                 }
+
+                // Increase the window size if we have failed high/low
+                delta += delta / 4;
 
             }
 
-        } else {
-            value = ::search(-VALUE_INFINITE, VALUE_INFINITE, depth, 0, false, board, &info, pv, true);
-        }
+            info.value[depth] = value;
 
-        info.value[depth] = value;
-        Duration duration = get_time_elapsed(info.start);
-
-        // Print the information returned from the previous iteration to the console
-        // Update the time management and decide if we should do another iteration or
-        // stop and report the best move
-        if (!Threads.has_stopped()) {
-            // Only the main thread reports to UCI
+            // On the main thread, update time management and decide if we 
+            // should do another iteration or stop searching and report the best move
             if (isMainThread) {
-                // Drawn/mate positions return an empty pv
-                if (pv.size > 0) {
-                    bestMove = pv.line[0];
-                    info.bestMove[depth] = bestMove;
-                    send_info(info, pv, duration, Threads.get_nodes());
-                }  else {
-                    break;
+
+                // Send the principal variation
+                // Do not report incomplete searches
+                if (!Threads.has_stopped()) {
+                    send_pv(info, value, pv, Threads.get_nodes(), alpha, beta);
                 }
 
-                update_time_managemement(&info);
-
-                if (info.limitTime) {
-                    if (should_stop(info)) {
-                        break;
+                // Drawn/mate positions return an empty pv
+                if (pv.length() > 0) {
+                    info.multiPvMoves[multiPv] = pv.best();
+                    if (multiPv == 0) {
+                        bestMove = info.bestMove[depth] = info.multiPvMoves[0];
                     }
                 }
+
+                update_time_management(&info);
+
+                if (info.limits.time) {
+                    if (should_stop(info)) {
+                        Threads.stop_searching();
+                    }
+                }
+
             }
-            
-        } else {
-            // If the search has been aborted, break the search loop
-            break;
+
         }
 
     }
@@ -1026,6 +1042,5 @@ void Thread::search() {
         // Print the best move found to the console
         send_bestmove(bestMove);
     }
-    
 
 }

@@ -28,8 +28,8 @@
 #include "search.hpp"
 
 extern Duration get_time_elapsed(TimePoint start);
-extern void init_time_management(const SearchLimits& limits, SearchInfo* info);
-extern void update_time_managemement(SearchInfo* info);
+extern void init_time_management(SearchInfo* info);
+extern void update_time_management(SearchInfo* info);
 extern bool is_time_exceeded(const SearchInfo* info);
 extern bool should_stop(const SearchInfo& info);
 

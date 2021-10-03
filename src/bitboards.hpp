@@ -40,23 +40,23 @@ struct Magic {
 extern Magic BishopMagics[64];
 extern Magic RookMagics[64];
 
-extern uint64_t PawnAttacksSpan[2][64];
-extern uint64_t KingShelterSpan[2][64];
-extern uint64_t KingRing[2][64];
-extern uint64_t RayTable[64][64];
-extern uint64_t LineTable[64][64];
-extern uint64_t PawnAttacks[2][64];
-extern uint64_t KnightAttacks[64];
-extern uint64_t BishopAttacks[64];
-extern uint64_t RookAttacks[64];
-extern uint64_t QueenAttacks[64];
-extern uint64_t KingAttacks[64];
-extern uint64_t FrontFileMask[2][64];
-extern uint64_t PassedPawnMask[2][64];
-extern uint64_t BackwardPawnMask[2][64];
+extern Bitboard PawnAttacksSpan[2][64];
+extern Bitboard KingShelterSpan[2][64];
+extern Bitboard KingRing[2][64];
+extern Bitboard RayTable[64][64];
+extern Bitboard LineTable[64][64];
+extern Bitboard PawnAttacks[2][64];
+extern Bitboard KnightAttacks[64];
+extern Bitboard BishopAttacks[64];
+extern Bitboard RookAttacks[64];
+extern Bitboard QueenAttacks[64];
+extern Bitboard KingAttacks[64];
+extern Bitboard FrontFileMask[2][64];
+extern Bitboard PassedPawnMask[2][64];
+extern Bitboard BackwardPawnMask[2][64];
 
-extern uint64_t get_slider_attacks(const unsigned sq, const uint64_t occupied, const int directions[4]);
-extern int get_magic_index(const uint64_t occupied, Magic *table);
+extern Bitboard get_slider_attacks(const Square sq, const Bitboard occupied, const int directions[4]);
+extern int get_magic_index(const Bitboard occupied, Magic *table);
 extern void init_bitboards();
 
 #endif

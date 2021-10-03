@@ -31,17 +31,194 @@
 #include "thread.hpp"
 #include "perft.hpp"
 
-#define VERSION 0.6
+enum OptionType {
+    Check, Spin, Combo, Button, String
+};
 
-constexpr unsigned TRANSPOSITION_TABLE_SIZE_MAX = 4096;
-constexpr unsigned TRANSPOSITION_TABLE_SIZE_MIN = 1;
-constexpr unsigned TRANSPOSITION_TABLE_SIZE_DEFAULT = 160;
-constexpr unsigned THREADS_MAX = 4;
-constexpr unsigned THREADS_MIN = 1;
-constexpr unsigned THREADS_DEFAULT = 1;
-constexpr unsigned MOVE_OVERHEAD_DEFAULT = 100;
-constexpr unsigned MOVE_OVERHEAD_MAX = 10000;
-constexpr unsigned MOVE_OVERHEAD_MIN = 0;
+class Option {
+
+    public:
+        std::string name;
+        OptionType type;
+
+        Option(std::string& n, OptionType t) {
+            name = n;
+            type = t;
+        }
+
+        virtual std::string uci_string() const {
+            return "option name " + name + " type ";
+        };
+
+};
+
+class CheckOption : public Option {
+
+    private:
+        bool value;
+        bool defaultValue;
+
+    public:
+        CheckOption(std::string name, bool initialValue) : Option(name, Check) {
+            value = initialValue;
+            defaultValue = initialValue;
+        }
+
+        bool set_value(bool newValue) {
+            value = newValue;
+            return true;
+        }
+
+        bool get_value() const {
+            return value;
+        }
+
+        std::string uci_string() const {
+            return Option::uci_string() + "check default " + std::to_string(defaultValue);
+        }
+
+};
+
+class SpinOption : public Option {
+
+    private:
+        int value;
+        int defaultValue;
+        int minValue;
+        int maxValue;
+
+    public:
+        SpinOption(std::string name, int initialValue, int min, int max) : Option(name, Spin) {
+            value = initialValue;
+            defaultValue = initialValue;
+            minValue = min;
+            maxValue = max;
+        }
+
+        bool set_value(int newValue) {
+            if (newValue < minValue || newValue > maxValue) {
+                return false;
+            }
+            value = newValue;
+            return true;
+        }
+
+        int get_value() const {
+            return value;
+        }
+
+        int get_default() const {
+            return value;
+        }
+
+        int get_min() const {
+            return minValue;
+        }
+
+        int get_max() const {
+            return maxValue;
+        }
+
+        std::string uci_string() const {
+            return Option::uci_string()
+                   + "spin default " + std::to_string(defaultValue)
+                   + " max " + std::to_string(maxValue)
+                   + " min " + std::to_string(minValue);
+        }
+
+};
+
+class ComboOption : public Option {
+
+    private:
+        std::string value;
+        std::string defaultValue;
+        const std::vector<std::string> comboValues;
+
+    public:
+        ComboOption(std::string name, const std::string initialValue, std::initializer_list<std::string> choices) : Option(name, Combo), comboValues{choices} {
+            value = initialValue;
+            defaultValue = initialValue;
+        }
+
+        bool set_value(std::string newValue) {
+            for (const std::string comboValue : comboValues) {
+                if (comboValue == newValue) {
+                    value = newValue;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        std::string get_value() const {
+            return value;
+        }
+
+        std::string get_default() const {
+            return defaultValue;
+        }
+
+        std::string uci_string() const {
+            std::stringstream ss;
+            ss << Option::uci_string() << "combo default " << defaultValue;
+            for (const std::string choice : comboValues) {
+                ss << " var " << choice;
+            }
+            return ss.str();
+        }
+};
+
+class ButtonOption : public Option {
+
+    private:
+        std::function<void ()> callback;
+
+    public:
+        ButtonOption(std::string name, std::function<void ()> c) : Option(name, Button) {
+            callback = c;
+        }
+
+        void push() {
+            callback();
+        }
+
+        std::string uci_string() const {
+            return Option::uci_string() + "button";
+        }
+
+};
+
+class StringOption : public Option {
+
+    private:
+        std::string value;
+        std::string defaultValue;
+
+    public:
+        StringOption(std::string name, std::string initialValue): Option(name, String) {
+            value = initialValue;
+            defaultValue = initialValue;
+        }
+
+        bool set_value(std::string newValue) {
+            value = newValue;
+            return true;
+        }
+
+        std::string get_value() const {
+            return value;
+        }
+
+        std::string get_default() const {
+            return defaultValue;
+        }
+
+        std::string uci_string() const {
+            return Option::uci_string() + "string default " + defaultValue;
+        }
+
+};
 
 // Testing positions for benchmark
 static std::string BENCHMARK_FENS[42] = {
@@ -114,14 +291,17 @@ inline std::string move_to_string(const Move raw) {
 
 }
 
-extern unsigned MoveOverhead;
+extern SpinOption HashOption;
+extern SpinOption MoveOverheadOption;
 
 extern ThreadPool Threads;
 extern TranspositionTable TTable;
 
 extern uint64_t benchmark();
-extern void send_info(const SearchInfo& info, const PvLine& pv, const Duration duration, const uint64_t nodes);
+extern void send_pv(const SearchInfo& info, const Value value, const PrincipalVariation& pv, const uint64_t nodes, const Value alpha, const Value beta);
+extern void send_currmove(const Move currentMove, const unsigned index);
 extern void send_bestmove(const Move bestMove);
+extern void send_string(const std::string string);
 extern void uci_loop(int argc, char* argv[]);
 
 #endif

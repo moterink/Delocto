@@ -51,19 +51,19 @@ enum Phase : unsigned {
 
 struct EvalInfo {
 
-    uint64_t mobilityArea[2] = { 0 };
-    uint64_t pieceAttacks[2][6] = { { 0, 0, 0, 0, 0, 0 }, { 0, 0, 0, 0, 0, 0 } };
-    uint64_t colorAttacks[2] = { 0 };
-    uint64_t multiAttacks[2] = { 0 };
-    uint64_t blockedPawns[2] = { 0 };
+    Bitboard mobilityArea[2] = { 0 };
+    Bitboard pieceAttacks[2][6] = { { 0, 0, 0, 0, 0, 0 }, { 0, 0, 0, 0, 0, 0 } };
+    Bitboard colorAttacks[2] = { 0 };
+    Bitboard multiAttacks[2] = { 0 };
+    Bitboard blockedPawns[2] = { 0 };
     int kingAttackersWeight[2] = { 0 };
     int kingAttackersNum[2] = { 0 };
     int kingRingAttacks[2] = { 0 };
-    unsigned int kingSq[2] = { 0 };
-    uint64_t kingRing[2] = { 0 };
-    uint64_t weakPawns = 0;
-    uint64_t passedPawns = 0;
-    uint64_t pawnAttacksSpan[2] = { 0 };
+    Square kingSq[2] = { 0 };
+    Bitboard kingRing[2] = { 0 };
+    Bitboard weakPawns = 0;
+    Bitboard passedPawns = 0;
+    Bitboard pawnAttacksSpan[2] = { 0 };
     EvalTerm mobility[2] = { V(0, 0), V(0, 0) };
 
 };

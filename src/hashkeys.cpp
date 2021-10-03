@@ -55,14 +55,14 @@ static uint64_t rand64() {
 // Furthermore, there are two additional hashkeys representing the current color to move
 void init_hashkeys() {
 
-    for (unsigned c = WHITE; c < BOTH; c++) {
-        for (unsigned sq = 0; sq < 64; sq++) {
-            for (unsigned pt = PAWN; pt < PIECE_NONE+1; pt++) {
+    for (Color c = WHITE; c < BOTH; c++) {
+        for (Square sq = 0; sq < 64; sq++) {
+            for (Piecetype pt = PAWN; pt < PIECE_NONE+1; pt++) {
                 PieceHashKeys[c][pt][sq] = rand64();
             }
             PawnHashKeys[c][sq] = rand64();
         }
-        for (unsigned pt = PAWN; pt < PIECE_NONE; pt++) {
+        for (Piecetype pt = PAWN; pt < PIECE_NONE; pt++) {
             for (unsigned i = 0; i < 11; i++) {
                 MaterialHashKeys[c][pt][i] = rand64();
             }
@@ -128,13 +128,11 @@ TTEntry * TranspositionTable::probe(const uint64_t key, bool& ttHit) {
 
     for (unsigned entryIndex = 0; entryIndex < TT_BUCKET_SIZE; entryIndex++) {
         TTEntry *entry = &entries[entryIndex];
-        TTBound bound = entry->bound();
         if (entry->key() == key16) {
             // Update entry age
             entry->update_generation(generation);
 
             assert(entry->generation() == generation);
-            assert(entry->bound() == bound);
 
             ttHit = true;
             return entry;

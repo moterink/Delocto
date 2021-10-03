@@ -135,7 +135,7 @@ static const int Imbalance[2][6][6] = {
 };
 
 // Bitboards for outposts and boni for having minors on those squares or attacking them
-static const uint64_t OutpostSquares[2]     = { BB_RANK_3 | BB_RANK_4 | BB_RANK_5, BB_RANK_6 | BB_RANK_5 | BB_RANK_4 };
+static const Bitboard OutpostSquares[2]        = { BB_RANK_3 | BB_RANK_4 | BB_RANK_5, BB_RANK_6 | BB_RANK_5 | BB_RANK_4 };
 static const EvalTerm OutpostBonus[2]          = { V(34, 11), V(17, 6) };
 static const EvalTerm OutpostReachableBonus[2] = { V(17,  6), V( 8, 3) };
 
@@ -324,7 +324,7 @@ bool Board::is_material_draw() const {
 }
 
 // Update attack info for calculating king safety
-static void update_attack_info(Color color, Piecetype pt, uint64_t moves, EvalInfo& info) {
+static void update_attack_info(Color color, Piecetype pt, Bitboard moves, EvalInfo& info) {
 
     // Merge the piece moves into the piece attacks bitboard
     info.pieceAttacks[color][pt] |= moves;
@@ -332,7 +332,7 @@ static void update_attack_info(Color color, Piecetype pt, uint64_t moves, EvalIn
     info.colorAttacks[color] |= moves; // All attacks by a color on the board
 
     // Detect attacks on the king area
-    const uint64_t kingAttacks = moves & info.kingRing[!color];
+    const Bitboard kingAttacks = moves & info.kingRing[!color];
 
     // If there is an attack, count the attacked squares and add the attacker weight
     if (kingAttacks) {
@@ -347,17 +347,17 @@ static void update_attack_info(Color color, Piecetype pt, uint64_t moves, EvalIn
 static const EvalTerm evaluate_knights(const Board& board, const Color color, EvalInfo& info) {
 
     EvalTerm value;
-    uint64_t knights = board.pieces(color, KNIGHT);
+    Bitboard knights = board.pieces(color, KNIGHT);
     while (knights) {
 
-        unsigned sq = pop_lsb(knights);
-        uint64_t moves = gen_knight_moves(sq, 0);
+        Square sq = pop_lsb(knights);
+        Bitboard moves = gen_knight_moves(sq, 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
 
         // Bonus for outposts
-        uint64_t outposts = OutpostSquares[color] & info.pieceAttacks[color][PAWN] & ~info.pawnAttacksSpan[!color];
+        Bitboard outposts = OutpostSquares[color] & info.pieceAttacks[color][PAWN] & ~info.pawnAttacksSpan[!color];
         if (outposts & SQUARES[sq]) {
             value += OutpostBonus[0];
         } else if (outposts & moves & ~board.pieces(color)) {
@@ -386,20 +386,20 @@ static const EvalTerm evaluate_bishops(const Board& board, const Color color, Ev
 
     EvalTerm value;
 
-    uint64_t bishops = board.pieces(color, BISHOP);
+    Bitboard bishops = board.pieces(color, BISHOP);
 
     while (bishops) {
 
-        unsigned sq = pop_lsb(bishops);
+        Square sq = pop_lsb(bishops);
 
         // Exclude queen for xrays
-        uint64_t moves = gen_bishop_moves(sq, board.pieces(BOTH) & ~board.pieces(QUEEN), 0);
+        Bitboard moves = gen_bishop_moves(sq, board.pieces(BOTH) & ~board.pieces(QUEEN), 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
 
         // Bonus for outposts
-        uint64_t outposts = OutpostSquares[color] & info.pieceAttacks[color][PAWN] & ~info.pawnAttacksSpan[!color];
+        Bitboard outposts = OutpostSquares[color] & info.pieceAttacks[color][PAWN] & ~info.pawnAttacksSpan[!color];
         if (outposts & SQUARES[sq]) {
             value += OutpostBonus[1];
         } else if (outposts & moves & ~board.pieces(color)) {
@@ -413,7 +413,7 @@ static const EvalTerm evaluate_bishops(const Board& board, const Color color, Ev
 
         // Penalty for having many pawns on the same square color as the bishop,
         // since this restricts the mobility of the bishop
-        uint64_t pawnsOnSameColor = board.get_same_colored_squares(sq) & board.pieces(color, PAWN);
+        Bitboard pawnsOnSameColor = board.get_same_colored_squares(sq) & board.pieces(color, PAWN);
         value -= bishopPawnsSameColorPenalty * popcount(pawnsOnSameColor) * (1 + popcount(info.blockedPawns[color] & CENTRAL_FILES));
 
         // Bonus for being attacking central squares
@@ -438,18 +438,18 @@ static const EvalTerm evaluate_rooks(const Board& board, const Color color, Eval
 
     EvalTerm value;
 
-    uint64_t rooks = board.pieces(color, ROOK);
+    Bitboard rooks = board.pieces(color, ROOK);
     while (rooks) {
 
-        unsigned sq = pop_lsb(rooks);
+        Square sq = pop_lsb(rooks);
 
         // Exclude queens and rooks for xrays
-        uint64_t moves = gen_rook_moves(sq, board.pieces(BOTH) & ~board.majors(), 0);
+        Bitboard moves = gen_rook_moves(sq, board.pieces(BOTH) & ~board.majors(), 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
 
-        const unsigned f = file(sq);
+        const File f = file(sq);
         const unsigned mob = popcount(moves & info.mobilityArea[color]);
 
         // Bonus for being on an open file (no pawns)
@@ -486,11 +486,11 @@ static const EvalTerm evaluate_queens(const Board& board, const Color color, Eva
 
     EvalTerm value;
 
-    uint64_t queens = board.pieces(color, QUEEN);
+    Bitboard queens = board.pieces(color, QUEEN);
     while (queens) {
 
-        unsigned sq = pop_lsb(queens);
-        uint64_t moves = get_queen_moves(sq, board.pieces(BOTH), 0);
+        Square sq = pop_lsb(queens);
+        Bitboard moves = get_queen_moves(sq, board.pieces(BOTH), 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
@@ -514,21 +514,21 @@ static const EvalTerm evaluate_pawns(const Board& board, const Color color, Eval
 
     EvalTerm value;
 
-    const uint64_t ownPawns = board.pieces(color, PAWN);
-    const uint64_t oppPawns = board.pieces(!color, PAWN);
+    const Bitboard ownPawns = board.pieces(color, PAWN);
+    const Bitboard oppPawns = board.pieces(!color, PAWN);
 
-    uint64_t pawns = ownPawns;
+    Bitboard pawns = ownPawns;
 
     while (pawns) {
 
-        const unsigned sq = pop_lsb(pawns);
-        const File f      = file(sq);
-        const Rank r      = relative_rank(color, sq);
+        const Square sq = pop_lsb(pawns);
+        const File f    = file(sq);
+        const Rank r    = relative_rank(color, sq);
 
-        const uint64_t front      = FrontFileMask[color][sq];
-        const uint64_t neighbours = ADJ_FILES[f] & ownPawns;
-        const uint64_t stoppers   = PassedPawnMask[color][sq] & oppPawns;
-        const uint64_t lever      = PawnAttacks[color][sq] & oppPawns;
+        const Bitboard front      = FrontFileMask[color][sq];
+        const Bitboard neighbours = ADJ_FILES[f] & ownPawns;
+        const Bitboard stoppers   = PassedPawnMask[color][sq] & oppPawns;
+        const Bitboard lever      = PawnAttacks[color][sq] & oppPawns;
 
         info.pawnAttacksSpan[color] |= PawnAttacksSpan[color][sq];
 
@@ -536,8 +536,8 @@ static const EvalTerm evaluate_pawns(const Board& board, const Color color, Eval
         const bool opposed       = front & oppPawns;
         const bool isolated      = !neighbours; // A pawn is isolated if there are no friendly pawns on the adjacent squares
         const bool passed        = !(stoppers ^ lever); // No enemy pawn can hinder the pawn from promoting
-        const uint64_t supported = (neighbours & RANKS[rank(sq + DIRECTIONS[color][DOWN])]);
-        const uint64_t phalanx   = (neighbours & RANKS[rank(sq)]); // Friendly pawns which are on the same rank and on adjacent squares
+        const Bitboard supported = (neighbours & RANKS[rank(sq + direction(color, DOWN))]);
+        const Bitboard phalanx   = (neighbours & RANKS[rank(sq)]); // Friendly pawns which are on the same rank and on adjacent squares
 
         bool backward = false;
 
@@ -546,7 +546,7 @@ static const EvalTerm evaluate_pawns(const Board& board, const Color color, Eval
         // ahead of the pawn. The pawn is only backwards however if it can be captured
         // by enemy pawns if he pushes one square north.
         if (!isolated && !phalanx && r <= 4 && !lever) {
-            const uint64_t br = RANKS[rank(lsb_index(most_backward(color, neighbours | stoppers)))];
+            const Bitboard br = RANKS[rank(lsb_index(most_backward(color, neighbours | stoppers)))];
             backward = (br | shift_up(ADJ_FILES[f] & br, color)) & stoppers;
         }
 
@@ -590,17 +590,17 @@ static int evaluate_shelter_storm(const Board& board, const Color color, const u
 
     int value = 0;
 
-    const uint64_t notBehind = ~KingShelterSpan[!color][kingSq];
-    const uint64_t ourPawns  = board.pieces(color, PAWN) & notBehind;
-    const uint64_t oppPawns  = board.pieces(!color, PAWN) & notBehind;
+    const Bitboard notBehind = ~KingShelterSpan[!color][kingSq];
+    const Bitboard ourPawns  = board.pieces(color, PAWN) & notBehind;
+    const Bitboard oppPawns  = board.pieces(!color, PAWN) & notBehind;
     const int kingFile       = file(kingSq);
     const int centralFile    = std::max(1, std::min(kingFile, 6)); // The central file for the shelter. Adjusted on the edges
 
     // Loop over each file ahead of the king
     for (int f = centralFile - 1; f <= centralFile + 1; f++) {
 
-        uint64_t owns = FILES[f] & ourPawns;
-        uint64_t opps = FILES[f] & oppPawns;
+        Bitboard owns = FILES[f] & ourPawns;
+        Bitboard opps = FILES[f] & oppPawns;
 
         // Get the square of the most backward friendly and most forward enemy pawn on the file
         unsigned ownRank = owns ? relative_rank(color, lsb_index(most_backward(color, owns))) : 0;
@@ -631,41 +631,41 @@ static const EvalTerm evaluate_king_safety(const Board& board, const Color color
 
     // Idea from Stockfish
     // If we can still castle, and the shelter bonus after the castling is greater, use the better value
-    if (board.can_castle(CASTLE_FLAGS[color * 2])) {
-        pawnValue = evaluate_shelter_storm(board, color, CASTLE_SQUARES[color * 2], pawnValue);
+    if (board.may_castle(CASTLE_TYPES[color][CASTLE_SHORT])) {
+        pawnValue = evaluate_shelter_storm(board, color, CASTLE_KING_TARGET_SQUARE[color][CASTLE_SHORT], pawnValue);
     }
-    if (board.can_castle(CASTLE_FLAGS[color * 2 + 1])) {
-        pawnValue = evaluate_shelter_storm(board, color, CASTLE_SQUARES[color * 2 + 1], pawnValue);
+    if (board.may_castle(CASTLE_TYPES[color][CASTLE_LONG])) {
+        pawnValue = evaluate_shelter_storm(board, color, CASTLE_KING_TARGET_SQUARE[color][CASTLE_LONG], pawnValue);
     }
 
     const File kingFile = file(info.kingSq[color]);
 
     // All squares attacked on the flank of the king excluding the base ranks (first 3 ranks) for our color
     // Count the number of squares which are attacked once and multiple times
-    const uint64_t flankAttackedSquares = KING_FLANK[kingFile] & (ALL_SQUARES ^ COLOR_BASE_RANKS[!color]) & info.colorAttacks[!color];
+    const Bitboard flankAttackedSquares = KING_FLANK[kingFile] & (SQUARES_ALL ^ COLOR_BASE_RANKS[!color]) & info.colorAttacks[!color];
     const unsigned flankAttacksCount = popcount(flankAttackedSquares) + popcount(flankAttackedSquares & info.multiAttacks[!color]);
 
     // The squares surrounding the king
-    const uint64_t ring = KingRing[color][info.kingSq[color]];
+    const Bitboard ring = KingRing[color][info.kingSq[color]];
 
     // Weak squares are squares are squares which we do not attack or only with queens or the king.
     // These squares are considered weak if the enemy attacks them, but not if we protect them with
     // multiple pieces
-    const uint64_t weakSquares = (info.colorAttacks[!color] & ~info.multiAttacks[color]) & (~info.colorAttacks[color] | info.pieceAttacks[color][QUEEN] | info.pieceAttacks[color][KING]);
+    const Bitboard weakSquares = (info.colorAttacks[!color] & ~info.multiAttacks[color]) & (~info.colorAttacks[color] | info.pieceAttacks[color][QUEEN] | info.pieceAttacks[color][KING]);
 
     // A square is considered safe for a enemy check if there it is not attacked by us or
     // it is a weak square which is attacked by multiple enemy pieces
-    const uint64_t safeCheckSquares = ~board.pieces(!color) & (~info.colorAttacks[color] | (weakSquares & info.multiAttacks[!color]));
+    const Bitboard safeCheckSquares = ~board.pieces(!color) & (~info.colorAttacks[color] | (weakSquares & info.multiAttacks[!color]));
 
-    const uint64_t knightCheckSquares = gen_knight_moves(info.kingSq[color], board.pieces(color));
-    const uint64_t bishopCheckSquares = gen_bishop_moves(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
-    const uint64_t rookCheckSquares   = gen_rook_moves(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
+    const Bitboard knightCheckSquares = gen_knight_moves(info.kingSq[color], board.pieces(color));
+    const Bitboard bishopCheckSquares = gen_bishop_moves(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
+    const Bitboard rookCheckSquares   = gen_rook_moves(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
 
-    uint64_t unsafeChecks = 0;
-    const uint64_t queenChecks  = info.pieceAttacks[!color][QUEEN] & (bishopCheckSquares | rookCheckSquares)  & ~info.pieceAttacks[color][QUEEN];
-    const uint64_t rookChecks   = info.pieceAttacks[!color][ROOK] & rookCheckSquares;
-    const uint64_t bishopChecks = info.pieceAttacks[!color][BISHOP] & bishopCheckSquares;
-    const uint64_t knightChecks = info.pieceAttacks[!color][KNIGHT] & knightCheckSquares;
+    Bitboard unsafeChecks = 0;
+    const Bitboard queenChecks  = info.pieceAttacks[!color][QUEEN] & (bishopCheckSquares | rookCheckSquares)  & ~info.pieceAttacks[color][QUEEN];
+    const Bitboard rookChecks   = info.pieceAttacks[!color][ROOK] & rookCheckSquares;
+    const Bitboard bishopChecks = info.pieceAttacks[!color][BISHOP] & bishopCheckSquares;
+    const Bitboard knightChecks = info.pieceAttacks[!color][KNIGHT] & knightCheckSquares;
 
     int danger = 0;
 
@@ -754,13 +754,13 @@ static const EvalTerm evaluate_passers(const Board& board, const Color color, co
 
     EvalTerm value;
 
-    uint64_t passers = info.passedPawns & board.pieces(color);
+    Bitboard passers = info.passedPawns & board.pieces(color);
 
     // Loop over all passed pawns
     while (passers) {
 
-        const unsigned sq      = pop_lsb(passers);
-        const unsigned blocksq = sq + DIRECTIONS[color][UP];
+        const Square sq        = pop_lsb(passers);
+        const Square blocksq   = sq + direction(color, UP);
         const Rank r           = relative_rank(color, sq);
         const File f           = file(sq);
         const unsigned rfactor = (r - 2) * (r - 1) / 2;
@@ -772,11 +772,11 @@ static const EvalTerm evaluate_passers(const Board& board, const Color color, co
 
             EvalTerm bonus = V(0, 0);
 
-            uint64_t path     = FrontFileMask[color][sq];
-            uint64_t behind   = FrontFileMask[!color][sq];
-            uint64_t attacked = PassedPawnMask[color][sq];
+            Bitboard path     = FrontFileMask[color][sq];
+            Bitboard behind   = FrontFileMask[!color][sq];
+            Bitboard attacked = PassedPawnMask[color][sq];
 
-            uint64_t majorsBehind = behind & board.majors();
+            Bitboard majorsBehind = behind & board.majors();
 
             // If there are no major enemy pieces on the file behind the pawn,
             // check if there are any squares in front of the pawn atttacked
@@ -853,20 +853,20 @@ static const EvalTerm evaluate_threats(const Board& board, const Color color, co
 
     EvalTerm value;
 
-    const uint64_t nonPawnPieces  = board.pieces(!color) ^ board.pieces(!color, PAWN); //board.minors_and_majors(!color);
-    const uint64_t strongSquares  = info.pieceAttacks[!color][PAWN] | (info.multiAttacks[!color] & ~info.multiAttacks[color]);
-    const uint64_t defendedPieces = nonPawnPieces & strongSquares;
-    const uint64_t weakPieces     = board.pieces(!color) & ~strongSquares & info.colorAttacks[color];
+    const Bitboard nonPawnPieces  = board.pieces(!color) ^ board.pieces(!color, PAWN); //board.minors_and_majors(!color);
+    const Bitboard strongSquares  = info.pieceAttacks[!color][PAWN] | (info.multiAttacks[!color] & ~info.multiAttacks[color]);
+    const Bitboard defendedPieces = nonPawnPieces & strongSquares;
+    const Bitboard weakPieces     = board.pieces(!color) & ~strongSquares & info.colorAttacks[color];
 
     // Evaluate minors and rooks attacking weak and defended pieces
     // Add a bigger bonus for pieces which are are close to our base
     // since they are more vulnerable there
     if (defendedPieces | weakPieces) {
 
-        uint64_t minorAttacks = (defendedPieces | weakPieces) & (info.pieceAttacks[color][KNIGHT] | info.pieceAttacks[color][BISHOP]);
+        Bitboard minorAttacks = (defendedPieces | weakPieces) & (info.pieceAttacks[color][KNIGHT] | info.pieceAttacks[color][BISHOP]);
         while (minorAttacks) {
 
-            const unsigned int sq = pop_lsb(minorAttacks);
+            const Square sq = pop_lsb(minorAttacks);
             const Piecetype pt = board.piecetype(sq);
 
             value += minorAttackWeight[pt];
@@ -876,10 +876,10 @@ static const EvalTerm evaluate_threats(const Board& board, const Color color, co
 
         }
 
-        uint64_t rookAttacks = weakPieces & info.pieceAttacks[color][ROOK];
+        Bitboard rookAttacks = weakPieces & info.pieceAttacks[color][ROOK];
         while (rookAttacks) {
 
-            const unsigned int sq = pop_lsb(rookAttacks);
+            const Square sq = pop_lsb(rookAttacks);
             const Piecetype pt = board.piecetype(sq);
 
             value += rookAttackWeight[pt];
@@ -900,28 +900,28 @@ static const EvalTerm evaluate_threats(const Board& board, const Color color, co
     // Bonus for restricting the mobility of enemy pieces
     value += mobilityRestriction * popcount(info.colorAttacks[!color] & ~strongSquares & info.colorAttacks[color]);
 
-    const uint64_t safeSquares = info.colorAttacks[color] | ~info.colorAttacks[!color];
-    const uint64_t safePawns   = board.pieces(color, PAWN) & safeSquares;
+    const Bitboard safeSquares = info.colorAttacks[color] | ~info.colorAttacks[!color];
+    const Bitboard safePawns   = board.pieces(color, PAWN) & safeSquares;
 
     // Bonus for safe pawns attacking minor and major pieces
     value += safePawnAttack * popcount(generate_pawns_attacks(safePawns, color) & nonPawnPieces);
 
     // Bonus for pawn pushes which attack enemy pieces
-    uint64_t pawnPushes = shift_up(board.pieces(color, PAWN), color) & ~board.pieces(BOTH);
+    Bitboard pawnPushes = shift_up(board.pieces(color, PAWN), color) & ~board.pieces(BOTH);
     pawnPushes |= shift_up(pawnPushes & PAWN_FIRST_PUSH_RANK[color], color) & ~board.pieces(BOTH);
     pawnPushes &= ~info.pieceAttacks[!color][PAWN] & safeSquares;
 
     value += pawnPushThreat * popcount(generate_pawns_attacks(pawnPushes, color) & nonPawnPieces);
 
     // Evaluate possible safe attacks on queen
-    uint64_t queens = board.pieces(!color, QUEEN);
+    Bitboard queens = board.pieces(!color, QUEEN);
     if (queens) {
 
-        unsigned sq = pop_lsb(queens);
-        uint64_t knightAttackSquares = gen_knight_moves(sq, board.pieces(color)) & info.pieceAttacks[color][KNIGHT];
-        uint64_t bishopAttackSquares = gen_bishop_moves(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][BISHOP];
-        uint64_t rookAttackSquares   = gen_rook_moves(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][ROOK];
-        uint64_t safe = info.mobilityArea[color] & ~strongSquares;
+        Square sq = pop_lsb(queens);
+        Bitboard knightAttackSquares = gen_knight_moves(sq, board.pieces(color)) & info.pieceAttacks[color][KNIGHT];
+        Bitboard bishopAttackSquares = gen_bishop_moves(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][BISHOP];
+        Bitboard rookAttackSquares   = gen_rook_moves(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][ROOK];
+        Bitboard safe = info.mobilityArea[color] & ~strongSquares;
 
         value += KnightQueenAttackThreat * popcount(knightAttackSquares & safe);
 
@@ -942,8 +942,8 @@ static void init_eval_info(const Board& board, EvalInfo& info) {
     // The mobility area is all squares we count for mobility.
     // We count all squares except for those attacked by enemy pawns
     // and blocked friendly pawns, our queens and king.
-    info.mobilityArea[WHITE] = ALL_SQUARES & ~((board.pieces(WHITE, KING) | board.pieces(WHITE, QUEEN)) | (board.pieces(WHITE, PAWN) & (shift_down(board.pieces(BOTH), WHITE) | BB_RANK_2 | BB_RANK_3)) | info.pieceAttacks[BLACK][PAWN]);
-    info.mobilityArea[BLACK] = ALL_SQUARES & ~((board.pieces(BLACK, KING) | board.pieces(BLACK, QUEEN)) | (board.pieces(BLACK, PAWN) & (shift_down(board.pieces(BOTH), BLACK) | BB_RANK_7 | BB_RANK_6)) | info.pieceAttacks[WHITE][PAWN]);
+    info.mobilityArea[WHITE] = SQUARES_ALL & ~((board.pieces(WHITE, KING) | board.pieces(WHITE, QUEEN)) | (board.pieces(WHITE, PAWN) & (shift_down(board.pieces(BOTH), WHITE) | BB_RANK_2 | BB_RANK_3)) | info.pieceAttacks[BLACK][PAWN]);
+    info.mobilityArea[BLACK] = SQUARES_ALL & ~((board.pieces(BLACK, KING) | board.pieces(BLACK, QUEEN)) | (board.pieces(BLACK, PAWN) & (shift_down(board.pieces(BOTH), BLACK) | BB_RANK_7 | BB_RANK_6)) | info.pieceAttacks[WHITE][PAWN]);
 
     // Set king square and ring area bitboards for each color
     info.kingSq[WHITE] = lsb_index(board.pieces(WHITE, KING));

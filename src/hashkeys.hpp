@@ -29,7 +29,7 @@
 #include "move.hpp"
 
 // A megabyte
-#define MB 0x100000
+static constexpr unsigned MB = 0x100000;
 
 // Transpositon Table Bucket Size
 static constexpr unsigned TT_BUCKET_SIZE     = 3;
@@ -83,11 +83,11 @@ struct PawnEntry {
 
     uint64_t key;
     EvalTerm value;
-    uint64_t pawnWAttacks;
-    uint64_t pawnBAttacks;
-    uint64_t passedPawns;
-    uint64_t pawnWAttacksSpan;
-    uint64_t pawnBAttacksSpan;
+    Bitboard pawnWAttacks;
+    Bitboard pawnBAttacks;
+    Bitboard passedPawns;
+    Bitboard pawnWAttacksSpan;
+    Bitboard pawnBAttacksSpan;
 
 };
 
@@ -180,7 +180,9 @@ inline int value_to_tt(Value value, Depth plies) {
 
     assert(value != VALUE_NONE);
 
-    return value >= VALUE_MATE_MAX ? value + plies : value <= VALUE_MATED_MAX ? value - plies : value;
+    return   value >= VALUE_MATE_MAX  ? value + plies
+           : value <= VALUE_MATED_MAX ? value - plies
+           : value;
 
 }
 
@@ -188,7 +190,10 @@ inline int value_to_tt(Value value, Depth plies) {
 // of plies
 inline int value_from_tt(Value value, Depth plies) {
 
-    return value == VALUE_NONE ? VALUE_NONE : value >= VALUE_MATE_MAX ? value - plies : value <= VALUE_MATED_MAX ? value + plies : value;
+    return value == VALUE_NONE ? VALUE_NONE 
+                               : value >= VALUE_MATE_MAX  ? value - plies
+                               : value <= VALUE_MATED_MAX ? value + plies
+                               : value;
 
 }
 

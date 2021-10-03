@@ -25,18 +25,6 @@
 #include "board.hpp"
 #include "bitboards.hpp"
 
-// Blocking squares for the castling moves
-static const uint64_t WKCAS_BLOCKERS = SQUARES[SQUARE_F1] | SQUARES[SQUARE_G1];
-static const uint64_t WQCAS_BLOCKERS = SQUARES[SQUARE_B1] | SQUARES[SQUARE_C1] | SQUARES[SQUARE_D1];
-static const uint64_t BKCAS_BLOCKERS = SQUARES[SQUARE_F8] | SQUARES[SQUARE_G8];
-static const uint64_t BQCAS_BLOCKERS = SQUARES[SQUARE_B8] | SQUARES[SQUARE_C8] | SQUARES[SQUARE_D8];
-
-// Move objects for each castling
-static const Move WKCAS_MOVE = make_move(SQUARE_E1, SQUARE_G1, CASTLING);
-static const Move WQCAS_MOVE = make_move(SQUARE_E1, SQUARE_C1, CASTLING);
-static const Move BKCAS_MOVE = make_move(SQUARE_E8, SQUARE_G8, CASTLING);
-static const Move BQCAS_MOVE = make_move(SQUARE_E8, SQUARE_C8, CASTLING);
-
 // Appends the moves of a given move list to its own moves
 void MoveList::merge(MoveList list) {
 
@@ -88,21 +76,21 @@ void MoveList::print() {
 }
 
 // Generates all pseudo-legal quiet promotions in a given position and adds them to the given move list
-static void gen_quietproms(const Board& board, MoveList& moveList, const Color color, const uint64_t targets) {
+static void gen_quietproms(const Board& board, MoveList& moveList, const Color color, const Bitboard targets) {
 
     // Bitboard of all pawns for the given color which are one square away from promotion
-    uint64_t pawns = board.pieces(color, PAWN) & PAWN_STARTRANK[!color];
+    Bitboard pawns = board.pieces(color, PAWN) & PAWN_STARTRANK[!color];
 
     while (pawns) {
 
-        const unsigned int fromsq = pop_lsb(pawns);
-        const unsigned int tosq = fromsq + DIRECTIONS[color][UP];
+        const Square fromSq = pop_lsb(pawns);
+        const Square toSq   = fromSq + direction(color, UP);
 
-        if (SQUARES[tosq] & targets) {
-            moveList.append(make_move(fromsq, tosq, PROMOTION_QUEEN));
-            moveList.append(make_move(fromsq, tosq, PROMOTION_ROOK));
-            moveList.append(make_move(fromsq, tosq, PROMOTION_BISHOP));
-            moveList.append(make_move(fromsq, tosq, PROMOTION_KNIGHT));
+        if (SQUARES[toSq] & targets) {
+            moveList.append(make_move(fromSq, toSq, PROMOTION_QUEEN));
+            moveList.append(make_move(fromSq, toSq, PROMOTION_ROOK));
+            moveList.append(make_move(fromSq, toSq, PROMOTION_BISHOP));
+            moveList.append(make_move(fromSq, toSq, PROMOTION_KNIGHT));
         }
 
     }
@@ -110,23 +98,23 @@ static void gen_quietproms(const Board& board, MoveList& moveList, const Color c
 }
 
 // Generates all pseudo-legal promotions in a given position which capture a piece and adds them to the given move list
-static void gen_capproms(const Board& board, MoveList& moveList, const Color color, const uint64_t targets) {
+static void gen_capproms(const Board& board, MoveList& moveList, const Color color, const Bitboard targets) {
 
-    uint64_t pawns = board.pieces(color, PAWN) & PAWN_STARTRANK[!color];
+    Bitboard pawns = board.pieces(color, PAWN) & PAWN_STARTRANK[!color];
 
     while (pawns) {
 
-        const unsigned fromsq = pop_lsb(pawns);
-        uint64_t caps = PawnAttacks[color][fromsq] & targets;
+        const Square fromSq = pop_lsb(pawns);
+        Bitboard caps = PawnAttacks[color][fromSq] & targets;
 
         while (caps) {
 
-            const unsigned int tosq = pop_lsb(caps);
+            const Square toSq = pop_lsb(caps);
 
-            moveList.append(make_move(fromsq, tosq, PROMOTION_QUEEN));
-            moveList.append(make_move(fromsq, tosq, PROMOTION_ROOK));
-            moveList.append(make_move(fromsq, tosq, PROMOTION_BISHOP));
-            moveList.append(make_move(fromsq, tosq, PROMOTION_KNIGHT));
+            moveList.append(make_move(fromSq, toSq, PROMOTION_QUEEN));
+            moveList.append(make_move(fromSq, toSq, PROMOTION_ROOK));
+            moveList.append(make_move(fromSq, toSq, PROMOTION_BISHOP));
+            moveList.append(make_move(fromSq, toSq, PROMOTION_KNIGHT));
 
         }
 
@@ -135,14 +123,14 @@ static void gen_capproms(const Board& board, MoveList& moveList, const Color col
 }
 
 // Generates the pseudo-legal en-passant captures (if possible) for a given position and adds them to the given move list
-static void gen_ep(const Board& board, MoveList& moveList, const Color color, const uint64_t targets) {
+static void gen_ep(const Board& board, MoveList& moveList, const Color color, const Bitboard targets) {
 
-    const unsigned epSq = board.enpassant_square();
+    const Square epSq = board.enpassant_square();
 
     if (epSq != SQUARE_NONE && (SQUARES[epSq] & targets)) {
 
         // Bitboard of all friendly pawns attacking the en-passant square
-        uint64_t pawns = PawnAttacks[!color][epSq] & board.pieces(color, PAWN);
+        Bitboard pawns = PawnAttacks[!color][epSq] & board.pieces(color, PAWN);
 
         while (pawns) {
 
@@ -157,10 +145,10 @@ static void gen_ep(const Board& board, MoveList& moveList, const Color color, co
 // Generates all pseudo-legal moves capturing pieces for a given color and adds them to the move list
 // For each piece, the method creates a bitboard with all possible target squares. It then loops over each
 // set bit on the bitboard and adds a move for each to the move list until there are not bits left on the bitboard.
-static void gen_piece_caps(const Board& board, MoveList& moveList, const Color color, uint64_t targets) {
+static void gen_piece_caps(const Board& board, MoveList& moveList, const Color color, Bitboard targets) {
 
-    const unsigned sq = lsb_index(board.pieces(color, KING));
-    uint64_t moves = KingAttacks[sq] & board.pieces(!color);
+    const Square sq = lsb_index(board.pieces(color, KING));
+    Bitboard moves = KingAttacks[sq] & board.pieces(!color);
 
     while (moves) {
 
@@ -168,11 +156,11 @@ static void gen_piece_caps(const Board& board, MoveList& moveList, const Color c
 
     }
 
-    uint64_t pawns = board.pieces(color, PAWN) & ~PAWN_STARTRANK[!color];
+    Bitboard pawns = board.pieces(color, PAWN) & ~PAWN_STARTRANK[!color];
     while (pawns) {
 
-        const unsigned sq = pop_lsb(pawns);
-        uint64_t moves = PawnAttacks[color][sq] & targets;
+        const Square sq = pop_lsb(pawns);
+        Bitboard moves = PawnAttacks[color][sq] & targets;
 
         while (moves) {
 
@@ -182,11 +170,11 @@ static void gen_piece_caps(const Board& board, MoveList& moveList, const Color c
 
     }
 
-    uint64_t knights = board.pieces(color, KNIGHT);
+    Bitboard knights = board.pieces(color, KNIGHT);
     while (knights) {
 
-        const unsigned sq = pop_lsb(knights);
-        uint64_t moves = KnightAttacks[sq] & targets;
+        const Square sq = pop_lsb(knights);
+        Bitboard moves = KnightAttacks[sq] & targets;
 
         while (moves) {
 
@@ -196,11 +184,11 @@ static void gen_piece_caps(const Board& board, MoveList& moveList, const Color c
 
     }
 
-    uint64_t bishops = board.pieces(color, BISHOP);
+    Bitboard bishops = board.pieces(color, BISHOP);
     while (bishops) {
 
-        const unsigned sq = pop_lsb(bishops);
-        uint64_t moves = gen_bishop_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
+        const Square sq = pop_lsb(bishops);
+        Bitboard moves = gen_bishop_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
 
         while (moves) {
 
@@ -210,11 +198,11 @@ static void gen_piece_caps(const Board& board, MoveList& moveList, const Color c
 
     }
 
-    uint64_t rooks = board.pieces(color, ROOK);
+    Bitboard rooks = board.pieces(color, ROOK);
     while (rooks) {
 
-        const unsigned sq = pop_lsb(rooks);
-        uint64_t moves = gen_rook_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
+        const Square sq = pop_lsb(rooks);
+        Bitboard moves = gen_rook_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
 
         while (moves) {
 
@@ -223,11 +211,11 @@ static void gen_piece_caps(const Board& board, MoveList& moveList, const Color c
         }
     }
 
-    uint64_t queens = board.pieces(color, QUEEN);
+    Bitboard queens = board.pieces(color, QUEEN);
     while (queens) {
 
-        const unsigned sq = pop_lsb(queens);
-        uint64_t moves = get_queen_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
+        const Square sq = pop_lsb(queens);
+        Bitboard moves = get_queen_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
 
         while (moves) {
 
@@ -240,18 +228,18 @@ static void gen_piece_caps(const Board& board, MoveList& moveList, const Color c
 }
 
 // Same as the function above, only for quiet moves though
-static void gen_piece_quiets(const Board& board, MoveList& moveList, const Color color, const uint64_t targets) {
+static void gen_piece_quiets(const Board& board, MoveList& moveList, const Color color, const Bitboard targets) {
 
-    const uint64_t pawns      = board.pieces(color, PAWN) & ~PAWN_STARTRANK[!color];
-    const uint64_t pawnPushes = shift_up(pawns, color) & ~board.pieces(BOTH);
-    uint64_t singlePushes     = pawnPushes & targets;
-    uint64_t doublePushes     = shift_up(pawnPushes & PAWN_FIRST_PUSH_RANK[color], color) & targets;
+    const Bitboard pawns      = board.pieces(color, PAWN) & ~PAWN_STARTRANK[!color];
+    const Bitboard pawnPushes = shift_up(pawns, color) & ~board.pieces(BOTH);
+    Bitboard singlePushes     = pawnPushes & targets;
+    Bitboard doublePushes     = shift_up(pawnPushes & PAWN_FIRST_PUSH_RANK[color], color) & targets;
 
-    uint64_t knights = board.pieces(color, KNIGHT);
+    Bitboard knights = board.pieces(color, KNIGHT);
     while (knights) {
 
-        const unsigned sq = pop_lsb(knights);
-        uint64_t moves = KnightAttacks[sq] & targets;
+        const Square sq = pop_lsb(knights);
+        Bitboard moves = KnightAttacks[sq] & targets;
 
         while (moves) {
 
@@ -261,11 +249,11 @@ static void gen_piece_quiets(const Board& board, MoveList& moveList, const Color
 
     }
 
-    uint64_t bishops = board.pieces(color, BISHOP);
+    Bitboard bishops = board.pieces(color, BISHOP);
     while (bishops) {
 
-        const unsigned sq = pop_lsb(bishops);
-        uint64_t moves = gen_bishop_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
+        const Square sq = pop_lsb(bishops);
+        Bitboard moves = gen_bishop_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
 
         while (moves) {
 
@@ -275,11 +263,11 @@ static void gen_piece_quiets(const Board& board, MoveList& moveList, const Color
 
     }
 
-    uint64_t rooks = board.pieces(color, ROOK);
+    Bitboard rooks = board.pieces(color, ROOK);
     while (rooks) {
 
-        const unsigned sq = pop_lsb(rooks);
-        uint64_t moves = gen_rook_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
+        const Square sq = pop_lsb(rooks);
+        Bitboard moves = gen_rook_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
 
         while (moves) {
 
@@ -288,11 +276,11 @@ static void gen_piece_quiets(const Board& board, MoveList& moveList, const Color
         }
     }
 
-    uint64_t queens = board.pieces(color, QUEEN);
+    Bitboard queens = board.pieces(color, QUEEN);
     while (queens) {
 
-        const unsigned sq = pop_lsb(queens);
-        uint64_t moves = get_queen_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
+        const Square sq = pop_lsb(queens);
+        Bitboard moves = get_queen_moves(sq, board.pieces(BOTH), board.pieces(color)) & targets;
 
         while (moves) {
 
@@ -304,22 +292,22 @@ static void gen_piece_quiets(const Board& board, MoveList& moveList, const Color
 
     while (singlePushes) {
 
-        const unsigned tosq = pop_lsb(singlePushes);
-        const unsigned fromsq = lsb_index(shift_down(SQUARES[tosq], color));
-        moveList.append(make_move(fromsq, tosq, NORMAL));
+        const Square toSq = pop_lsb(singlePushes);
+        const Square fromSq = lsb_index(shift_down(SQUARES[toSq], color));
+        moveList.append(make_move(fromSq, toSq, NORMAL));
 
     }
 
     while (doublePushes) {
 
-        const unsigned tosq = pop_lsb(doublePushes);
-        const unsigned fromsq = lsb_index(shift_down(shift_down(SQUARES[tosq], color), color));
-        moveList.append(make_move(fromsq, tosq, NORMAL));
+        const Square toSq = pop_lsb(doublePushes);
+        const Square fromSq = lsb_index(shift_down(shift_down(SQUARES[toSq], color), color));
+        moveList.append(make_move(fromSq, toSq, NORMAL));
 
     }
 
-    const unsigned sq = lsb_index(board.pieces(color, KING));
-    uint64_t moves = gen_king_moves(sq, board.pieces(color)) & ~board.pieces(BOTH);
+    const Square sq = lsb_index(board.pieces(color, KING));
+    Bitboard moves = gen_king_moves(sq, board.pieces(color)) & ~board.pieces(BOTH);
 
     while (moves) {
 
@@ -330,45 +318,15 @@ static void gen_piece_quiets(const Board& board, MoveList& moveList, const Color
 }
 
 // Returns true if the given castling is possible in the current position, false if not.
-bool Board::is_castling_valid(const unsigned flag) const {
+bool Board::is_castling_valid(const unsigned type) const {
 
     if (!checkers()) {
 
-        switch (flag) {
+        return (   state.castlingRights & CASTLE_TYPES[stm][type]
+                && pieces(stm, KING)    & SQUARES[KING_INITIAL_SQUARE[stm]]
+                && pieces(stm, ROOK)    & SQUARES[CASTLE_ROOK_ORIGIN_SQUARE[stm][type]]
+                && !(pieces(BOTH)       & CASTLE_PATH[stm][type]));
 
-            case WKCASFLAG:
-            {
-                return (   state.castling & WKCASFLAG
-                        && pieces(WHITE, KING) & SQUARES[SQUARE_E1]
-                        && pieces(WHITE, ROOK) & SQUARES[SQUARE_H1]
-                        && !(pieces(BOTH) & WKCAS_BLOCKERS));
-
-            }
-            case WQCASFLAG:
-            {
-                return (   state.castling & WQCASFLAG
-                        && pieces(WHITE, KING) & SQUARES[SQUARE_E1]
-                        && pieces(WHITE, ROOK) & SQUARES[SQUARE_A1]
-                        && !(pieces(BOTH) & WQCAS_BLOCKERS));
-
-
-            }
-            case BKCASFLAG:
-            {
-                return (   state.castling & BKCASFLAG
-                        && pieces(BLACK, KING) & SQUARES[SQUARE_E8]
-                        && pieces(BLACK, ROOK) & SQUARES[SQUARE_H8]
-                        && !(pieces(BOTH) & BKCAS_BLOCKERS));
-
-            }
-            case BQCASFLAG:
-            {
-                return (   state.castling & BQCASFLAG
-                        && pieces(BLACK, KING) & SQUARES[SQUARE_E8]
-                        && pieces(BLACK, ROOK) & SQUARES[SQUARE_A8]
-                        && !(pieces(BOTH) & BQCAS_BLOCKERS));
-            }
-        }
     }
 
     return false;
@@ -378,26 +336,12 @@ bool Board::is_castling_valid(const unsigned flag) const {
 // Generates all castling moves for the given position or a given color and adds them to the move list
 static void gen_castlings(const Board& board, MoveList& moveList, const Color color) {
 
-    if (color == WHITE) {
+    if (board.is_castling_valid(CASTLE_SHORT)) {
+        moveList.append(CASTLE_MOVES[color][CASTLE_SHORT]);
+    }
 
-        if (board.is_castling_valid(WKCASFLAG)) {
-            moveList.append(WKCAS_MOVE);
-        }
-
-        if (board.is_castling_valid(WQCASFLAG)) {
-            moveList.append(WQCAS_MOVE);
-        }
-
-    } else {
-
-        if (board.is_castling_valid(BKCASFLAG)) {
-            moveList.append(BKCAS_MOVE);
-        }
-
-        if (board.is_castling_valid(BQCASFLAG)) {
-            moveList.append(BQCAS_MOVE);
-        }
-
+    if (board.is_castling_valid(CASTLE_LONG)) {
+        moveList.append(CASTLE_MOVES[color][CASTLE_LONG]);
     }
 
 }
@@ -410,13 +354,13 @@ MoveList gen_evasions(const Board& board, const MoveGenType mtype) {
     MoveList moveList;
 
     const Color color       = board.turn();
-    const unsigned ksq      = lsb_index(board.pieces(color, KING));
-    const uint64_t checkers = board.checkers();
-    const uint64_t sliders  = checkers & ~(board.pieces(color, KNIGHT) | board.pieces(color, PAWN));
+    const Square ksq        = lsb_index(board.pieces(color, KING));
+    const Bitboard checkers = board.checkers();
+    const Bitboard sliders  = checkers & ~(board.pieces(color, KNIGHT) | board.pieces(color, PAWN));
 
     if (popcount(checkers) >= 2) {
 
-        uint64_t kingMoves = KingAttacks[ksq] & ((mtype == MOVES_QUIETS) ? ~board.pieces(BOTH) : board.pieces(!color));
+        Bitboard kingMoves = KingAttacks[ksq] & ((mtype == MOVES_QUIETS) ? ~board.pieces(BOTH) : board.pieces(!color));
         while (kingMoves) {
             moveList.append(make_move(ksq, pop_lsb(kingMoves), NORMAL));
         }
@@ -428,7 +372,7 @@ MoveList gen_evasions(const Board& board, const MoveGenType mtype) {
 
         case MOVES_QUIETS:
         {
-            const uint64_t targets = (sliders ? (RayTable[lsb_index(sliders)][ksq] & ~board.pieces(BOTH)) : ~board.pieces(BOTH));
+            const Bitboard targets = (sliders ? (RayTable[lsb_index(sliders)][ksq] & ~board.pieces(BOTH)) : ~board.pieces(BOTH));
             gen_quietproms(board, moveList, color, targets);
             gen_piece_quiets(board, moveList, color, targets);
             break;
@@ -444,7 +388,7 @@ MoveList gen_evasions(const Board& board, const MoveGenType mtype) {
         }
         case MOVES_ALL:
         {
-            const uint64_t targets = (sliders ? (RayTable[lsb_index(sliders)][ksq] & ~board.pieces(BOTH)) : ~board.pieces(BOTH));
+            const Bitboard targets = (sliders ? (RayTable[lsb_index(sliders)][ksq] & ~board.pieces(BOTH)) : ~board.pieces(BOTH));
             gen_quietproms(board, moveList, color, targets);
             gen_piece_quiets(board, moveList, color, targets);
             gen_capproms(board, moveList, color, checkers);
@@ -469,7 +413,7 @@ MoveList gen_legals(const Board& board, const MoveList& moves) {
 
     MoveList legals;
 
-    for (unsigned int m = 0; m < moves.size; m++) {
+    for (unsigned m = 0; m < moves.size; m++) {
 
         const Move move = moves.moves[m];
 
@@ -491,7 +435,7 @@ MoveList gen_quiets(const Board& board, const Color color) {
     if (board.checkers()) {
         return gen_evasions(board, MOVES_QUIETS);
     } else {
-        const uint64_t targets = ~board.pieces(BOTH);
+        const Bitboard targets = ~board.pieces(BOTH);
         gen_quietproms(board, moveList, color, targets);
         gen_castlings(board, moveList, color);
         gen_piece_quiets(board, moveList, color, targets);
@@ -509,7 +453,7 @@ MoveList gen_caps(const Board& board, const Color color) {
     if (board.checkers()) {
         return gen_evasions(board, MOVES_CAPTURES);
     } else {
-        const uint64_t targets = board.pieces(!color);
+        const Bitboard targets = board.pieces(!color);
         gen_capproms(board, moveList, color, targets);
         gen_piece_caps(board, moveList, color, targets);
         gen_ep(board, moveList, color, SQUARES[board.enpassant_square()]);
@@ -534,11 +478,11 @@ MoveList gen_all(const Board& board, const Color color) {
 // Checks wether a move is giving check to the opponent's king
 bool Board::gives_check(const Move move) {
 
-    const unsigned ksq    = lsb_index(pieces(!stm, KING));
-    const unsigned fromSq = from_sq(move);
-    const unsigned toSq   = to_sq(move);
+    const Square ksq    = lsb_index(pieces(!stm, KING));
+    const Square fromSq = from_sq(move);
+    const Square toSq   = to_sq(move);
 
-    uint64_t attacks = 0;
+    Bitboard attacks = 0;
 
     switch(pieceTypes[fromSq]) {
 

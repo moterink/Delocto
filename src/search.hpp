@@ -48,17 +48,20 @@ enum NodeType {
 };
 
 // A principal variation. Holds a list of all moves played in the current sequence
-class PvLine {
+class PrincipalVariation {
+
+    private:
+
+        unsigned size = 0;
+        std::array<Move, DEPTH_MAX> line = { MOVE_NONE };
 
     public:
 
-        unsigned size = 0;
-        Move line[DEPTH_MAX];
-
-        void merge(PvLine pv);
-        void append(const Move move);
-        bool compare(const PvLine& pv) const;
-        void clear();
+        Move best() { assert(size > 0); return line[0]; }
+        Move get_move(const unsigned index) const { return line[index]; }
+        unsigned length() const { return size; }
+        void reset() { size = 0; }
+        void update(const Move bestMove, const PrincipalVariation& pv);
 
 };
 
@@ -66,12 +69,14 @@ class PvLine {
 // specified by the user
 struct SearchLimits {
 
-    Duration moveTime = -1;
-    Duration time = -1;
-    Duration increment = 0;
-
     bool infinite = false;
+    unsigned multiPv = 1;
     Depth depth = DEPTH_MAX;
+    uint64_t nodes = 0;
+
+    Duration moveTime = 0;
+    Duration time = 0;
+    Duration increment = 0;
 
 };
 
@@ -91,14 +96,17 @@ class SearchInfo {
 
         TimePoint start;
 
-        bool limitTime = true;
+        SearchLimits limits;
+        
+        std::array<Move, MOVES_MAX_COUNT> multiPvMoves = { MOVE_NONE };
+        size_t multiPv = 0;
 
         Duration idealTime = 0;
         Duration maxTime = 0;
 
         unsigned hashTableHits = 0;
         Depth depth = 0; // Absolute depth
-        Depth selectiveDepth = 0; // Selective depth; so quiecent search depth is included
+        Depth selectiveDepth = 0; // Selective depth; so quiescent search depth is included
         std::atomic<uint64_t> nodes{0};
 
         int pvStability = 0;

@@ -74,7 +74,6 @@ class Thread {
         std::mutex mtx;
         std::condition_variable cv;
         
-        SearchLimits limits;
         SearchInfo info;
 
 };

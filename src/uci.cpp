@@ -20,51 +20,116 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
 */
+#include <sstream>
+#include <stdlib.h>
+
 #include "uci.hpp"
 #include "search.hpp"
 #include "evaluate.hpp"
 #include "timeman.hpp"
 #include "thread.hpp"
 
-static const uint64_t KING_START_SQ[2]       = { SQUARES[SQUARE_E1], SQUARES[SQUARE_E8] };
-static const uint64_t KING_CASTLE_SQUARES[2] = { (SQUARES[SQUARE_G1] | SQUARES[SQUARE_C1]), (SQUARES[SQUARE_G8] | SQUARES[SQUARE_C8]) };
+static void clear_hash() {
+    TTable.clear();
+}
 
-unsigned ThreadsCount = 1;
-unsigned MoveOverhead = 100;
+SpinOption   ThreadsOption      = SpinOption("Threads", 1, 1, 4);
+SpinOption   HashOption         = SpinOption("Hash", 64, 1, 4096);
+ButtonOption ClearHashOption    = ButtonOption("Clear Hash", clear_hash);
+SpinOption   MoveOverheadOption = SpinOption("MoveOverhead", 100, 0, 10000);
+SpinOption   MultiPVOption      = SpinOption("MultiPV", 1, 1, 100);
 
-ThreadPool Threads(ThreadsCount);
+const Option* Options[5] = {
+    &ThreadsOption,
+    &HashOption,
+    &ClearHashOption,
+    &MoveOverheadOption,
+    &MultiPVOption,
+};
 
+ThreadPool Threads(ThreadsOption.get_default());
 TranspositionTable TTable;
 
-// This function takes a FEN and a principal variation string as an input and
-// plays the given sequence of moves on a board.
-static void play_sequence(Board& board, std::string fen, std::string input, std::string::size_type start) {
+// This function receives various information about the current search iteration and prints
+// information like current depth, selective depth, duration, score... to the console. It
+// also shows a principal variation (the suggested line of play)
+void send_pv(const SearchInfo& info, const Value value, const PrincipalVariation& pv, const uint64_t nodes, const Value alpha, const Value beta) {
 
-    input.append(" ");
-    board.set_fen(fen);
-    for (unsigned c = start; c < input.size(); c++) {
+    std::stringstream ss;
+    Duration duration = get_time_elapsed(info.start);
 
-        if (input[c] != ' ') {
+    // Show depth and selective depth
+    ss << "info depth " << info.depth
+       << " seldepth "  << info.selectiveDepth;
 
-            const unsigned fromsq = square(7 - (input[c]     - 'a'), input[c + 1] - '1');
-            const unsigned tosq   = square(7 - (input[c + 2] - 'a'), input[c + 3] - '1');
-
-            c += 4;
-
-            MoveType type = NORMAL;
-
-            if (input[c] != ' ') {
-                type = char_to_promotion(input[c]);
-            } else if ((SQUARES[fromsq] & (board.pieces(board.turn(), KING) & KING_START_SQ[board.turn()])) && (SQUARES[tosq] & KING_CASTLE_SQUARES[board.turn()])) {
-                type = CASTLING;
-            } else if (tosq == board.enpassant_square() && SQUARES[fromsq] & board.pieces(board.turn(), PAWN)) {
-                type = ENPASSANT;
-            }
-
-            board.do_move(make_move(fromsq, tosq, type));
-        }
-
+    // If we are in multiPV mode, also send the pv index
+    if (info.limits.multiPv > 1) {
+        ss << " multipv " << info.multiPv + 1;
     }
+
+    // Show the score (in centipawns) or if a mate was found, the plies until the mate
+    if (std::abs(value) >= VALUE_MATE_MAX) {
+        ss << " score mate " << (value > 0 ? VALUE_MATE - value + 1 : -VALUE_MATE - value) / 2;
+    } else {
+        ss << " score cp " << value;
+    }
+
+    if (value >= beta) {
+        ss << " lowerbound";
+    } else if (value <= alpha) {
+        ss << " upperbound";
+    }
+
+    // Show number of visited nodes, duration, nodes per second, and the principal variation
+    ss << " nodes "    << nodes
+       << " time "     << duration
+       << " nps "      << (duration != 0 ? nodes * 1000 / duration : nodes)
+       << " hashfull " << TTable.hashfull();
+
+    // Connect the moves of the principal variation to a string
+    if (pv.length()) {
+        ss << " pv";
+        for (unsigned pvIndex = 0; pvIndex < pv.length(); pvIndex++) {
+            ss << ' ' << move_to_string(pv.get_move(pvIndex));
+        }
+    }
+
+    ss << std::endl;
+    
+    std::cout << ss.str();
+
+}
+
+void send_string(const std::string string) {
+    
+    std::cout << "info string " << string << std::endl;
+
+}
+
+void send_currmove(const Move currentMove, const unsigned index) {
+
+    std::cout << "info currmove " << move_to_string(currentMove) << " currmovenumber " << index << std::endl;
+
+}
+
+// Show the best move for the current position in the console; if the position is mate or stalemate, the engine will output "none"
+void send_bestmove(const Move bestMove) {
+
+    std::cout << "bestmove " << (bestMove != MOVE_NONE ? move_to_string(bestMove) : "none") << std::endl;
+
+}
+
+// Send the engine identification and options to the console; end it with a "uciok"
+static void show_information() {
+
+    std::cout << "id name Delocto " << VERSION << std::endl;
+    std::cout << "id author Moritz Terink" << std::endl << std::endl;
+
+    for (const Option* option : Options) {
+        std::cout << option->uci_string() << std::endl;
+    }
+    
+    std::cout << "uciok" << std::endl << std::endl;
 
 }
 
@@ -100,7 +165,7 @@ uint64_t benchmark() {
 
     Board board;
     SearchLimits limits;
-    limits.depth = 6;
+    limits.depth = 8;
 
     uint64_t nodes = 0;
 
@@ -131,156 +196,214 @@ uint64_t benchmark() {
     std::cout << "Nodes searched (total):     " << std::setw(12) << nodes << std::endl;
     std::cout << "Nodes searched (per second):" << std::setw(12) << 1000 * nodes / elapsed << std::endl << std::endl;
 
+    // Reset thread pool to original value
+    Threads.resize(ThreadsOption.get_value());
+
     return nodes;
 
 }
 
-// Send the engine identification and options to the console; end it with a "uciok"
-static void show_information() {
+static void handle_setoption(std::stringstream& ss) {
 
-    std::cout << "id name Delocto " << VERSION << std::endl;
-    std::cout << "id author Moritz Terink" << std::endl << std::endl;
-    std::cout << "option name Hash type spin default " << TRANSPOSITION_TABLE_SIZE_DEFAULT << " max " << TRANSPOSITION_TABLE_SIZE_MAX << " min " << TRANSPOSITION_TABLE_SIZE_MIN << std::endl;
-    std::cout << "option name Threads type spin default " << THREADS_DEFAULT << " max " << THREADS_MAX << " min " << THREADS_MIN << std::endl;
-    std::cout << "option name MoveOverhead type spin default " << MOVE_OVERHEAD_DEFAULT << " max " << MOVE_OVERHEAD_MAX << " min " << MOVE_OVERHEAD_MIN << std::endl;
-    std::cout << "uciok" << std::endl << std::endl;
+    std::string word, name, valueRaw;
 
-}
+    ss >> word;
 
-// This function receives various information about the current search iteration and prints
-// information like current depth, selective depth, duration, score... to the console. It
-// also shows a principal variation (the suggested line of play)
-void send_info(const SearchInfo& info, const PvLine& pv, const Duration duration, const uint64_t nodes) {
-
-    std::string pvString;
-    Value value = info.value[info.depth];
-
-    // Connect the moves of the principal variation to a string
-    for (unsigned pvIndex = 0; pvIndex < pv.size; pvIndex++) {
-        pvString += move_to_string(pv.line[pvIndex]) + " ";
+    while (ss >> word) {
+        if (word == "value") {
+            break;
+        }
+        name += word + ' ';
     }
+    name.pop_back();
 
-    // Show depth and selective depth 
-    // (using unary operator + because uint8_t is treated like a character by std::cout)
-    std::cout << "info depth " << info.depth
-              << " seldepth "  << info.selectiveDepth;
+    ss >> valueRaw;
+    bool isValid = false;
 
-    // Show the score (in centipawns) or if a mate was found, the plies until the mate
-    if (std::abs(value) >= VALUE_MATE_MAX) {
-        std::cout << " score mate " << ((value > 0 ? VALUE_MATE - value + 1 : -VALUE_MATE - value) / 2);
+    if (name == HashOption.name) {
+        int value = std::stoi(valueRaw);
+        isValid = HashOption.set_value(value);
+        if (isValid) {
+            TTable.set_size(value);
+            TTable.clear();
+        }
+    } else if (name == ThreadsOption.name) {
+        int value = std::stoi(valueRaw);
+        isValid = ThreadsOption.set_value(value);
+        if (isValid) {
+            Threads.resize(value);
+        }
+    } else if (name == MoveOverheadOption.name) {
+        isValid = MoveOverheadOption.set_value(std::stoi(valueRaw));
+    } else if (name == MultiPVOption.name) {
+        isValid = MultiPVOption.set_value(std::stoi(valueRaw));
+    } else if (name == ClearHashOption.name) {
+        isValid = true;
+        ClearHashOption.push();
     } else {
-        std::cout << " score cp " << value;
+        send_string("Error: No option named \"" + name + "\"");
+        return;
     }
 
-    // Show number of visited nodes, duration, nodes per second, and the principal variation
-    std::cout << " nodes "    << nodes
-              << " time "     << duration 
-              << " nps "      << (duration != 0 ? nodes * 1000 / duration : nodes)
-              << " hashfull " << TTable.hashfull()
-              << " pv "       << pvString << std::endl;
+    if (!isValid) {
+        send_string("Error: Invalid value for option " + name);
+    }
 
 }
 
-// Show the best move for the current position in the console; if the position is mate or stalemate, the engine will output "none"
-void send_bestmove(const Move bestMove) {
+static void handle_position(std::stringstream& ss, Board& board) {
 
-    std::cout << "bestmove " << (bestMove != MOVE_NONE ? move_to_string(bestMove) : "none") << std::endl;
+    std::stringstream position;
+    std::string part;
+
+    while (ss >> part && part != "moves") {
+        if (part == "startpos") {
+            position << INITIAL_POSITION_FEN;
+        } else if (part == "fen") {
+            continue;
+        } else {
+            position << part << ' ';
+        }
+    }
+
+    board.set_fen(position.str());
+
+    std::string move;
+
+    while (ss >> move) {
+
+        const Square fromSq = square(7 - (move[0] - 'a'), move[1] - '1');
+        const Square toSq   = square(7 - (move[2] - 'a'), move[3] - '1');
+
+        MoveType type = NORMAL;
+
+        if (move.length() == 5) {
+            type = char_to_promotion(move[4]);
+        } else if (    (SQUARES[fromSq] & board.pieces(board.turn(), KING) & SQUARES[KING_INITIAL_SQUARE[board.turn()]])
+                    && std::abs(toSq - fromSq) == 2) {
+            type = CASTLING;
+        } else if (toSq == board.enpassant_square() && SQUARES[fromSq] & board.pieces(board.turn(), PAWN)) {
+            type = ENPASSANT;
+        }
+
+        board.do_move(make_move(fromSq, toSq, type));
+
+    }
+
+}
+
+static void handle_go(std::stringstream& ss, Board& board) {
+
+    SearchLimits limits;
+    std::string part;
+
+    // Information about white/black time, increments, fixed depth, etc.
+    while (ss >> part) {
+        if (part == "infinite") {
+            limits.infinite = true;
+            break;
+        } else if (part == "depth") {
+            ss >> part;
+            limits.depth = std::min(std::stoi(part), DEPTH_MAX);
+            break;
+        } else if (part == "nodes") {
+            ss >> part;
+            limits.nodes = std::max(std::stoll(part), 1ll);
+            break;
+        } else if (part == "movetime") {
+            ss >> part;
+            limits.moveTime = std::stoll(part);
+            break;
+        } else if ((part == "wtime" && board.turn() == WHITE) || (part == "btime" && board.turn() == BLACK)) {
+            ss >> part;
+            limits.time = std::stoll(part);
+        } else if ((part == "winc" && board.turn() == WHITE) || (part == "binc" && board.turn() == BLACK)) {
+            ss >> part;
+            limits.increment = std::stoll(part);
+        }
+    }
+
+    limits.multiPv = MultiPVOption.get_value();
+
+    go(board, limits);
 
 }
 
 // Parse a string and act according to the UCI protocol
 bool parse_uci_input(std::string input, Board& board) {
 
-    // Show information about the engine
-    if (input.compare("uci") == 0) {
-        show_information();
-    // Reset the board tot the initial position
-    } else if (input.compare("ucinewgame") == 0) {
-        newgame(board);
-    // A sort of ping command sent by the user interface to check if the engine is still responsive
-    } else if (input.compare("isready") == 0) {
-        std::cout << "readyok" << std::endl;
-    // Set the board to the initial position
-    } else if (input.compare("position startpos") == 0) {
-        board.set_fen(INITIAL_POSITION_FEN);
-    // Play all the moves from the initial position
-    } else if (input.find("position startpos moves ") == 0) {
-        play_sequence(board, INITIAL_POSITION_FEN, input, 24);
-    // Set the position to the given FEN; play all the moves on the board
-    } else if (input.find("position fen ") == 0) {
-        const std::string::size_type end = input.find("moves ");
-        if (end != std::string::npos) {
-            const std::string fen = input.substr(13, end - 13);
-            play_sequence(board, fen, input, end + 6);
-        } else {
-            board.set_fen(input.substr(13));
-        }
-    // Set an option
-    } else if (input.find("setoption name ") == 0) {
-        if (input.find("Hash value ") == 15) {
-            TTable.set_size(std::max(1, std::stoi(input.substr(26))));
-            TTable.clear();
-        } else if (input.find("Threads value ") == 15) {
-            ThreadsCount = std::stoi(input.substr(29));
-            Threads.resize(ThreadsCount);
-        } else if (input.find("MoveOverhead value ") == 15) {
-            MoveOverhead = std::stoi(input.substr(34));
-        }
-    // Start the search
-    } else if (input.find("go") == 0) {
-        SearchLimits limits;
-        std::string::size_type wtimestr, btimestr, wincstr, bincstr, movetimestr, infinitestr, depthstr;
+    std::stringstream ss(input);
+    std::string word;
 
-        // Information about white/black time, increments, fixed depth, etc.
-        wtimestr = input.find("wtime");
-        btimestr = input.find("btime");
-        wincstr = input.find("winc");
-        bincstr = input.find("binc");
-        movetimestr = input.find("movetime");
-        infinitestr = input.find("infinite");
-        depthstr = input.find("depth");
-
-        if (infinitestr != std::string::npos) {
-            limits.infinite = true;
-        } else if (depthstr != std::string::npos) {
-            limits.depth = std::min(std::stoi(input.substr(depthstr + 6)) + 1, DEPTH_MAX);
-        } else if (movetimestr != std::string::npos) {
-            limits.moveTime = std::stoll(input.substr(movetimestr + 9));
-        } else {
-            if (wtimestr != std::string::npos && board.turn() == WHITE) {
-                limits.time = std::stoll(input.substr(wtimestr + 6));
-            } else if (btimestr != std::string::npos && board.turn() == BLACK) {
-                limits.time = std::stoll(input.substr(btimestr + 6));
-            }
-            if (wincstr != std::string::npos && board.turn() == WHITE) {
-                limits.increment = std::stoll(input.substr(wincstr + 5));
-            } else if (bincstr != std::string::npos && board.turn() == BLACK) {
-                limits.increment = std::stoll(input.substr(bincstr + 5));
-            }
+    while (ss >> word) {
+        // Show information about the engine
+        if (word == "uci") {
+            show_information();
+            break;
         }
 
-        go(board, limits);
-    // Interrupt the current search
-    } else if (input.compare("stop") == 0) {
-        Threads.stop_searching();
-    // Output an evaluation of the current position. Useful for debugging
-    } else if (input.compare("eval") == 0) {
-        evaluate_info(board);
-    // Run a perft test
-    } else if (input.find("perft ") == 0) {
-        unsigned depth = std::stoi(input.substr(6));
-        runPerft(board.get_fen(), depth);
-    // Run a benchmark
-    } else if (input.compare("bench") == 0) {
-        benchmark();
-    // Quit the program
-    } else if (input.compare("quit") == 0) {
-        // If we are currently searching, stop it before quitting
-        if (!Threads.has_stopped()) {
+        // Reset the board tot the initial position
+        if (word == "ucinewgame") {
+            newgame(board);
+            break;
+        }
+        
+        // A sort of ping command sent by the user interface to check if the engine is still responsive
+        if (word == "isready") {
+            std::cout << "readyok" << std::endl;
+            break;
+        }
+
+        if (word == "setoption") {
+            handle_setoption(ss);
+            break;
+        }
+
+        if (word == "position") {
+            handle_position(ss, board);
+            break;
+        }
+
+        if (word == "go") {
+            handle_go(ss, board);
+            break;
+        }
+
+        // Interrupt the current search
+        if (word == "stop") {
             Threads.stop_searching();
-            Threads.wait_until_finished();
+            break;
         }
-        return true;
+
+        // Output an evaluation of the current position. Useful for debugging
+        if (word == "eval") {
+            evaluate_info(board);
+            break;
+        }
+
+        // Run a perft test
+        if (word == "perft") {
+            unsigned depth = std::stoi(input.substr(6));
+            runPerft(board.get_fen(), depth);
+            break;
+        }
+
+        // Run a benchmark
+        if (word == "bench") {
+            benchmark();
+            break;
+        }
+
+        // Quit the program
+        if (word == "quit") {
+            // If we are currently searching, stop it before quitting
+            if (!Threads.has_stopped()) {
+                Threads.stop_searching();
+                Threads.wait_until_finished();
+            }
+            return true;
+        }
+        
     }
 
     // Parsing done, input was not quit
@@ -294,7 +417,7 @@ void uci_loop(int argc, char* argv[]) {
     std::string input;
 
     // Set the transposition table to the default size in Megabytes; can be changed through options later
-    TTable.set_size(TRANSPOSITION_TABLE_SIZE_DEFAULT);
+    TTable.set_size(HashOption.get_default());
 
     // Initialize a chess board with the initial position
     Board board;
@@ -311,7 +434,7 @@ void uci_loop(int argc, char* argv[]) {
             std::getline(std::cin, input);
             shouldQuit = parse_uci_input(input, board);
 
-        };
+        }
     }
 
 }
