@@ -38,6 +38,7 @@ struct StateInfo {
     CastleRight castlingRights = 0u; // Castling rights
     Square enPassant = SQUARE_NONE; // En-passant square
     unsigned fiftyMoves = 0; // Fifty moves counter
+    unsigned repetitionCount = 0;
     Piecetype captured = PIECE_NONE; // Last captured piece, necessary for undoing a move
     EvalTerm pst[2]; // Piece Square Table balances
     EvalTerm material[2]; // Material balances
@@ -188,6 +189,7 @@ class Board {
         unsigned least_valuable_piece(Bitboard attackers, const Color color) const;
 
         void update_check_info();
+        void update_repetition_count();
 
 };
 

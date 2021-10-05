@@ -73,6 +73,7 @@ void Board::clear() {
     state.enPassant = SQUARE_NONE;
     state.castlingRights = 0;
     state.fiftyMoves = 0;
+    state.repetitionCount = 0;
     state.material[WHITE] = V(0, 0);
     state.material[BLACK] = V(0, 0);
     state.captured = PIECE_NONE;
@@ -135,6 +136,20 @@ void Board::update_check_info() {
     state.kingBlockers[BLACK] = get_slider_blockers(bbColors[WHITE], lsb_index(pieces(BLACK, KING)));
 
     state.checkers = sq_attackers(!stm, lsb_index(pieces(stm, KING)), bbColors[BOTH]);
+
+}
+
+// Update the number of times this position has appeared during the current game already
+// Used for detection of 3-fold repetitions
+void Board::update_repetition_count() {
+
+    state.repetitionCount = 0;
+
+    for (int i = static_cast<int>(states.size()) - 2; i >= 0; i -= 2) {
+        if (states[i].hashKey == state.hashKey) {
+            state.repetitionCount++;
+        }
+    }
 
 }
 
@@ -288,15 +303,12 @@ void Board::set_fen(std::string fen) {
     }
 
     // The final part of the FEN string is the number of half moves made since the last capture or pawn move
-    // and the number of moves played on the board so far
+    // and the number of full moves played on the board so far
     if (fen.size() >= i && isdigit(fen[i])) {
         std::string cut = fen.substr(i);
         unsigned space = cut.find(" ");
         state.fiftyMoves = std::stoi(cut.substr(0, space));
-        ply = std::stoi(cut.substr(space)) * 2 - 1;
-    } else {
-        state.fiftyMoves = 0;
-        ply = 0;
+        ply = (std::stoi(cut.substr(space)) - 1) * 2;
     }
 
     // Update checkers and king blockers and calculate the hash keys
@@ -341,8 +353,10 @@ std::string Board::get_fen() const {
 
     }
 
+    // Current turn
     fen += stm == WHITE ? " w " : " b ";
 
+    // Castling rights
     if (state.castlingRights == CASTLE_NONE) {
         fen += '-';
     } else {
@@ -362,9 +376,11 @@ std::string Board::get_fen() const {
 
     Square epSq = enpassant_square();
 
+    // En-passant square
     fen += ' ' + (epSq != SQUARE_NONE ? SQUARE_NAMES[epSq] : "-") + ' ';
 
-    fen += std::to_string(state.fiftyMoves) + ' ' + std::to_string(ply / 2 + (ply % 2 != 0));
+    // Halfmove & fullmove number
+    fen += std::to_string(state.fiftyMoves) + ' ' + std::to_string(ply / 2 + (ply % 2 == 0));
 
     return fen;
 
@@ -598,6 +614,9 @@ void Board::do_move(const Move move) {
     // Update the king blockers and checkers
     update_check_info();
 
+    // Update the repetition count
+    update_repetition_count();
+
     // Increase the number of played half moves
     ply++;
 
@@ -700,34 +719,11 @@ void Board::undo_nullmove() {
 
 }
 
-// Checks for threefold repetition, 50 move rule and insufficient material.
-// Stalemate is settled by search.
+// Checks for draw by threefold repetition or 50 move rule.
+// Stalemate is settled by search, insufficient material by evaluation
 bool Board::check_draw() {
 
-    if (state.fiftyMoves >= 100) {
-        return true;
-    }
-
-    // If there is insufficient mating material, the position is drawn
-    if (is_material_draw()) {
-        return true;
-    }
-
-    // We count how often the hashkey of the current position has already occured
-    // in the game previously.
-    unsigned count = 0;
-    for (unsigned i = 0; i < states.size(); i++) {
-        if (states[i].hashKey == state.hashKey) {
-            count++;
-        }
-    }
-
-    // If the position has already occured twice before, this is a threefold repetition
-    if (count >= 2) {
-        return true;
-    }
-
-    return false;
+    return state.repetitionCount >= 2 || state.fiftyMoves >= 100 || is_material_draw();
 
 }
 

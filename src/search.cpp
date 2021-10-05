@@ -100,9 +100,9 @@ void Thread::clear_killers() {
 
 }
 
-static Value get_draw_value(SearchInfo* info) {
+static Value get_draw_value(Depth depth, SearchInfo* info) {
 
-    return 1 - (info->nodes & 2);
+    return depth > 3 ? 1 - static_cast<Value>(info->nodes & 2) : VALUE_DRAW;
 
 }
 
@@ -273,9 +273,15 @@ static Value qsearch(Value alpha, Value beta, Depth depth, Depth plies, Board& b
         check_finished(info);
     }
 
+    const bool inCheck = board.checkers();
+
     // Check if the search has been stopped or the current position is a draw
     if (Threads.has_stopped() || board.check_draw()) {
         return VALUE_DRAW;
+    }
+
+    if (plies >= DEPTH_MAX) {
+        return inCheck ? VALUE_DRAW : evaluate(board, info->threadIndex);
     }
 
     const bool pvNode = (beta - alpha != 1); // Check if we are in a pv node (no zero window search)
@@ -285,7 +291,6 @@ static Value qsearch(Value alpha, Value beta, Depth depth, Depth plies, Board& b
     bool ttHit = false;
 
     const Value oldAlpha = alpha;
-    const bool inCheck   = board.checkers();
     const Depth ttDepth  = (inCheck || depth >= 0) ? 0 : -1; // Set the depth for the transposition table entry (is constant because quiescent search depth is relative and would be invalid in further iterations)
 
     info->currentMove[plies] = MOVE_NONE;
@@ -456,18 +461,21 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
 
     assert(!(pvNode && cutNode));
 
-    if (Threads.has_stopped() || board.check_draw()) {
-        return VALUE_DRAW;//get_draw_value(info);
-    }
+    const bool inCheck = board.checkers();
 
-    /*if (!rootNode) {
+    if (!rootNode) {
         // Check if the search has been stopped or the current position is a draw
-        if (Threads.has_stopped() || board.check_draw()) {
-            return get_draw_value(info);
+        if (Threads.has_stopped()) {
+            return VALUE_DRAW;
+        }
+        
+        // Checks for draw by 50-move rule or 3-fold repetition
+        if (board.check_draw()) {
+            return VALUE_DRAW; //TODO: This does not work yet: get_draw_value(depth, info);
         }
 
         if (plies >= DEPTH_MAX) {
-            return evaluate(board, info->threadIndex);
+            return inCheck ? VALUE_DRAW : evaluate(board, info->threadIndex);
         }
 
         // Mate Distance Pruning
@@ -477,7 +485,7 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
             return alpha;
         }
 
-    }*/
+    }
     
 
     Thread *thread = Threads.get_thread(info->threadIndex);
@@ -517,8 +525,6 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
         }
 
     }
-
-    const bool inCheck = board.checkers();
 
     // Static Evaluation of the current position
     if (!inCheck) {
@@ -793,7 +799,7 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
         if (inCheck) {
             return get_mated_value(plies);
         } else {
-            return VALUE_DRAW;//get_draw_value(info);
+            return VALUE_DRAW;
         }
     }
 
