@@ -17,17 +17,46 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-TARGET = delocto
+NAME := delocto
+CXXSTD := -std=c++17
+SRC := *.cpp
 
-CXXSTD = -std=c++17
-
-OPTIMIZEFLAGS = -mtune=native -march=native -DNDEBUG -O3 -pthread
+OPTIMIZEFLAGS = -DNDEBUG -O3 -pthread
 DEBUGFLAGS = -g
 
-SRC = *.cpp
+define init
+@echo Detected $(ARCH) architecture
+endef
 
-all:
-	$(CXX) $(CXXSTD) $(OPTIMIZEFLAGS) $(SRC) -o $(TARGET)
+define compile
+$(CXX) $(CXXSTD) $(1) $(SRC) -o $(NAME)
+endef
+
+define finish
+@echo Built executable named \"$(NAME)\".
+@echo Finished.
+endef
+
+ifneq ($(OS),Windows_NT)
+OS := $(shell uname -s)
+ARCH = $(shell uname -p)
+endif
+
+# ARM architecture prefers -mcpu over -march (some ARM processors don't support -march at all)
+ifeq ($(ARCH),arm)
+OPTIMIZEFLAGS += -mcpu=native
+else
+OPTIMIZEFLAGS += -march=native
+endif
+
+optimized:
+	$(call init)
+	@echo Creating optimized build...
+	$(call compile,$(OPTIMIZEFLAGS))
+	$(call finish)
 
 debug:
-	$(CXX) $(CXXSTD) $(DEBUGFLAGS) $(SRC) -o $(TARGET)
+	$(call init)
+	@echo Creating debug build...
+	$(call compile,$(DEBUGFLAGS))
+	$(call finish)
