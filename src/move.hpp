@@ -52,6 +52,8 @@ static const std::string SQUARE_NAMES[64] = {
 
 };
 
+static const std::string PROMOTION_CHARS = "nbrq";
+
 // Extracts move type from a Move object
 inline MoveType move_type(const Move move) {
 
@@ -113,7 +115,25 @@ inline bool is_ep(const Move move) {
 
 }
 
-extern void print_move(const Move move);
-extern void print_bitboard(const Bitboard bitboard);
+// Converts a promotion character to a MoveType
+inline MoveType char_to_promotion(const char c) {
+
+    return (PROMOTION_CHARS.find(c) * 2 + 1) * PROMOTION_KNIGHT;
+
+}
+
+// Converts a MoveType e.g PROMOTION_QUEEN to a character, e.g q, r, b, n
+inline char promotion_to_char(const MoveType mt) {
+
+    return PROMOTION_CHARS[(mt / PROMOTION_KNIGHT) / 2];
+
+}
+
+// Converts a move object to a string, e.g "a2a5"
+inline std::string move_to_string(const Move raw) {
+
+    return (std::string() + SQUARE_NAMES[from_sq(raw)] + SQUARE_NAMES[to_sq(raw)]) + (is_promotion(raw) ? std::string(1, promotion_to_char(move_type(raw))) : "");
+
+}
 
 #endif

@@ -26,8 +26,8 @@
 // Score all the moves with the Most Valuable Victim - Least Valuable Attacker Heuristic
 void MovePicker::score_captures() {
 
-    for (unsigned index = 0; index < moves.size; index++) {
-        moves.scores[index] = board.mvvlva(moves.moves[index]);
+    for (unsigned index = 0; index < moves.size(); index++) {
+        moves.set_score(index, board.mvvlva(moves[index]));
     }
 
 }
@@ -35,8 +35,8 @@ void MovePicker::score_captures() {
 // Assign each move a score from the history table
 void MovePicker::score_quiets() {
 
-    for (unsigned index = 0; index < moves.size; index++) {
-        moves.scores[index] = thread->history[board.turn()][board.piecetype(from_sq(moves.moves[index]))][to_sq(moves.moves[index])];
+    for (unsigned index = 0; index < moves.size(); index++) {
+        moves.set_score(index, history->get_score(board.turn(), board.piecetype(from_sq(moves[index])), to_sq(moves[index])));
     }
 
 }
@@ -44,11 +44,11 @@ void MovePicker::score_quiets() {
 // Assign each evasion a score
 void MovePicker::score_evasions() {
 
-    for (unsigned index = 0; index < moves.size; index++) {
-        if (board.is_capture(moves.moves[index])) {
-            moves.scores[index] = board.mvvlva(moves.moves[index]);
+    for (unsigned index = 0; index < moves.size(); index++) {
+        if (board.is_capture(moves[index])) {
+            moves.set_score(index, board.mvvlva(moves[index]));
         } else {
-            moves.scores[index] = thread->history[board.turn()][board.piecetype(from_sq(moves.moves[index]))][to_sq(moves.moves[index])];
+            moves.set_score(index, history->get_score(board.turn(), board.piecetype(from_sq(moves[index])), to_sq(moves[index])));
         }
 
     }
@@ -64,9 +64,9 @@ Move MovePicker::pick() {
     switch (phase) {
 
         // Transposition Table Move
-        case TTMove:
-        case TTMoveQS:
-        case TTMoveEvasions:
+        case TT_MOVE:
+        case TT_MOVE_QS:
+        case TT_MOVE_EVASIONS:
 
             {
                 
@@ -76,48 +76,44 @@ Move MovePicker::pick() {
                 if (ttMove != MOVE_NONE && board.is_valid(ttMove)) {
                     return ttMove;
                 } else {
-                    return pick(); // Skip to next stage if no ttMove available
+                    // Skip to next stage if there is no transposition move available
+                    return pick();
                 }
 
             }
 
-        case GenCaps:
+        case GENERATE_CAPTURES:
 
             {
 
                 ++phase;
 
                 // Generate all captures for the current position and score them
-                moves = gen_caps(board, board.turn());
+                moves = generate_moves<CAPTURE, PSEUDO_LEGAL>(board, board.turn());
                 score_captures();
 
             }
 
-        // Good Captures
+        // Good captures
         // These moves gain material in the next move
-        case GoodCaps:
+        case GOOD_CAPTURES:
 
             {
 
-                while (moves.index < moves.size) {
-
-                    Move best = moves.pick();
-
-                    assert(best != MOVE_NONE);
-
+                ScoredMoveEntry best;
+                while ((best = moves.pick()).move != MOVE_NONE) {
                     // If the capture loses material, move to the next stage
-                    if (moves.scores[moves.index] < 0) {
+                    if (best.score < 0) {
                         badCaptures = moves;
                         break;
                     }
 
-                    moves.index++;
+                    moves.next();
 
                     // The capture could be equal to the transposition table move
-                    if (best != ttMove) {
-                        return best;
+                    if (best.move != ttMove) {
+                        return best.move;
                     }
-
                 }
 
                 ++phase;
@@ -126,88 +122,96 @@ Move MovePicker::pick() {
 
         // Killer Moves
         // These are quiet moves which have caused a beta-cutoff in the search in previous iterations, so it is wise to try them again
-        case FirstKiller:
+        case FIRST_KILLER:
 
             ++phase;
 
-            // NOTE: Checking wether killer is a capture, since it could have already been picked during GoodCaps
-            if (killers[0] != ttMove && killers[0] != MOVE_NONE && !board.is_capture(killers[0]) && board.is_valid(killers[0])) {
-                return killers[0];
+            // NOTE: Checking wether killer is a capture, since it could have already been picked during good captures
+            if (   killers.first != ttMove
+                && killers.first != MOVE_NONE
+                && !board.is_capture(killers.first)
+                && board.is_valid(killers.first))
+            {
+                return killers.first;
             }
 
-        case SecondKiller:
+        case SECOND_KILLER:
 
             ++phase;
 
-            if (killers[1] != ttMove && killers[1] != MOVE_NONE && !board.is_capture(killers[1]) && board.is_valid(killers[1])) {
-                return killers[1];
+            if (   killers.second != ttMove
+                && killers.second != MOVE_NONE
+                && !board.is_capture(killers.second)
+                && board.is_valid(killers.second))
+            {
+                return killers.second;
             }
 
         // Counter Move
         // A counter move is move which works good to counter a piece at a certain square,
         // so next we try that
-        case CounterMove:
+        case COUNTER_MOVE:
 
             ++phase;
 
-            // Check that we do not have tried the counter move in a previous state already
-            if (counterMove != ttMove && counterMove != MOVE_NONE && counterMove != killers[0] && counterMove != killers[1] && !board.is_capture(counterMove) && board.is_valid(counterMove)) {
+            // Verify that we haven't tried the counter move in a previous phase already
+            if (   counterMove != ttMove
+                && counterMove != MOVE_NONE
+                && counterMove != killers.first && counterMove != killers.second
+                && !board.is_capture(counterMove)
+                && board.is_valid(counterMove))
+            {
                 return counterMove;
             }
 
         // Quiet moves
-        case GenQuiets:
+        case GENERATE_QUIETS:
 
             {
                 ++phase;
 
                 // Generate all quiet moves and assign them a value based on their history score
-                moves = gen_quiets(board, board.turn());
+                moves = generate_moves<QUIET, PSEUDO_LEGAL>(board, board.turn());
                 score_quiets();
 
             }
 
-        case Quiets:
+        case QUIETS:
 
             {
 
-                while (moves.index < moves.size) {
-
-                    // Pick the quiet move with the highest score
-                    Move best = moves.pick();
-                    assert(best != MOVE_NONE);
-                    ++moves.index;
-
+                ScoredMoveEntry best;
+                // Pick the quiet move with the highest score
+                while ((best = moves.pick()).move != MOVE_NONE) {
+                    moves.next();
                     // Make sure we have not tried this quiet move before
-                    if (best != ttMove && best != killers[0] && best != killers[1] && best != counterMove) {
-                        return best;
+                    if (   best.move != ttMove
+                        && best.move != killers.first && best.move != killers.second
+                        && best.move != counterMove) {
+                        return best.move;
                     }
-
-                }
+                };
 
                 ++phase;
 
             }
 
-        case LosingCaps:
+        case BAD_CAPTURES:
 
             {
 
                 // Next, we try captures which lose material in the next move.
                 // These moves are usually quite bad so we try them last
-                while (moves.index < moves.size) {
-
-                    Move best = moves.pick();
-                    moves.index++;
-
+                ScoredMoveEntry best;
+                while ((best = moves.pick()).move != MOVE_NONE) {
+                    moves.next();
                     // TODO: Check if comparison with killer even necessary? killers are not captures!
-                    if (best != ttMove && best != killers[0] && best != killers[1]) {
-
-                        return best;
-
+                    if (   best.move != ttMove
+                        && best.move != killers.first && best.move != killers.second)
+                    {
+                        return best.move;
                     }
-
-                }
+                };
 
                 return MOVE_NONE;
 
@@ -216,7 +220,7 @@ Move MovePicker::pick() {
 
         // Evasions
         // These are moves which escape the check
-        case GenEvasions:
+        case GENERATE_EVASIONS:
 
             {
 
@@ -226,27 +230,23 @@ Move MovePicker::pick() {
                 
                 ++phase;
 
-                moves = gen_evasions(board, MOVES_ALL);
+                moves = generate_moves<EVASION, PSEUDO_LEGAL>(board, board.turn());
                 score_evasions();
 
             }
 
-        case Evasions:
+        case EVASIONS:
 
             {
-
-                while (moves.index < moves.size) {
-
-                    // Pick the best evasion
-                    Move best = moves.pick();
-                    assert(best != MOVE_NONE);
-                    ++moves.index;
-
-                    if (best != ttMove) {
-                        return best;
+                
+                ScoredMoveEntry best;
+                // Pick the best evasion
+                while ((best = moves.pick()).move != MOVE_NONE) {
+                    moves.next();
+                    if (best.move != ttMove) {
+                        return best.move;
                     }
-
-                }
+                };
 
                 // Do not continue with any other stages; all moves evading check have already been searched here
                 return MOVE_NONE;
@@ -254,32 +254,28 @@ Move MovePicker::pick() {
             }
 
         // Captures in quiescence search
-        case GenCapsQS:
+        case GENERATE_CAPTURES_QS:
 
             {
                 ++phase;
 
-                // Same as state GenCaps, only in quiescence search
-                moves = gen_caps(board, board.turn());
+                // Same as phase GENERATE_CAPTURES, only for quiescence search
+                moves = generate_moves<CAPTURE, PSEUDO_LEGAL>(board, board.turn());
                 score_captures();
 
             }
 
-        case CapsQS:
+        case CAPTURES_QS:
 
             {
 
-                while (moves.index < moves.size) {
-
-                    Move best = moves.pick();
-                    assert(best != MOVE_NONE);
-                    ++moves.index;
-
-                    if (best != ttMove) {
-                        return best;
+                ScoredMoveEntry best;
+                while ((best = moves.pick()).move != MOVE_NONE) {
+                    moves.next();
+                    if (best.move != ttMove) {
+                        return best.move;
                     }
-
-                }
+                };
 
                 return MOVE_NONE;
 
@@ -294,4 +290,45 @@ Move MovePicker::pick() {
     assert(false);
     return false;
 
+}
+
+
+// Picks the move in the list with the highest score and returns its index
+ScoredMoveEntry ScoredMoveList::pick() {
+
+    if (currentIndex == _size) {
+        return { MOVE_NONE, 0 };
+    }
+
+    unsigned bestIndex = currentIndex;
+    int bestScore = scores[bestIndex];
+
+    for (unsigned i = currentIndex; i < _size; i++) {
+        if (scores[i] > bestScore) {
+            bestIndex = i;
+            bestScore = scores[i];
+        }
+    }
+
+    swap(currentIndex, bestIndex);
+
+    return { moves[currentIndex], scores[currentIndex] };
+
+}
+
+void ScoredMoveList::swap(const unsigned index1, const unsigned index2) {
+
+    MoveList::swap(index1, index2);
+    std::iter_swap(scores.begin() + index1, scores.begin() + index2);
+    
+}
+
+MovePickerPhase& operator++(MovePickerPhase& phase) {
+    phase = static_cast<MovePickerPhase>(static_cast<unsigned>(phase) + 1);
+    return phase;
+}
+
+MovePickerPhase operator++(MovePickerPhase& phase, int) {
+    phase = static_cast<MovePickerPhase>(static_cast<unsigned>(phase) + 1);
+    return phase;
 }

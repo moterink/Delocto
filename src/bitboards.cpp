@@ -259,11 +259,11 @@ void init_bitboards() {
         for (Square sq2 = 0; sq2 < 64; sq2++) {
 
             if (bishopPseudoBB & SQUARES[sq2]) {
-                RayTable[sq1][sq2]  = (gen_bishop_moves(sq1, SQUARES[sq2], SQUARES[sq2]) & gen_bishop_moves(sq2, SQUARES[sq1], SQUARES[sq1])) | SQUARES[sq2];
-                LineTable[sq1][sq2] = (gen_bishop_moves(sq1, 0, 0) & gen_bishop_moves(sq2, 0, 0)) | SQUARES[sq1] | SQUARES[sq2];
+                RayTable[sq1][sq2]  = (bishop_target_squares(sq1, SQUARES[sq2], SQUARES[sq2]) & bishop_target_squares(sq2, SQUARES[sq1], SQUARES[sq1])) | SQUARES[sq2];
+                LineTable[sq1][sq2] = (bishop_target_squares(sq1, 0, 0) & bishop_target_squares(sq2, 0, 0)) | SQUARES[sq1] | SQUARES[sq2];
             } else if (rookPseudoBB & SQUARES[sq2]) {
-                RayTable[sq1][sq2]  = (gen_rook_moves(sq1, SQUARES[sq2], SQUARES[sq2]) & gen_rook_moves(sq2, SQUARES[sq1], SQUARES[sq1])) | SQUARES[sq2];
-                LineTable[sq1][sq2] = (gen_rook_moves(sq1, 0, 0) & gen_rook_moves(sq2, 0, 0)) | SQUARES[sq1] | SQUARES[sq2];
+                RayTable[sq1][sq2]  = (rook_target_squares(sq1, SQUARES[sq2], SQUARES[sq2]) & rook_target_squares(sq2, SQUARES[sq1], SQUARES[sq1])) | SQUARES[sq2];
+                LineTable[sq1][sq2] = (rook_target_squares(sq1, 0, 0) & rook_target_squares(sq2, 0, 0)) | SQUARES[sq1] | SQUARES[sq2];
             }
 
         }
@@ -277,5 +277,30 @@ void init_bitboards() {
         BackwardPawnMask[BLACK][sq1] = (r != 7 ? (f != 0 ? FrontFileMask[WHITE][sq1+7] : 0) | (f != 7 ? FrontFileMask[WHITE][sq1+9] : 0) : 0);
 
     }
+
+}
+
+// Converts a bitboard to an ASCII-like representation
+// with 1 representing occupied and 0 unoccupied squares
+std::string bitboard_to_string(const Bitboard bitboard) {
+
+    std::stringstream ss;
+
+    for (unsigned rank = RANK_1; rank <= RANK_8; rank++) {
+        for (unsigned file = FILE_H; file <= FILE_A; file++) {
+            ss << (bitboard & SQUARES[rank * 8 + file] ? "1 " : "0 ");
+        }
+        ss << std::endl;
+    }
+
+    return ss.str();
+
+}
+
+// This is for debugging purposes only - when using debuggers, newlines are usually escaped
+// Therefor the only way we can show this ascii representation of the bitboard is in stdout
+void print_bitboard(const Bitboard bitboard) {
+
+    std::cout << bitboard_to_string(bitboard) << std::endl;
 
 }

@@ -789,28 +789,6 @@ bool Board::is_valid(const Move move) const {
         }
     }
 
-    if (checkers()) {
-        if (SQUARES[fromSq] != pieces(stm, KING)) {
-
-            const unsigned kingSq = lsb_index(pieces(stm, KING));
-
-            // If there is more than one checker and we are not moving the king, this move cannot be valid
-            if (popcount(checkers()) >= 2) {
-                return false;
-            }
-
-            // If the target square does not block a sliding attack or capture the checking piece, the move is invalid
-            if (!((RayTable[lsb_index(checkers())][kingSq] | checkers()) & SQUARES[toSq])) {
-                return false;
-            }
-
-        // If we move the king and there are enemy attackers to the target square, the move is invalid
-        // We remove the king from occupied pieces so that a move by the king along the diagonal/file is also detected as invalid
-        } else if (sq_attackers(!stm, toSq, (bbColors[BOTH] ^ SQUARES[fromSq])) & bbColors[!stm]) {
-            return false;
-        }
-    }
-
     return true;
 
 }

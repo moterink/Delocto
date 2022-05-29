@@ -21,6 +21,9 @@
   SOFTWARE.
 */
 
+#ifndef MOVEPICK_H
+#define MOVEPICK_H
+
 #include "types.hpp"
 #include "move.hpp"
 #include "search.hpp"
@@ -29,58 +32,101 @@
 // Maximum value of a move in the history table
 constexpr int HISTORY_VALUE_MAX = 0x4000;
 
-// Stages of the move picker
-enum MovePickPhase : unsigned {
+struct ScoredMoveEntry {
 
-    TTMove, GenCaps, GoodCaps, FirstKiller, SecondKiller, CounterMove, GenQuiets, Quiets, LosingCaps, TTMoveEvasions, GenEvasions, Evasions, TTMoveQS, GenCapsQS, CapsQS
+    Move move;
+    int score;
 
 };
+
+class ScoredMoveList : public MoveList {
+
+    public:
+
+        ScoredMoveList& operator=(const MoveList& list) {
+            MoveList::operator=(list);
+            currentIndex = 0;
+            return *this;
+        }
+
+        void swap(const unsigned index1, const unsigned index2);
+        ScoredMoveEntry pick();
+        inline void next() { currentIndex++; }
+
+        inline void set_score(const unsigned index, const int score) {
+            scores[index] = score;
+        }
+
+    private:
+
+        unsigned currentIndex = 0;
+        std::array<int, MOVES_MAX_COUNT> scores;
+
+};
+
+// Stages of the move picker
+enum MovePickerPhase : unsigned {
+
+    TT_MOVE,
+    GENERATE_CAPTURES,
+    GOOD_CAPTURES,
+    FIRST_KILLER,
+    SECOND_KILLER,
+    COUNTER_MOVE,
+    GENERATE_QUIETS,
+    QUIETS,
+    BAD_CAPTURES,
+    TT_MOVE_EVASIONS,
+    GENERATE_EVASIONS,
+    EVASIONS,
+    TT_MOVE_QS,
+    GENERATE_CAPTURES_QS,
+    CAPTURES_QS
+
+};
+
+MovePickerPhase& operator++(MovePickerPhase& phase);
+MovePickerPhase operator++(MovePickerPhase& phase, int);
 
 class MovePicker {
 
     public:
 
-        const Thread *thread;
         const Board& board;
         const SearchInfo *info;
-        unsigned phase = TTMove;
 
         Move counterMove = MOVE_NONE;
 
         // Constructor for normal search
-        MovePicker(const Thread *th, const Board& b, SearchInfo *i, Depth plies, Move t) : thread(th), board(b), info(i) {
+        MovePicker(const Board& b, SearchInfo *i, const KillerMoves& k, const HistoryTable *h, const CounterMoveTable& c, Depth plies, Move t) : board(b), info(i), killers(std::make_pair(k.first(plies), k.second(plies))), history(h) {
 
-            // Set the killer moves
-            killers[0] = thread->killers[plies][0];
-            killers[1] = thread->killers[plies][1];
+            ttMove = t;
 
-            phase = board.checkers() ? TTMoveEvasions : TTMove;
-
-            // If we do not have a move from the transposition table, skip to evasions or captures
-            if (t != MOVE_NONE) {
-                ttMove = t;
-            } else {
-                ++phase;
-            }
+            phase = board.checkers() ? TT_MOVE_EVASIONS : TT_MOVE;
 
             // Get the counter move if available
             if (plies > 0 && info->currentMove[plies-1] != MOVE_NONE) {
                 unsigned prevSq = to_sq(info->currentMove[plies-1]);
-                counterMove = thread->counterMove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq];
+                counterMove = c.get_move(board.owner(prevSq), board.piecetype(prevSq), prevSq);
+            }
+
+            // If we do not have a move from the transposition table, skip to evasions or good captures
+            if (ttMove == MOVE_NONE) {
+                ++phase;
             }
 
         }
 
         // Constructor for quiescence search
-        MovePicker(const Thread *th, const Board& b, SearchInfo * i, int plies, Move lastMove, Move t) : thread(th), board(b), info(i) {
+        MovePicker(const Board& b, SearchInfo * i, const HistoryTable *h, int plies, Move lastMove, Move t) : board(b), info(i), history(h) {
 
-            // Check if there is a hash move available and if it is a capture to the square of the last move
+            // Check if there is a transposition table move available
+            // In quiescence search we only allow this move if it is a capture to the square of the last move
             if (plies > 0 && lastMove != MOVE_NONE) {
                 ttMove = t != MOVE_NONE && (to_sq(lastMove) == to_sq(t)) ? t : MOVE_NONE;
             }
 
-            // If we do not have a transposition table move, skip to evasions or captures
-            phase = board.checkers() ? TTMoveEvasions : TTMoveQS;
+            phase = board.checkers() ? TT_MOVE_EVASIONS : TT_MOVE_QS;
 
             // If we do not have a move from the transposition table, skip to evasions or captures
             if (ttMove == MOVE_NONE) {
@@ -97,9 +143,13 @@ class MovePicker {
 
     private:
 
-        Move killers[2];
+        MovePickerPhase phase = TT_MOVE;
         Move ttMove = MOVE_NONE;
-        MoveList moves;
-        MoveList badCaptures;
+        const std::pair<Move, Move> killers;
+        const HistoryTable *history;
+        ScoredMoveList moves;
+        ScoredMoveList badCaptures;
 
 };
+
+#endif

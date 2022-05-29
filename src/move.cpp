@@ -33,7 +33,7 @@ bool Board::is_legal(const Move move) const {
     const Square fromSq = from_sq(move);
     const Square kSq    = lsb_index(pieces(stm, KING));
 
-    // An en-passant capture is illegal, if the capturing pawn is pinned,
+    // An en-passant capture is illegal if the capturing pawn is pinned
     // or if the captured pawn reveals a sliding attacker which attacks the king
     if (move_type(move) == ENPASSANT) {
         const Square capSq = toSq + direction(stm, DOWN);
@@ -41,7 +41,8 @@ bool Board::is_legal(const Move move) const {
         return !slider_attackers(kSq, occupied, !stm);
     }
 
-    // A castling is illegal if any of the squares on the way of the kings end square is attacked
+    // A castle move is illegal if the kings start square, end square or any squares
+    // between those two are being attacked
     if (move_type(move) == CASTLING) {
         const int step = toSq > fromSq ? -1 : 1;
         for (int sq = toSq; sq != fromSq; sq += step) {
@@ -56,46 +57,28 @@ bool Board::is_legal(const Move move) const {
     // to the square
     if (fromSq == kSq) {
         return !sq_attacked_noking(toSq, !stm);
-    }
-
-    return !((SQUARES[fromSq] & state.kingBlockers[stm]) && !(SQUARES[toSq] & LineTable[kSq][fromSq]));
-
-}
-
-// Print a move to the console
-// Shows move type and origin and target square
-void print_move(const Move move) {
-
-    std::cout << "From:"  << SQUARE_NAMES[from_sq(move)]
-              << " To:"   << SQUARE_NAMES[to_sq(move)]
-              << " Type:" << move_type(move)
-              << std::endl;
-
-}
-
-// Print a bitboard to the console
-void print_bitboard(const Bitboard bitboard) {
-
-    int lcount, bcount;
-
-    lcount = 0;
-
-    // Go over each square on the bitboard
-    for (bcount = 0; bcount < 64; bcount++) {
-        lcount++;
-        // If the bit is set, print 1 else 0
-        if (bitboard & SQUARES[bcount]) {
-            std::cout << "1 ";
-        } else {
-            std::cout << "0 ";
+    } else if (checkers()) {
+        // If there is more than one checker and we are not moving the king,
+        // this move cannot be legal
+        if (popcount(checkers()) >= 2) {
+            return false;
         }
-        // If the end of the rank has been reached, print a new line
-        if (lcount == 8) {
-            std::cout << std::endl;
-            lcount = 0;
+
+        // We can now assume that there is only a single checker
+        const Square checkerSq         = lsb_index(checkers());
+        const Bitboard blockingSquares = RayTable[checkerSq][kSq];
+
+        // In case the checker is a slider and the move does not capture the
+        // checking piece or blocks the sliding attack, then this move is illegal
+        if (!((blockingSquares | checkers()) & SQUARES[toSq])) {
+            return false;
         }
     }
 
-    std::cout << std::endl;
+    // If the moving piece is pinned, it may only move along the pin line
+    return !(
+                 (SQUARES[fromSq] & state.kingBlockers[stm])
+             && !(SQUARES[toSq]   & LineTable[kSq][fromSq])
+            );
 
 }

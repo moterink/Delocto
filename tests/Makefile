@@ -23,11 +23,15 @@ CXXSTD = -std=c++17
 
 EXCLUDED := ../src/delocto.cpp
 
-COMMON := $(filter-out $(EXCLUDED), $(wildcard ../src/*.cpp))
+SRC_FILES := $(filter-out $(EXCLUDED), $(wildcard ../src/*.cpp))
+TEST_FILES = *.cpp
 
-SRC = $(COMMON) tests.cpp
+FILES = $(SRC_FILES) $(TEST_FILES)
 
 FLAGS = -pthread
+DEBUGFLAGS = -g
 
 all:
-	$(CXX) $(CXXSTD) $(FLAGS) $(SRC) -o $(TARGET)
+	$(CXX) $(CXXSTD) $(FLAGS) $(FILES) -o $(TARGET)
+debug:
+	$(CXX) $(CXXSTD) $(FLAGS) $(DEBUGFLAGS) $(FILES) -o $(TARGET)

@@ -28,6 +28,7 @@
 #include "evaluate.hpp"
 #include "timeman.hpp"
 #include "thread.hpp"
+#include "bench.hpp"
 
 SpinOption   ThreadsOption      = SpinOption("Threads", 1, 1, 4);
 SpinOption   HashOption         = SpinOption("Hash", 64, 1, 4096);
@@ -140,7 +141,7 @@ static void newgame(Board& board) {
 
 // Find the best move for the given position.
 // The search can be constrained by depth or time or nodes.
-static void go(const Board& board, const SearchLimits& limits) {
+void go(const Board& board, const SearchLimits& limits) {
 
     // If we are already searching, stop the current search
     if (!Threads.has_stopped()) {
@@ -152,51 +153,6 @@ static void go(const Board& board, const SearchLimits& limits) {
     Threads.initialize_search(board, limits);
     Threads.start_searching();
     
-}
-
-// Runs a benchmark for 42 testing positions to retrieve a number of total visited
-// nodes. This number should stay consistent and can be used as a verification
-// of search/evaluation integrity
-uint64_t benchmark() {
-
-    Board board;
-    SearchLimits limits;
-    limits.depth = 8;
-
-    uint64_t nodes = 0;
-
-    // Set thread count to 1 for consistency
-    Threads.resize(1);
-    Threads.reset();
-
-    TimePoint start = Clock::now();
-
-    for (unsigned i = 0; i < 42; i++) {
-
-        std::cout << "Position: " << (i + 1) << std::endl;
-        board.set_fen(BENCHMARK_FENS[i]);
-        TTable.clear(); // Clear Transposition Table between searches
-        go(board, limits);
-
-        // Wait for search thread to finish
-        Threads.wait_until_finished();
-        nodes += Threads.get_nodes();
-
-    }
-    
-    Duration elapsed = get_time_elapsed(start);
-
-    std::cout << std::endl;
-    std::cout << "========== BENCHMARK FINISHED ==========" << std::endl;
-    std::cout << "Time elapsed (ms):          " << std::setw(12) << elapsed << std::endl;
-    std::cout << "Nodes searched (total):     " << std::setw(12) << nodes << std::endl;
-    std::cout << "Nodes searched (per second):" << std::setw(12) << 1000 * nodes / elapsed << std::endl << std::endl;
-
-    // Reset thread pool to original value
-    Threads.resize(ThreadsOption.get_value());
-
-    return nodes;
-
 }
 
 static void handle_setoption(std::stringstream& ss) {
@@ -379,8 +335,17 @@ bool parse_uci_input(std::string input, Board& board) {
 
         // Run a perft test
         if (word == "perft") {
-            unsigned depth = std::stoi(input.substr(6));
+            Depth depth;
+            ss >> depth;
             runPerft(board.get_fen(), depth);
+            break;
+        }
+
+        // Run a divide test
+        if (word == "divide") {
+            Depth depth;
+            ss >> depth;
+            runDivide(board.get_fen(), depth);
             break;
         }
 

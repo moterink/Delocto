@@ -124,9 +124,15 @@ constexpr Bitboard SQUARES_ALL   = SQUARES_WHITE | SQUARES_BLACK;
 typedef uint16_t Move;
 typedef uint16_t MoveType;
 
-enum MoveGenType : unsigned {
+enum MoveGenerationType : unsigned {
 
-    MOVES_QUIETS, MOVES_CAPTURES, MOVES_ALL
+    QUIET, CAPTURE, EVASION, ALL
+
+};
+
+enum MoveLegality : unsigned {
+
+    PSEUDO_LEGAL, LEGAL
 
 };
 

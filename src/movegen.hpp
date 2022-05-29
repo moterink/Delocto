@@ -35,21 +35,27 @@ class MoveList {
 
     public:
 
-        unsigned size = 0;
-        unsigned index = 0;
-
-        std::array<Move, MOVES_MAX_COUNT> moves;
-        std::array<int, MOVES_MAX_COUNT> scores;
-
         inline void append(Move move) {
-            moves[size++] = move;
+            moves[_size++] = move;
         }
 
-        void merge(MoveList list);
+        Move operator [](unsigned index) const { return moves[index]; }
+
+        std::array<Move, MOVES_MAX_COUNT>::const_iterator begin() const { return moves.begin(); }
+        std::array<Move, MOVES_MAX_COUNT>::const_iterator end() const { return moves.begin() + _size; }
+
+        void concat(const MoveList& list);
         unsigned find(const Move move);
         void swap(const unsigned index1, const unsigned index2);
-        Move pick();
         void print();
+
+        unsigned size() const { return _size; }
+
+    protected:
+
+        unsigned _size = 0;
+
+        std::array<Move, MOVES_MAX_COUNT> moves;
 
 };
 
@@ -124,7 +130,9 @@ inline Bitboard generate_pawn_captures(const unsigned sq, const Bitboard oppPiec
 // Returns a bitboard of all possible pawn destination squares on the given square for the given color
 inline Bitboard generate_pawn_moves(const Color color, const unsigned sq, const Bitboard allPieces, const Bitboard oppPieces) {
 
-    return (SQUARES[get_pawn_push_sq(sq, allPieces, direction(color, UP))] | SQUARES[get_pawn_double_push_sq(sq, allPieces, direction(color, UP), color)] | generate_pawn_captures(sq, oppPieces, color));
+    return (SQUARES[get_pawn_push_sq(sq, allPieces, direction(color, UP))]
+          | SQUARES[get_pawn_double_push_sq(sq, allPieces, direction(color, UP), color)]
+          | generate_pawn_captures(sq, oppPieces, color));
 
 }
 
@@ -136,14 +144,14 @@ inline Bitboard generate_pawns_attacks(const Bitboard pawns, const Color color) 
 }
 
 // Returns a bitboard of all possible destination squares for a knight on the given square
-inline Bitboard gen_knight_moves(const unsigned sq, const Bitboard ownPieces) {
+inline Bitboard knight_target_squares(const unsigned sq, const Bitboard ownPieces) {
 
     return KnightAttacks[sq] & ~ownPieces;
 
 }
 
 // Returns a bitboard of all possible destination squares for a king on the given square
-inline Bitboard gen_king_moves(const unsigned sq, const Bitboard ownPieces) {
+inline Bitboard king_target_squares(const unsigned sq, const Bitboard ownPieces) {
 
     return KingAttacks[sq] & ~ownPieces;
 
@@ -151,30 +159,27 @@ inline Bitboard gen_king_moves(const unsigned sq, const Bitboard ownPieces) {
 
 // Sliding Pieces
 // Returns a bitboard of all possible destination squares for a bishop on the given square
-inline Bitboard gen_bishop_moves(const Square sq, const Bitboard both, const Bitboard friendly) {
+inline Bitboard bishop_target_squares(const Square sq, const Bitboard both, const Bitboard friendly) {
 
     return BishopMagics[sq].attacks[get_magic_index(both, &BishopMagics[sq])] & ~friendly;
 
 }
 
 // Returns a bitboard of all possible destination squares for a rook on the given square
-inline Bitboard gen_rook_moves(const Square sq, const Bitboard both, const Bitboard friendly) {
+inline Bitboard rook_target_squares(const Square sq, const Bitboard both, const Bitboard friendly) {
 
     return RookMagics[sq].attacks[get_magic_index(both, &RookMagics[sq])] & ~friendly;
 
 }
 
 // Returns a bitboard of all possible destination squares for a queen on the given square
-inline Bitboard get_queen_moves(const Square sq, const Bitboard both, const Bitboard friendly) {
+inline Bitboard queen_target_squares(const Square sq, const Bitboard both, const Bitboard friendly) {
 
-    return gen_bishop_moves(sq, both, friendly) | gen_rook_moves(sq, both, friendly);
+    return bishop_target_squares(sq, both, friendly) | rook_target_squares(sq, both, friendly);
 
 }
 
-extern MoveList gen_quiets(const Board& board, const Color color);
-extern MoveList gen_caps(const Board& board, const Color color);
-extern MoveList gen_evasions(const Board&board, const MoveGenType mtype);
-extern MoveList gen_all(const Board& board, const Color color);
-extern MoveList gen_legals(const Board& board, const MoveList& moves);
+template<MoveGenerationType T, MoveLegality L>
+extern MoveList generate_moves(const Board& board, const Color color);
 
 #endif

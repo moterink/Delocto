@@ -75,31 +75,6 @@ void SearchInfo::reset() {
 
 }
 
-// Resets history and counter move heuristics collected during
-// other iterations of search
-void Thread::clear_history() {
-
-    for (Color c = WHITE; c < COLOR_COUNT; c++) {
-        for (Piecetype pt = PAWN; pt < PIECETYPE_COUNT+1; pt++) {
-            for (unsigned sq = 0; sq < 64; sq++) {
-                history[c][pt][sq] = 0;
-                counterMove[c][pt][sq] = MOVE_NONE;
-            }
-        }
-    }
-
-}
-
-// Clear the killer moves found in previous iterations/runs of search
-void Thread::clear_killers() {
-
-    for (int i = 0; i < DEPTH_MAX; i++) {
-        killers[i][0] = MOVE_NONE;
-        killers[i][1] = MOVE_NONE;
-    }
-
-}
-
 static Value get_draw_value(Depth depth, SearchInfo* info) {
 
     return depth > 3 ? 1 - static_cast<Value>(info->nodes & 2) : VALUE_DRAW;
@@ -217,15 +192,14 @@ Value Board::see(const Move move) const {
 static void update_quiet_stats(Thread *thread, const Board& board, SearchInfo *info, const Depth plies, const Depth depth, const MoveList& quiets, const Move bestMove) {
 
     // Set the move as new killer move for the current ply if it not already is
-    if (bestMove != thread->killers[plies][0]) {
-        thread->killers[plies][1] = thread->killers[plies][0];
-        thread->killers[plies][0] = bestMove;
+    if (bestMove != thread->killers.first(plies)) {
+        thread->killers.update(plies, bestMove);
     }
 
     // If the previous search depth was not a null move search, set the counter move
     if (info->currentMove[plies-1] != MOVE_NONE) {
         const Square prevSq = to_sq(info->currentMove[plies-1]);
-        thread->counterMove[board.owner(prevSq)][board.piecetype(prevSq)][prevSq] = bestMove;
+        thread->counterMove.set_move(board.owner(prevSq), board.piecetype(prevSq), prevSq, bestMove);
     }
 
     // The history bonus should rise exponentially with depth
@@ -233,15 +207,13 @@ static void update_quiet_stats(Thread *thread, const Board& board, SearchInfo *i
 
     // Update the history table.
     // Increase the value of the best move found and decrease it for all other moves
-    for (unsigned i = 0; i < quiets.size; i++) {
-        Move move = quiets.moves[i];
+    for (const Move& move : quiets) {
         Square fromSq = from_sq(move);
         Square toSq = to_sq(move);
         Piecetype pt = board.piecetype(fromSq);
 
         int delta = (move == bestMove) ? bonus : -bonus;
-        int score = thread->history[board.turn()][pt][toSq];
-        thread->history[board.turn()][pt][toSq] += 32 * delta - score * std::abs(delta) / 512; // Formula for calculating new history score
+        thread->history.update_score(board.turn(), pt, toSq, delta);
     }
 
 }
@@ -353,7 +325,7 @@ static Value qsearch(Value alpha, Value beta, Depth depth, Depth plies, Board& b
     Move bestMove = MOVE_NONE;
     Move move = MOVE_NONE;
 
-    MovePicker picker(thread, board, info, plies, info->currentMove[plies-1], ttMove);
+    MovePicker picker(board, info, &thread->history, plies, info->currentMove[plies-1], ttMove);
 
     while ( (move = picker.pick()) != MOVE_NONE ) {
 
@@ -499,7 +471,7 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
     ttValue = eval = info->eval[plies] = VALUE_NONE;
 
     info->currentMove[plies] = MOVE_NONE;
-    thread->killers[plies + 1][0] = thread->killers[plies + 1][1] = MOVE_NONE;
+    thread->killers.clear(plies + 1);
 
     TTEntry * entry;
     Move ttMove = MOVE_NONE;
@@ -615,7 +587,7 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
     }
 
     // Initialize the move picker
-    MovePicker picker(thread, board, info, plies, ttMove);
+    MovePicker picker(board, info, thread->killers, &thread->history, thread->counterMove, plies, ttMove);
 
     Move move;
     Depth newDepth;
@@ -732,14 +704,14 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
             reductions += cutNode;
 
             // Decrease reduction for killer and counter moves since they are usually good moves and cause a quick fail high which reduces the tree size
-            reductions -= (move == thread->killers[plies][0] || move == thread->killers[plies][1] || move == picker.counterMove);
+            reductions -= (move == thread->killers.first(plies) || move == thread->killers.second(plies) || move == picker.counterMove);
 
             // Decrease reduction if we are in check since the position might be very dynamic
             reductions -= inCheck;
 
             // Decrease the reduction based on the history score. If the move has proven to be quite good in previous iterations,
             // we should not reduce the search depth
-            reductions -= std::min(1, thread->history[!board.turn()][board.piecetype(to_sq(move))][to_sq(move)] / 512);
+            reductions -= std::min(1, thread->history.get_score(!board.turn(), board.piecetype(to_sq(move)), to_sq(move)) / 512);
 
             // Do not reduce more than depth - 2, also do not extend
             reductions = std::max(0, std::min(reductions, depth - 2));
@@ -840,8 +812,8 @@ void Thread::search() {
     info.isMainThread = isMainThread;
 
     // Adjust multiPv to maximum number of legal moves in root position
-    MoveList rootMoves  = gen_legals(board, gen_all(board, board.turn()));
-    info.limits.multiPv = std::min(info.limits.multiPv, rootMoves.size);
+    MoveList rootMoves  = generate_moves<ALL, LEGAL>(board, board.turn());
+    info.limits.multiPv = std::min(info.limits.multiPv, rootMoves.size());
 
     // Iterative Deepening
     // We do not search to a fixed depth from the start, but rather increase it with every

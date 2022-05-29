@@ -30,7 +30,7 @@
 struct PerftInfo {
 
     Depth depth = 0;
-    uint64_t divide[250] = { 0 };
+    uint64_t divide[MOVES_MAX_COUNT] = { 0 };
     uint64_t capturesCount = 0;
     uint64_t enPassantCount = 0;
     uint64_t castlesCount = 0;
@@ -38,6 +38,7 @@ struct PerftInfo {
 
 };
 
-extern uint64_t runPerft(const std::string fen, const unsigned depth);
+extern std::vector<uint64_t> runPerft(const std::string fen, const Depth depth);
+extern uint64_t runDivide(const std::string fen, const Depth depth);
 
 #endif

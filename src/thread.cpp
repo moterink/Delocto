@@ -128,9 +128,11 @@ void Thread::initialize(const Board& b, const SearchLimits& limits) {
     board = b;
     info.reset();
     info.limits = limits;
+
     // TODO: This seems to positively affect strength - why??
-    clear_history();
-    clear_killers();
+    killers.clear();
+    history.clear();
+    counterMove.clear();
 
 }
 
@@ -140,8 +142,9 @@ void Thread::clear() {
     board = Board();
     pawnTable.clear();
     materialTable.clear();
-    clear_history();
-    clear_killers();
+    killers.clear();
+    history.clear();
+    counterMove.clear();
     info.reset();
 
 }

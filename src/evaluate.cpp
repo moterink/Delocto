@@ -351,7 +351,7 @@ static const EvalTerm evaluate_knights(const Board& board, const Color color, Ev
     while (knights) {
 
         Square sq = pop_lsb(knights);
-        Bitboard moves = gen_knight_moves(sq, 0);
+        Bitboard moves = knight_target_squares(sq, 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
@@ -393,7 +393,7 @@ static const EvalTerm evaluate_bishops(const Board& board, const Color color, Ev
         Square sq = pop_lsb(bishops);
 
         // Exclude queen for xrays
-        Bitboard moves = gen_bishop_moves(sq, board.pieces(BOTH) & ~board.pieces(QUEEN), 0);
+        Bitboard moves = bishop_target_squares(sq, board.pieces(BOTH) & ~board.pieces(QUEEN), 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
@@ -417,7 +417,7 @@ static const EvalTerm evaluate_bishops(const Board& board, const Color color, Ev
         value -= bishopPawnsSameColorPenalty * popcount(pawnsOnSameColor) * (1 + popcount(info.blockedPawns[color] & CENTRAL_FILES));
 
         // Bonus for being attacking central squares
-        if (popcount(gen_bishop_moves(sq, board.pieces(PAWN), 0) & CENTRAL_SQUARES) > 1) {
+        if (popcount(bishop_target_squares(sq, board.pieces(PAWN), 0) & CENTRAL_SQUARES) > 1) {
             value += bishopCenterAlignBonus;
         }
 
@@ -444,7 +444,7 @@ static const EvalTerm evaluate_rooks(const Board& board, const Color color, Eval
         Square sq = pop_lsb(rooks);
 
         // Exclude queens and rooks for xrays
-        Bitboard moves = gen_rook_moves(sq, board.pieces(BOTH) & ~board.majors(), 0);
+        Bitboard moves = rook_target_squares(sq, board.pieces(BOTH) & ~board.majors(), 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
@@ -490,7 +490,7 @@ static const EvalTerm evaluate_queens(const Board& board, const Color color, Eva
     while (queens) {
 
         Square sq = pop_lsb(queens);
-        Bitboard moves = get_queen_moves(sq, board.pieces(BOTH), 0);
+        Bitboard moves = queen_target_squares(sq, board.pieces(BOTH), 0);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
@@ -657,9 +657,9 @@ static const EvalTerm evaluate_king_safety(const Board& board, const Color color
     // it is a weak square which is attacked by multiple enemy pieces
     const Bitboard safeCheckSquares = ~board.pieces(!color) & (~info.colorAttacks[color] | (weakSquares & info.multiAttacks[!color]));
 
-    const Bitboard knightCheckSquares = gen_knight_moves(info.kingSq[color], board.pieces(color));
-    const Bitboard bishopCheckSquares = gen_bishop_moves(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
-    const Bitboard rookCheckSquares   = gen_rook_moves(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
+    const Bitboard knightCheckSquares = knight_target_squares(info.kingSq[color], board.pieces(color));
+    const Bitboard bishopCheckSquares = bishop_target_squares(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
+    const Bitboard rookCheckSquares   = rook_target_squares(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
 
     Bitboard unsafeChecks = 0;
     const Bitboard queenChecks  = info.pieceAttacks[!color][QUEEN] & (bishopCheckSquares | rookCheckSquares)  & ~info.pieceAttacks[color][QUEEN];
@@ -918,9 +918,9 @@ static const EvalTerm evaluate_threats(const Board& board, const Color color, co
     if (queens) {
 
         Square sq = pop_lsb(queens);
-        Bitboard knightAttackSquares = gen_knight_moves(sq, board.pieces(color)) & info.pieceAttacks[color][KNIGHT];
-        Bitboard bishopAttackSquares = gen_bishop_moves(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][BISHOP];
-        Bitboard rookAttackSquares   = gen_rook_moves(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][ROOK];
+        Bitboard knightAttackSquares = knight_target_squares(sq, board.pieces(color)) & info.pieceAttacks[color][KNIGHT];
+        Bitboard bishopAttackSquares = bishop_target_squares(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][BISHOP];
+        Bitboard rookAttackSquares   = rook_target_squares(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][ROOK];
         Bitboard safe = info.mobilityArea[color] & ~strongSquares;
 
         value += KnightQueenAttackThreat * popcount(knightAttackSquares & safe);

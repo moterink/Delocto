@@ -57,6 +57,7 @@ extern Bitboard BackwardPawnMask[2][64];
 
 extern Bitboard get_slider_attacks(const Square sq, const Bitboard occupied, const int directions[4]);
 extern int get_magic_index(const Bitboard occupied, Magic *table);
+extern std::string bitboard_to_string(const Bitboard bitboard);
 extern void init_bitboards();
 
 #endif

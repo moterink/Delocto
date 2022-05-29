@@ -77,6 +77,8 @@ class Board {
         inline Bitboard pieces(const Piecetype pt) const { return bbPieces[pt]; }
         inline Bitboard pieces(const Color color, const Piecetype pt) const { return bbColors[color] & bbPieces[pt]; }
 
+        inline Bitboard empty_squares() const { return ~bbColors[BOTH]; }
+
         inline Color owner(const Square sq) const { return Color(!(bbColors[WHITE] & SQUARES[sq])); }
         inline Piecetype piecetype(const Square sq) const { return pieceTypes[sq]; }
         inline bool is_sq_empty(const Square sq) const { return pieceTypes[sq] == PIECE_NONE; }
@@ -85,6 +87,7 @@ class Board {
         inline CastleRight castleRights() const { return state.castlingRights; }
 
         inline Square enpassant_square() const { return state.enPassant; }
+        inline Square king_square(const Color color) const { return lsb_index(bbPieces[KING] & bbColors[color]); };
 
         inline uint64_t hashkey() const { return state.hashKey; }
         inline uint64_t materialkey() const { return state.materialKey; }
@@ -123,6 +126,7 @@ class Board {
 
         inline Bitboard minors_and_majors(const Color color) const;
         inline Bitboard majors() const;
+        inline Bitboard sliders() const;
         inline Bitboard sliders(const Color color) const;
 
         inline bool is_capture(const Move move) const;
@@ -223,10 +227,17 @@ inline Bitboard Board::majors() const {
 
 }
 
+// Returns a bitboard of all sliding pieces
+inline Bitboard Board::sliders() const {
+
+    return (bbPieces[BISHOP] | bbPieces[ROOK] | bbPieces[QUEEN]);
+
+}
+
 // Returns a bitboard of all sliding pieces for a given color
 inline Bitboard Board::sliders(const Color color) const {
 
-    return (bbPieces[BISHOP] | bbPieces[ROOK] | bbPieces[QUEEN]) && bbColors[color];
+    return sliders() & bbColors[color];
 
 }
 
@@ -305,8 +316,8 @@ inline Bitboard Board::sq_attackers(const Color color, const Square sq, const Bi
 
     return  ((PawnAttacks[!color][sq]           & bbPieces[PAWN])
            | (KnightAttacks[sq]                 & bbPieces[KNIGHT])
-           | (gen_bishop_moves(sq, occupied, 0) & (bbPieces[BISHOP] | bbPieces[QUEEN]))
-           | (gen_rook_moves(sq, occupied, 0)   & (bbPieces[ROOK]   | bbPieces[QUEEN]))
+           | (bishop_target_squares(sq, occupied, 0) & (bbPieces[BISHOP] | bbPieces[QUEEN]))
+           | (rook_target_squares(sq, occupied, 0)   & (bbPieces[ROOK]   | bbPieces[QUEEN]))
            | (KingAttacks[sq]                   & bbPieces[KING])) & bbColors[color];
 
 }
@@ -314,8 +325,8 @@ inline Bitboard Board::sq_attackers(const Color color, const Square sq, const Bi
 // Get a bitboard of all sliding attackers to a square
 inline Bitboard Board::slider_attackers(const Square sq, const Bitboard occupied) const {
 
-    return (gen_bishop_moves(sq, occupied, 0) & (bbPieces[BISHOP] | bbPieces[QUEEN]))
-         | (gen_rook_moves(sq, occupied, 0)   & (bbPieces[ROOK]   | bbPieces[QUEEN]));
+    return (bishop_target_squares(sq, occupied, 0) & (bbPieces[BISHOP] | bbPieces[QUEEN]))
+         | (rook_target_squares(sq, occupied, 0)   & (bbPieces[ROOK]   | bbPieces[QUEEN]));
 
 }
 
@@ -370,9 +381,9 @@ inline Bitboard Board::gen_pawns_attacks(const Color color) const {
 // Get a bitboards with all pseudo-legal destination squares for a slider on the given square
 inline Bitboard slider_moves(const Piecetype pt, const Square sq, const Bitboard occupied, const Bitboard friendly) {
 
-    return   (pt == BISHOP) ? gen_bishop_moves(sq, occupied, friendly)
-           : (pt == ROOK)   ? gen_rook_moves(sq, occupied, friendly)
-           : get_queen_moves(sq, occupied, friendly);
+    return   (pt == BISHOP) ? bishop_target_squares(sq, occupied, friendly)
+           : (pt == ROOK)   ? rook_target_squares(sq, occupied, friendly)
+           : queen_target_squares(sq, occupied, friendly);
 
 }
 

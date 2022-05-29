@@ -33,11 +33,6 @@
 
 class Thread {
 
-    private:
-
-        void clear_killers();
-        void clear_history();
-
     public:
 
         Board board;
@@ -45,9 +40,9 @@ class Thread {
         PawnTable pawnTable;
         MaterialTable materialTable;
 
-        Move killers[DEPTH_MAX + 1][2];
-        Move counterMove[2][7][64];
-        int history[2][7][64];
+        KillerMoves killers;
+        CounterMoveTable counterMove;
+        HistoryTable history;
 
         Thread(const unsigned threadIndex);
         Thread(const Thread&) = delete;

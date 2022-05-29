@@ -20,31 +20,9 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
 */
+#ifndef BENCH_H
+#define BENCH_H
 
-#define CATCH_CONFIG_RUNNER
+extern uint64_t benchmark();
 
-#include "catch.hpp"
-
-#include "../src/types.hpp"
-#include "../src/evaluate.hpp"
-#include "../src/uci.hpp"
-#include "../src/bitboards.hpp"
-#include "../src/search.hpp"
-#include "../src/bench.hpp"
-
-static uint64_t BenchmarkResult;
-
-int main(int argc, char* argv[]) {
-
-    init_hashkeys();
-    init_king_distance();
-    init_bitboards();
-    init_psqt();
-    init_eval();
-    init_search();
-
-    TTable.set_size(HashOption.get_default());
-
-    return Catch::Session().run( argc, argv );
-
-}
+#endif

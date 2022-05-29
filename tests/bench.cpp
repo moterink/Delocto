@@ -21,30 +21,13 @@
   SOFTWARE.
 */
 
-#define CATCH_CONFIG_RUNNER
+#include "./catch.hpp"
 
-#include "catch.hpp"
-
-#include "../src/types.hpp"
-#include "../src/evaluate.hpp"
-#include "../src/uci.hpp"
-#include "../src/bitboards.hpp"
-#include "../src/search.hpp"
 #include "../src/bench.hpp"
 
-static uint64_t BenchmarkResult;
-
-int main(int argc, char* argv[]) {
-
-    init_hashkeys();
-    init_king_distance();
-    init_bitboards();
-    init_psqt();
-    init_eval();
-    init_search();
-
-    TTable.set_size(HashOption.get_default());
-
-    return Catch::Session().run( argc, argv );
-
+// Two consecutive run benchmarks should return the same number of nodes
+TEST_CASE("Benchmark consistency") {
+    uint64_t bench1 = benchmark();
+    uint64_t bench2 = benchmark();
+    REQUIRE(bench1 == bench2);
 }

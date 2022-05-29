@@ -26,6 +26,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <utility>
 
 #include "types.hpp"
 #include "board.hpp"
@@ -112,8 +113,86 @@ class SearchInfo {
         int pvStability = 0;
 
         void reset();
-        void clear_history();
-        void clear_killers();
+
+};
+
+class KillerMoves {
+
+    public:
+        inline Move first(Depth plies) const {
+            return moves[plies].first;
+        }
+
+        inline Move second(Depth plies) const {
+            return moves[plies].second;
+        }
+
+        // Put the current first killer (if available) back to second killer and
+        // set the new move as first killer
+        inline void update(Depth plies, Move move) {
+            moves[plies].second = moves[plies].first;
+            moves[plies].first = move;
+        }
+
+        inline void clear(Depth plies) {
+            moves[plies] = std::make_pair(MOVE_NONE, MOVE_NONE);
+        }
+        
+        inline void clear() {
+            moves.fill(std::make_pair(MOVE_NONE, MOVE_NONE));
+        }
+
+    private:
+        std::array<std::pair<Move, Move>, DEPTH_MAX+1> moves;
+
+};
+
+template<typename T>
+class ButterflyTable {
+
+    public:
+        inline T get(Color color, Piecetype type, Square square) const {
+            return values[color][type][square];
+        };
+
+        inline void clear(T value = 0) {
+            std::fill_n(&values[0][0][0], COLOR_COUNT * (PIECETYPE_COUNT + 1) * SQUARE_COUNT, value);
+        }
+
+    protected:
+        T values[COLOR_COUNT][PIECETYPE_COUNT+1][SQUARE_COUNT] = {};
+
+};
+
+class HistoryTable : public ButterflyTable<int> {
+
+    public:
+        inline int get_score(Color color, Piecetype type, Square square) const {
+            return ButterflyTable::get(color, type, square);
+        }
+
+        inline void update_score(Color color, Piecetype type, Square square, int delta) {
+            const int currentScore = get_score(color, type, square);
+            // Formula for calculating new history score
+            values[color][type][square] += 32 * delta - currentScore * std::abs(delta) / 512; 
+        }
+
+};
+
+class CounterMoveTable : public ButterflyTable<Move> {
+
+    public:
+        inline Move get_move(Color color, Piecetype type, Square square) const {
+            return ButterflyTable::get(color, type, square);
+        }
+
+        inline void set_move(Color color, Piecetype type, Square square, Move move) {
+            values[color][type][square] = move;
+        }
+
+        inline void clear() {
+            ButterflyTable::clear(MOVE_NONE);
+        }
 
 };
 

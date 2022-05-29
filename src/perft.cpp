@@ -23,28 +23,29 @@
 
 #include "perft.hpp"
 #include "movegen.hpp"
+#include "timeman.hpp"
 #include "uci.hpp"
 
 // Runs a performance test to a given depth.
 // This method returns the total number of nodes visited
 // by traversing the search tree and counting the number of all positions
 // which may occur until a given depth.
-static uint64_t perft(int depth, PerftInfo& info, Board& board) {
+static uint64_t recursive_traverse(int depth, PerftInfo& info, Board& board) {
 
     if (depth == 0) return 1;
 
-    unsigned long total = 0;
+    uint64_t total = 0;
 
     // Generare all legal moves for the current position
-    MoveList moves = gen_legals(board, gen_all(board, board.turn()));
+    MoveList moves = generate_moves<ALL, LEGAL>(board, board.turn());
 
-    for (unsigned i = 0; i < moves.size; i++) {
-        Move move = moves.moves[i];
+    for (unsigned i = 0; i < moves.size(); i++) {
+        Move move = moves[i];
 
         board.do_move(move);
 
         // Recursive call
-        uint64_t nodes = perft(depth - 1, info, board);
+        uint64_t nodes = recursive_traverse(depth - 1, info, board);
 
         // If we are in a root node, add the number of nodes for divide
         if (depth == info.depth) {
@@ -63,9 +64,47 @@ static uint64_t perft(int depth, PerftInfo& info, Board& board) {
 
 // Starts a perft to a given depth.
 // The function outputs the number of total nodes visited
-uint64_t runPerft(const std::string fen, const unsigned depth) {
+std::vector<uint64_t> runPerft(const std::string fen, const Depth maxDepth) {
 
-    std::cout << "Starting perft test..." << std::endl;
+    std::cout << "Starting perft test to maximum depth of " << maxDepth << "..." << std::endl << std::endl;
+
+    Board board;
+    board.set_fen(fen);
+
+    std::vector<uint64_t> results;
+
+    TimePoint start = Clock::now();
+
+    uint64_t nodes = 0;
+    for (Depth depth = 1; depth < maxDepth+1; depth++) {
+        PerftInfo info;
+        info.depth = depth;
+        
+        TimePoint iterationStart = Clock::now();
+        nodes = recursive_traverse(depth, info, board);
+        Duration duration = get_time_elapsed(iterationStart);
+
+        results.push_back(nodes);
+
+        std::cout << "Depth " << depth << ": " << std::setw(12) << nodes << " (took " << ((float)duration / 1000.0f) <<  "s)" << std::endl;
+    }
+
+    Duration duration = get_time_elapsed(start);
+
+    std::cout << std::endl;
+    std::cout << "Perft test finished." << std::endl;
+    std::cout << "Total duration: " << ((float)duration / 1000.0f) << "s" << std::endl;
+
+    return results;
+
+}
+
+// A divide test is a special kind of perft test which returns the number of positions
+// that occured from each root move played for a given position. A divide test runs
+// to a fixed depth only.
+uint64_t runDivide(const std::string fen, const Depth depth) {
+
+    std::cout << "Starting divide test to depth " << depth << "..." << std::endl;
 
     PerftInfo info;
     info.depth = depth;
@@ -73,20 +112,20 @@ uint64_t runPerft(const std::string fen, const unsigned depth) {
     Board board;
     board.set_fen(fen);
 
-    const uint64_t nodes = perft(depth, info, board);
+    const uint64_t nodes = recursive_traverse(depth, info, board);
 
     // Generate all legal moves for the root position
-    MoveList moves = gen_legals(board, gen_all(board, board.turn()));
+    MoveList moves = generate_moves<ALL, LEGAL>(board, board.turn());
 
-    std::cout << "Depth(" << depth << "): " << nodes << std::endl;
+    std::cout << "Total positions to depth " << depth << ": " << nodes << std::endl << std::endl;
 
     // Show the root moves and the resulting number of nodes for each in the console
-    for (unsigned i = 0; i < moves.size; i++) {
-        std::cout << move_to_string(moves.moves[i]) << ": " << info.divide[i] << std::endl;
+    for (unsigned i = 0; i < moves.size(); i++) {
+        std::cout << move_to_string(moves[i]) << ": " << info.divide[i] << std::endl;
     }
 
-    std::cout << "Perft test finished." << std::endl;
+    std::cout << std::endl;
+    std::cout << "Divide test finished." << std::endl;
 
     return nodes;
-
 }
