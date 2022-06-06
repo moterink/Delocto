@@ -31,6 +31,8 @@
 #include "thread.hpp"
 #include "perft.hpp"
 
+#include <set>
+
 enum OptionType {
     Check, Spin, Combo, Button, String
 };
@@ -41,10 +43,7 @@ class Option {
         std::string name;
         OptionType type;
 
-        Option(std::string& n, OptionType t) {
-            name = n;
-            type = t;
-        }
+        Option(const std::string& n, OptionType t): name(n), type(t) {}
 
         virtual std::string uci_string() const {
             return "option name " + name + " type ";
@@ -59,7 +58,7 @@ class CheckOption : public Option {
         bool defaultValue;
 
     public:
-        CheckOption(std::string name, bool initialValue) : Option(name, Check) {
+        CheckOption(const std::string& name, bool initialValue) : Option(name, Check) {
             value = initialValue;
             defaultValue = initialValue;
         }
@@ -73,7 +72,7 @@ class CheckOption : public Option {
             return value;
         }
 
-        std::string uci_string() const {
+        std::string uci_string() const override {
             return Option::uci_string() + "check default " + std::to_string(defaultValue);
         }
 
@@ -88,7 +87,7 @@ class SpinOption : public Option {
         int maxValue;
 
     public:
-        SpinOption(std::string name, int initialValue, int min, int max) : Option(name, Spin) {
+        SpinOption(const std::string& name, int initialValue, int min, int max) : Option(name, Spin) {
             value = initialValue;
             defaultValue = initialValue;
             minValue = min;
@@ -119,7 +118,7 @@ class SpinOption : public Option {
             return maxValue;
         }
 
-        std::string uci_string() const {
+        std::string uci_string() const override {
             return Option::uci_string()
                    + "spin default " + std::to_string(defaultValue)
                    + " max " + std::to_string(maxValue)
@@ -133,20 +132,15 @@ class ComboOption : public Option {
     private:
         std::string value;
         std::string defaultValue;
-        const std::vector<std::string> comboValues;
+        const std::set<std::string> comboValues;
 
     public:
-        ComboOption(std::string name, const std::string initialValue, std::initializer_list<std::string> choices) : Option(name, Combo), comboValues{choices} {
-            value = initialValue;
-            defaultValue = initialValue;
-        }
+        ComboOption(const std::string& name, const std::string& initialValue, std::initializer_list<std::string> choices) : Option(name, Combo), value(initialValue), defaultValue(initialValue), comboValues{choices} {}
 
-        bool set_value(std::string newValue) {
-            for (const std::string& comboValue : comboValues) {
-                if (comboValue == newValue) {
-                    value = newValue;
-                    return true;
-                }
+        bool set_value(const std::string& newValue) {
+            if (comboValues.find(newValue) != comboValues.end()) {
+                value = newValue;
+                return true;
             }
             return false;
         }
@@ -159,7 +153,7 @@ class ComboOption : public Option {
             return defaultValue;
         }
 
-        std::string uci_string() const {
+        std::string uci_string() const override {
             std::stringstream ss;
             ss << Option::uci_string() << "combo default " << defaultValue;
             for (const std::string& choice : comboValues) {
@@ -175,15 +169,13 @@ class ButtonOption : public Option {
         std::function<void ()> callback;
 
     public:
-        ButtonOption(std::string name, std::function<void ()> c) : Option(name, Button) {
-            callback = c;
-        }
+        ButtonOption(const std::string& name, std::function<void ()> c) : Option(name, Button), callback(c) {}
 
         void push() {
             callback();
         }
 
-        std::string uci_string() const {
+        std::string uci_string() const override {
             return Option::uci_string() + "button";
         }
 
@@ -196,12 +188,9 @@ class StringOption : public Option {
         std::string defaultValue;
 
     public:
-        StringOption(std::string name, std::string initialValue): Option(name, String) {
-            value = initialValue;
-            defaultValue = initialValue;
-        }
+        StringOption(const std::string& name, const std::string& initialValue): Option(name, String), value(initialValue), defaultValue(initialValue) {}
 
-        bool set_value(std::string newValue) {
+        bool set_value(const std::string& newValue) {
             value = newValue;
             return true;
         }
@@ -214,7 +203,7 @@ class StringOption : public Option {
             return defaultValue;
         }
 
-        std::string uci_string() const {
+        std::string uci_string() const override {
             return Option::uci_string() + "string default " + defaultValue;
         }
 
@@ -227,11 +216,14 @@ extern SpinOption MoveOverheadOption;
 extern ThreadPool Threads;
 extern TranspositionTable TTable;
 
-extern void send_pv(const SearchInfo& info, const Value value, const PrincipalVariation& pv, const uint64_t nodes, const Value alpha, const Value beta);
-extern void send_currmove(const Move currentMove, const unsigned index);
-extern void send_bestmove(const Move bestMove);
-extern void send_string(const std::string string);
-extern void go(const Board& board, const SearchLimits& limits);
-extern void uci_loop(int argc, char* argv[]);
+namespace UCI {
+    extern void init();
+    extern void loop(int argc, char* argv[]);
+    extern void send_pv(const SearchInfo& info, const Value value, const PrincipalVariation& pv, const uint64_t nodes, const Value alpha, const Value beta);
+    extern void send_currmove(const Move currentMove, const unsigned index);
+    extern void send_bestmove(const Move bestMove);
+    extern void send_string(const std::string& string);
+    extern void go(const Board& board, const SearchLimits& limits);
+}
 
 #endif

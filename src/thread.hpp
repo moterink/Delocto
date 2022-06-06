@@ -44,7 +44,7 @@ class Thread {
         CounterMoveTable counterMove;
         HistoryTable history;
 
-        Thread(const unsigned threadIndex);
+        explicit Thread(const unsigned threadIndex);
         Thread(const Thread&) = delete;
         Thread& operator=(const Thread&) = delete;
 
@@ -80,7 +80,7 @@ class ThreadPool {
         unsigned get_thread_count() { return threads.size(); }
         Thread* get_thread(const unsigned index) { return threads[index]; }
 
-        ThreadPool(const unsigned count);
+        explicit ThreadPool(const unsigned count);
         void resize(const unsigned threadCount);
         void reset();
         void initialize_search(const Board& board, const SearchLimits& limits);

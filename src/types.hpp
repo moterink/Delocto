@@ -374,7 +374,7 @@ inline Bitboard most_backward(const Color color, const Bitboard bitboard) {
 
 }
 
-inline const int direction(const Color color, const int direction) {
+inline int direction(const Color color, const int direction) {
     return direction * (color == WHITE ? 1 : -1);
 }
 
@@ -478,21 +478,31 @@ inline EvalTerm operator/(const EvalTerm value1, const int divisor) {
 }
 
 inline Color operator!(const Color color) {
-
     return Color(!unsigned(color));
-
 }
 
-inline Color& operator++(Color& c, int) {
-
-    return c = Color(int(c) + 1);
-
+inline Color& operator++(Color& c) {
+    return c = static_cast<Color>(static_cast<int>(c) + 1);
 }
 
-inline Piecetype& operator++(Piecetype& pt, int) {
+inline Piecetype& operator++(Piecetype& pt) {
+    return pt = static_cast<Piecetype>(static_cast<int>(pt) + 1);
+}
 
-    return pt = Piecetype(int(pt) + 1);
+inline Rank& operator++(Rank& r) {
+    return r = static_cast<Rank>(static_cast<unsigned>(r) + 1);
+}
 
+inline Rank& operator--(Rank& r) {
+    return r = static_cast<Rank>(static_cast<unsigned>(r) - 1);
+}
+
+inline File& operator++(File& f) {
+    return f = static_cast<File>(static_cast<unsigned>(f) + 1);
+}
+
+inline File& operator--(File& f) {
+    return f = static_cast<File>(static_cast<unsigned>(f) - 1);
 }
 
 // Print a value to the console, showing the midgame and endgame terms

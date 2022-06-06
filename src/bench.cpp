@@ -96,7 +96,7 @@ uint64_t benchmark() {
         std::cout << "Position: " << (i + 1) << std::endl;
         board.set_fen(BENCHMARK_FENS[i]);
         TTable.clear(); // Clear Transposition Table between searches
-        go(board, limits);
+        UCI::go(board, limits);
 
         // Wait for search thread to finish
         Threads.wait_until_finished();

@@ -77,12 +77,11 @@ inline int scaled_eval(const int scale, const EvalTerm value) {
 
 extern EvalTerm PieceSquareTable[2][6][64];
 
-extern int KingDistance[64][64];
-
-extern void init_king_distance();
-extern void init_psqt();
-extern void init_eval();
 extern int evaluate(const Board& board, const unsigned threadIndex);
 extern void evaluate_info(const Board& board);
+
+namespace Eval {
+    extern void init();
+}
 
 #endif

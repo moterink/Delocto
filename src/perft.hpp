@@ -38,7 +38,7 @@ struct PerftInfo {
 
 };
 
-extern std::vector<uint64_t> runPerft(const std::string fen, const Depth depth);
-extern uint64_t runDivide(const std::string fen, const Depth depth);
+extern std::vector<uint64_t> runPerft(const std::string& fen, const Depth depth);
+extern uint64_t runDivide(const std::string& fen, const Depth depth);
 
 #endif

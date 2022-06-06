@@ -44,6 +44,7 @@ struct StateInfo {
     EvalTerm material[2]; // Material balances
     Bitboard kingBlockers[2]; // Pieces blocking sliding attacks to the kings
     Bitboard checkers = 0; // Pieces attacking the king
+    Bitboard checkSquares[PIECETYPE_COUNT];
     uint64_t hashKey = 0;
     uint64_t pawnKey = 0;
     uint64_t materialKey = 0;
@@ -78,6 +79,7 @@ class Board {
         inline Bitboard pieces(const Color color, const Piecetype pt) const { return bbColors[color] & bbPieces[pt]; }
 
         inline Bitboard empty_squares() const { return ~bbColors[BOTH]; }
+        inline Bitboard check_squares(const Piecetype pt) const { return state.checkSquares[pt]; }
 
         inline Color owner(const Square sq) const { return Color(!(bbColors[WHITE] & SQUARES[sq])); }
         inline Piecetype piecetype(const Square sq) const { return pieceTypes[sq]; }
@@ -180,8 +182,6 @@ class Board {
         void add_piece(const Color color, const Piecetype pt, const Square sq);
         void remove_piece(const Square sq);
         void move_piece(const Square fromSq, const Square toSq);
-
-        inline Bitboard piece_attacks(const Piecetype pt, const Color color, const Square sq) const;
 
         inline Bitboard sq_attackers(const Color color, const Square sq, const Bitboard occupied) const;
         inline Bitboard slider_attackers(const Square sq, const Bitboard occupied) const;
@@ -314,19 +314,19 @@ inline void Board::hash_material(const Color color, const Piecetype pt) {
 // Get a bitboard of all attackers of a color to a square
 inline Bitboard Board::sq_attackers(const Color color, const Square sq, const Bitboard occupied) const {
 
-    return  ((PawnAttacks[!color][sq]           & bbPieces[PAWN])
-           | (KnightAttacks[sq]                 & bbPieces[KNIGHT])
-           | (bishop_target_squares(sq, occupied, 0) & (bbPieces[BISHOP] | bbPieces[QUEEN]))
-           | (rook_target_squares(sq, occupied, 0)   & (bbPieces[ROOK]   | bbPieces[QUEEN]))
-           | (KingAttacks[sq]                   & bbPieces[KING])) & bbColors[color];
+    return  ((PawnAttacks[!color][sq]             & bbPieces[PAWN])
+           | (piece_attacks<KNIGHT>(sq)           & bbPieces[KNIGHT])
+           | (piece_attacks<BISHOP>(sq, occupied) & (bbPieces[BISHOP] | bbPieces[QUEEN]))
+           | (piece_attacks<ROOK>(sq, occupied)   & (bbPieces[ROOK]   | bbPieces[QUEEN]))
+           | (piece_attacks<KING>(sq)             & bbPieces[KING])) & bbColors[color];
 
 }
 
 // Get a bitboard of all sliding attackers to a square
 inline Bitboard Board::slider_attackers(const Square sq, const Bitboard occupied) const {
 
-    return (bishop_target_squares(sq, occupied, 0) & (bbPieces[BISHOP] | bbPieces[QUEEN]))
-         | (rook_target_squares(sq, occupied, 0)   & (bbPieces[ROOK]   | bbPieces[QUEEN]));
+    return (piece_attacks<BISHOP>(sq, occupied) & (bbPieces[BISHOP] | bbPieces[QUEEN]))
+         | (piece_attacks<ROOK>(sq, occupied)   & (bbPieces[ROOK]   | bbPieces[QUEEN]));
 
 }
 
@@ -375,25 +375,6 @@ inline Bitboard Board::gen_black_pawns_attacks() const {
 inline Bitboard Board::gen_pawns_attacks(const Color color) const {
 
     return (color == WHITE) ? gen_white_pawns_attacks() : gen_black_pawns_attacks();
-
-}
-
-// Get a bitboards with all pseudo-legal destination squares for a slider on the given square
-inline Bitboard slider_moves(const Piecetype pt, const Square sq, const Bitboard occupied, const Bitboard friendly) {
-
-    return   (pt == BISHOP) ? bishop_target_squares(sq, occupied, friendly)
-           : (pt == ROOK)   ? rook_target_squares(sq, occupied, friendly)
-           : queen_target_squares(sq, occupied, friendly);
-
-}
-
-// Get a bitboard with all pseudo-legal attack squares for a piece on the given square
-inline Bitboard Board::piece_attacks(const Piecetype pt, const Color color, const Square sq) const {
-
-    return ((pt == BISHOP || pt == ROOK || pt == QUEEN) ? slider_moves(pt, sq, bbColors[BOTH], bbColors[color])
-                                                        : pt == KNIGHT ? KnightAttacks[sq]
-                                                        : pt == PAWN   ? PawnAttacks[color][sq]
-                                                        : KingAttacks[sq]) & ~bbColors[color];
 
 }
 

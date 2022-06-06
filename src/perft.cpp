@@ -64,7 +64,7 @@ static uint64_t recursive_traverse(int depth, PerftInfo& info, Board& board) {
 
 // Starts a perft to a given depth.
 // The function outputs the number of total nodes visited
-std::vector<uint64_t> runPerft(const std::string fen, const Depth maxDepth) {
+std::vector<uint64_t> runPerft(const std::string& fen, const Depth maxDepth) {
 
     std::cout << "Starting perft test to maximum depth of " << maxDepth << "..." << std::endl << std::endl;
 
@@ -102,7 +102,7 @@ std::vector<uint64_t> runPerft(const std::string fen, const Depth maxDepth) {
 // A divide test is a special kind of perft test which returns the number of positions
 // that occured from each root move played for a given position. A divide test runs
 // to a fixed depth only.
-uint64_t runDivide(const std::string fen, const Depth depth) {
+uint64_t runDivide(const std::string& fen, const Depth depth) {
 
     std::cout << "Starting divide test to depth " << depth << "..." << std::endl;
 

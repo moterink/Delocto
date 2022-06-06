@@ -36,15 +36,17 @@
 // been played.
 static int LMRTable[DEPTH_MAX][MOVES_MAX_COUNT];
 
-// Initializes search parameters which are computed at execution time
-void init_search() {
+namespace Search {
+    // Initializes search parameters which are computed at execution time
+    void init() {
 
-    for (int d = 1; d < DEPTH_MAX; d++) {
-        for (int m = 1; m < MOVES_MAX_COUNT; m++) {
-            LMRTable[d][m] = 1 + log(d) * log(m) / 2;
+        for (int d = 1; d < DEPTH_MAX; d++) {
+            for (unsigned m = 1; m < MOVES_MAX_COUNT; m++) {
+                LMRTable[d][m] = 1 + log(d) * log(m) / 2;
+            }
         }
-    }
 
+    }
 }
 
 // Update a principal variations
@@ -108,7 +110,7 @@ static void check_finished(SearchInfo* info) {
 // If no attacker was found, return SQUARE_NONE
 unsigned Board::least_valuable_piece(Bitboard attackers, const Color color) const {
 
-    for (Piecetype pt = PAWN; pt <= KING; pt++) {
+    for (Piecetype pt = PAWN; pt <= KING; ++pt) {
         Bitboard subset = attackers & pieces(color, pt);
         if (subset) {
             return lsb_index(subset);
@@ -323,7 +325,7 @@ static Value qsearch(Value alpha, Value beta, Depth depth, Depth plies, Board& b
     unsigned movesCount;
     movesCount = 0;
     Move bestMove = MOVE_NONE;
-    Move move = MOVE_NONE;
+    Move move;
 
     MovePicker picker(board, info, &thread->history, plies, info->currentMove[plies-1], ttMove);
 
@@ -681,7 +683,7 @@ static Value search(Value alpha, Value beta, Depth depth, Depth plies, bool cutN
             && info->isMainThread
             && get_time_elapsed(info->start) > 5000)
         {
-            send_currmove(move, movesCount);
+            UCI::send_currmove(move, movesCount);
         }
 
         // Late Move Reductions
@@ -865,7 +867,7 @@ void Thread::search() {
                     && (value <= alpha || value >= beta)
                     && get_time_elapsed(info.start) > 3000)
                 {
-                    send_pv(info, value, pv, Threads.get_nodes(), alpha, beta);
+                    UCI::send_pv(info, value, pv, Threads.get_nodes(), alpha, beta);
                 }
 
                 if (value <= alpha) {
@@ -891,7 +893,7 @@ void Thread::search() {
                 // Send the principal variation
                 // Do not report incomplete searches
                 if (!Threads.has_stopped()) {
-                    send_pv(info, value, pv, Threads.get_nodes(), alpha, beta);
+                    UCI::send_pv(info, value, pv, Threads.get_nodes(), alpha, beta);
                 }
 
                 // Drawn/mate positions return an empty pv
@@ -920,7 +922,7 @@ void Thread::search() {
         // Signal all other threads to stop searching
         Threads.stop_searching();
         // Print the best move found to the console
-        send_bestmove(bestMove);
+        UCI::send_bestmove(bestMove);
     }
 
 }

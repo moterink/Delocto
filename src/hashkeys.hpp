@@ -76,7 +76,6 @@ struct TTEntry {
 
         void update_generation(const uint8_t generation) { genBound8 = generation | bound(); }
 
-
 };
 
 struct PawnEntry {
@@ -204,6 +203,8 @@ extern uint64_t TurnHashKeys[2];
 extern uint64_t CastlingHashKeys[16];
 extern uint64_t EnPassantHashKeys[8];
 
-extern void init_hashkeys();
+namespace Hash {
+    extern void init();
+}
 
 #endif

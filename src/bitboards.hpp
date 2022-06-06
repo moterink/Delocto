@@ -35,29 +35,79 @@ struct Magic {
     uint64_t shift;
     uint64_t *attacks;
 
+    // Formula for getting the magic index for the given arrangement of pieces
+    int index(uint64_t occupied) {
+        return ((occupied & mask) * magic) >> shift;
+    }
+
 };
 
-extern Magic BishopMagics[64];
-extern Magic RookMagics[64];
+extern Magic BishopMagics[SQUARE_COUNT];
+extern Magic RookMagics[SQUARE_COUNT];
 
-extern Bitboard PawnAttacksSpan[2][64];
-extern Bitboard KingShelterSpan[2][64];
-extern Bitboard KingRing[2][64];
-extern Bitboard RayTable[64][64];
-extern Bitboard LineTable[64][64];
-extern Bitboard PawnAttacks[2][64];
-extern Bitboard KnightAttacks[64];
-extern Bitboard BishopAttacks[64];
-extern Bitboard RookAttacks[64];
-extern Bitboard QueenAttacks[64];
-extern Bitboard KingAttacks[64];
-extern Bitboard FrontFileMask[2][64];
-extern Bitboard PassedPawnMask[2][64];
-extern Bitboard BackwardPawnMask[2][64];
+extern Bitboard PawnAttacksSpan[COLOR_COUNT][SQUARE_COUNT];
+extern Bitboard KingShelterSpan[COLOR_COUNT][SQUARE_COUNT];
+extern Bitboard KingRing[COLOR_COUNT][SQUARE_COUNT];
+extern Bitboard RayTable[SQUARE_COUNT][SQUARE_COUNT];
+extern Bitboard LineTable[SQUARE_COUNT][SQUARE_COUNT];
+extern Bitboard PawnAttacks[COLOR_COUNT][SQUARE_COUNT];
+extern Bitboard PseudoAttacks[PIECETYPE_COUNT][SQUARE_COUNT];
+extern Bitboard FrontFileMask[COLOR_COUNT][SQUARE_COUNT];
+extern Bitboard PassedPawnMask[COLOR_COUNT][SQUARE_COUNT];
+extern Bitboard BackwardPawnMask[COLOR_COUNT][SQUARE_COUNT];
 
-extern Bitboard get_slider_attacks(const Square sq, const Bitboard occupied, const int directions[4]);
-extern int get_magic_index(const Bitboard occupied, Magic *table);
+extern int KingDistance[SQUARE_COUNT][SQUARE_COUNT];
+
 extern std::string bitboard_to_string(const Bitboard bitboard);
-extern void init_bitboards();
+extern void print_bitboard(const Bitboard bitboard);
+
+template<Piecetype T>
+inline Bitboard piece_attacks(const Square sq) {
+    static_assert(T != PAWN);
+
+    return PseudoAttacks[T][sq];
+}
+
+template<Piecetype T>
+inline Bitboard piece_attacks(const Square sq, Bitboard occupied);
+
+template<>
+inline Bitboard piece_attacks<BISHOP>(const Square sq, const Bitboard occupied) {
+    return BishopMagics[sq].attacks[BishopMagics[sq].index(occupied)];
+}
+
+template<>
+inline Bitboard piece_attacks<ROOK>(const Square sq, const Bitboard occupied) {
+    return RookMagics[sq].attacks[RookMagics[sq].index(occupied)];
+}
+
+template<>
+inline Bitboard piece_attacks<QUEEN>(const Square sq, const Bitboard occupied) {
+    return piece_attacks<BISHOP>(sq, occupied) | piece_attacks<ROOK>(sq, occupied);
+}
+
+inline Bitboard piece_attacks(const Piecetype pt, const Square sq, const Bitboard occupied) {
+    assert(pt != PAWN);
+
+    switch(pt) {
+        case BISHOP:
+            return piece_attacks<BISHOP>(sq, occupied);
+        case ROOK:
+            return piece_attacks<ROOK>(sq, occupied);
+        case QUEEN:
+            return piece_attacks<QUEEN>(sq, occupied);
+        default:
+            return PseudoAttacks[pt][sq];
+    }
+}
+
+// Returns the number of moves a king would need to move between two squares on an empty board
+inline uint8_t distance(const Square sq1, const Square sq2) {
+    return KingDistance[sq1][sq2];
+}
+
+namespace Bitboards {
+    extern void init();
+}
 
 #endif

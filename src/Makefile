@@ -23,13 +23,14 @@ SRC := *.cpp
 
 OPTIMIZEFLAGS = -DNDEBUG -O3 -pthread
 DEBUGFLAGS = -g
+WARNFLAGS = -Wall -Wextra
 
 define init
 @echo Detected $(ARCH) architecture
 endef
 
 define compile
-$(CXX) $(CXXSTD) $(1) $(SRC) -o $(NAME)
+$(CXX) $(CXXSTD) $(1) $(WARNFLAGS) $(SRC) -o $(NAME)
 endef
 
 define finish

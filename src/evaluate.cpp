@@ -253,27 +253,13 @@ static const EvalTerm rookAttackWeight[PIECETYPE_COUNT] = {
 // Tempo Bonus
 static const int tempoBonus = 12;
 
-int KingDistance[64][64];
 static int kingPawnShelter[8][8];
 static int kingPawnStorm[8][8];
-
-// Initialize king distance arrays
-void init_king_distance() {
-
-    unsigned int findex, tindex;
-
-    for (findex = 0; findex < 64; findex++) {
-        for (tindex = 0; tindex < 64; tindex++) {
-            KingDistance[findex][tindex] = std::max(std::abs((int)rank(tindex) - (int)rank(findex)), std::abs((int)file(tindex) - (int)file(findex)));
-        }
-    }
-
-}
 
 // Initialize the piece square tables
 void init_psqt() {
 
-    for (Piecetype pt = PAWN; pt < PIECE_NONE; pt++) {
+    for (Piecetype pt = PAWN; pt < PIECE_NONE; ++pt) {
         for (unsigned sq = 0; sq < 32; sq++) {
             const unsigned r = sq / 4;
             const unsigned f = sq & 0x3;
@@ -289,25 +275,29 @@ void init_psqt() {
 
 }
 
-// Initialize evaluation terms
-void init_eval() {
+namespace Eval {
+    // Initialize evaluation terms
+    void init() {
 
-    // Mirror King Pawn Shelter Values
-    for (unsigned int f = 0; f < 4; f++) {
-        for (unsigned int r = 0; r < 8; r++) {
-            kingPawnShelter[f][r]     = kingPawnShelterValues[f][r];
-            kingPawnShelter[7 - f][r] = kingPawnShelterValues[f][r];
+        // Mirror King Pawn Shelter Values
+        for (unsigned int f = 0; f < 4; f++) {
+            for (unsigned int r = 0; r < 8; r++) {
+                kingPawnShelter[f][r]     = kingPawnShelterValues[f][r];
+                kingPawnShelter[7 - f][r] = kingPawnShelterValues[f][r];
+            }
         }
-    }
 
-    // Mirror King Pawn Storm Values
-    for (unsigned int f = 0; f < 4; f++) {
-        for (unsigned int r = 0; r < 8; r++) {
-            kingPawnStorm[f][r]       = kingPawnStormValues[f][r];
-            kingPawnStorm[7 - f][r]   = kingPawnStormValues[f][r];
+        // Mirror King Pawn Storm Values
+        for (unsigned int f = 0; f < 4; f++) {
+            for (unsigned int r = 0; r < 8; r++) {
+                kingPawnStorm[f][r]       = kingPawnStormValues[f][r];
+                kingPawnStorm[7 - f][r]   = kingPawnStormValues[f][r];
+            }
         }
-    }
 
+        init_psqt();
+
+    }
 }
 
 // Check if there is enough mating material on the board
@@ -351,7 +341,7 @@ static const EvalTerm evaluate_knights(const Board& board, const Color color, Ev
     while (knights) {
 
         Square sq = pop_lsb(knights);
-        Bitboard moves = knight_target_squares(sq, 0);
+        Bitboard moves = piece_attacks<KNIGHT>(sq);
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
@@ -393,7 +383,7 @@ static const EvalTerm evaluate_bishops(const Board& board, const Color color, Ev
         Square sq = pop_lsb(bishops);
 
         // Exclude queen for xrays
-        Bitboard moves = bishop_target_squares(sq, board.pieces(BOTH) & ~board.pieces(QUEEN), 0);
+        Bitboard moves = piece_attacks<BISHOP>(sq, board.pieces(BOTH) & ~board.pieces(QUEEN));
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
@@ -417,7 +407,7 @@ static const EvalTerm evaluate_bishops(const Board& board, const Color color, Ev
         value -= bishopPawnsSameColorPenalty * popcount(pawnsOnSameColor) * (1 + popcount(info.blockedPawns[color] & CENTRAL_FILES));
 
         // Bonus for being attacking central squares
-        if (popcount(bishop_target_squares(sq, board.pieces(PAWN), 0) & CENTRAL_SQUARES) > 1) {
+        if (popcount(piece_attacks<BISHOP>(sq, board.pieces(PAWN)) & CENTRAL_SQUARES) > 1) {
             value += bishopCenterAlignBonus;
         }
 
@@ -444,7 +434,7 @@ static const EvalTerm evaluate_rooks(const Board& board, const Color color, Eval
         Square sq = pop_lsb(rooks);
 
         // Exclude queens and rooks for xrays
-        Bitboard moves = rook_target_squares(sq, board.pieces(BOTH) & ~board.majors(), 0);
+        Bitboard moves = piece_attacks<ROOK>(sq, board.pieces(BOTH) & ~board.majors());
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
@@ -490,7 +480,7 @@ static const EvalTerm evaluate_queens(const Board& board, const Color color, Eva
     while (queens) {
 
         Square sq = pop_lsb(queens);
-        Bitboard moves = queen_target_squares(sq, board.pieces(BOTH), 0);
+        Bitboard moves = piece_attacks<QUEEN>(sq, board.pieces(BOTH));
         if (board.get_king_blockers(color) & SQUARES[sq]) {
             moves &= LineTable[sq][info.kingSq[color]];
         }
@@ -657,9 +647,9 @@ static const EvalTerm evaluate_king_safety(const Board& board, const Color color
     // it is a weak square which is attacked by multiple enemy pieces
     const Bitboard safeCheckSquares = ~board.pieces(!color) & (~info.colorAttacks[color] | (weakSquares & info.multiAttacks[!color]));
 
-    const Bitboard knightCheckSquares = knight_target_squares(info.kingSq[color], board.pieces(color));
-    const Bitboard bishopCheckSquares = bishop_target_squares(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
-    const Bitboard rookCheckSquares   = rook_target_squares(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN), 0);
+    const Bitboard knightCheckSquares = piece_attacks<KNIGHT>(info.kingSq[color]) & ~board.pieces(color);
+    const Bitboard bishopCheckSquares = piece_attacks<BISHOP>(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN));
+    const Bitboard rookCheckSquares   = piece_attacks<ROOK>(info.kingSq[color], board.pieces(BOTH) ^ board.pieces(color, QUEEN));
 
     Bitboard unsafeChecks = 0;
     const Bitboard queenChecks  = info.pieceAttacks[!color][QUEEN] & (bishopCheckSquares | rookCheckSquares)  & ~info.pieceAttacks[color][QUEEN];
@@ -918,9 +908,9 @@ static const EvalTerm evaluate_threats(const Board& board, const Color color, co
     if (queens) {
 
         Square sq = pop_lsb(queens);
-        Bitboard knightAttackSquares = knight_target_squares(sq, board.pieces(color)) & info.pieceAttacks[color][KNIGHT];
-        Bitboard bishopAttackSquares = bishop_target_squares(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][BISHOP];
-        Bitboard rookAttackSquares   = rook_target_squares(sq, board.pieces(BOTH), 0) & info.pieceAttacks[color][ROOK];
+        Bitboard knightAttackSquares = piece_attacks<KNIGHT>(sq) & ~board.pieces(color) & info.pieceAttacks[color][KNIGHT];
+        Bitboard bishopAttackSquares = piece_attacks<BISHOP>(sq, board.pieces(BOTH)) & info.pieceAttacks[color][BISHOP];
+        Bitboard rookAttackSquares   = piece_attacks<ROOK>(sq, board.pieces(BOTH)) & info.pieceAttacks[color][ROOK];
         Bitboard safe = info.mobilityArea[color] & ~strongSquares;
 
         value += KnightQueenAttackThreat * popcount(knightAttackSquares & safe);
@@ -953,8 +943,8 @@ static void init_eval_info(const Board& board, EvalInfo& info) {
     info.kingRing[BLACK] = KingRing[BLACK][info.kingSq[BLACK]];
 
     // Bitboards for cumulative piece attacks for each piece type for each color
-    info.pieceAttacks[WHITE][KING] = KingAttacks[info.kingSq[WHITE]];
-    info.pieceAttacks[BLACK][KING] = KingAttacks[info.kingSq[BLACK]];
+    info.pieceAttacks[WHITE][KING] = piece_attacks<KING>(info.kingSq[WHITE]);
+    info.pieceAttacks[BLACK][KING] = piece_attacks<KING>(info.kingSq[BLACK]);
 
     // Bitboards for attacks of each color
     info.colorAttacks[WHITE] |= info.pieceAttacks[WHITE][KING] | info.pieceAttacks[WHITE][PAWN];

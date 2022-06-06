@@ -33,54 +33,58 @@ uint64_t TurnHashKeys[2];
 uint64_t CastlingHashKeys[16];
 uint64_t EnPassantHashKeys[8];
 
-// Generate a random 64bit integer
-// Source: http://vigna.di.unimi.it/ftp/papers/xorshift.pdf
-static uint64_t x = 88172645463325252ULL;
+namespace Hash {
 
-static uint64_t rand64() {
+    // Generate a random 64bit integer
+    // Source: http://vigna.di.unimi.it/ftp/papers/xorshift.pdf
+    static uint64_t x = 88172645463325252ULL;
 
-    x ^= x >> 12;
-    x ^= x << 25;
-    x ^= x >> 27;
-    return x * 2685821657736338717LL;
+    static uint64_t rand64() {
 
-}
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+        return x * 2685821657736338717LL;
 
-// Initialize the hash keys
-// For each color, we assign a hashkey to each square for each piece type
-// Also, we assign hashkeys to a second array for each pawn of both colors for each square
-// We also have hashkeys for all possible configurations of material on the board
-// There are also hashkeys for all possible castling states and 8 hashkeys for each file where
-// there could be a potential en-passant square.
-// Furthermore, there are two additional hashkeys representing the current color to move
-void init_hashkeys() {
+    }
 
-    for (Color c = WHITE; c < BOTH; c++) {
-        for (Square sq = 0; sq < 64; sq++) {
-            for (Piecetype pt = PAWN; pt < PIECE_NONE+1; pt++) {
-                PieceHashKeys[c][pt][sq] = rand64();
+    // Initialize the hash keys
+    // For each color, we assign a hashkey to each square for each piece type
+    // Also, we assign hashkeys to a second array for each pawn of both colors for each square
+    // We also have hashkeys for all possible configurations of material on the board
+    // There are also hashkeys for all possible castling states and 8 hashkeys for each file where
+    // there could be a potential en-passant square.
+    // Furthermore, there are two additional hashkeys representing the current color to move
+    void init() {
+
+        for (Color c = WHITE; c < BOTH; ++c) {
+            for (Square sq = 0; sq < 64; sq++) {
+                for (Piecetype pt = PAWN; pt < PIECE_NONE+1; ++pt) {
+                    PieceHashKeys[c][pt][sq] = rand64();
+                }
+                PawnHashKeys[c][sq] = rand64();
             }
-            PawnHashKeys[c][sq] = rand64();
-        }
-        for (Piecetype pt = PAWN; pt < PIECE_NONE; pt++) {
-            for (unsigned i = 0; i < 11; i++) {
-                MaterialHashKeys[c][pt][i] = rand64();
+            for (Piecetype pt = PAWN; pt < PIECE_NONE; ++pt) {
+                for (unsigned i = 0; i < 11; i++) {
+                    MaterialHashKeys[c][pt][i] = rand64();
+                }
             }
         }
+
+        for (unsigned i = 0; i < 16; i++) {
+            CastlingHashKeys[i] = rand64();
+        }
+
+        for (unsigned i = 0; i < 8; i++) {
+            EnPassantHashKeys[i] = rand64();
+        }
+
+        TurnHashKeys[WHITE] = rand64();
+        TurnHashKeys[BLACK] = rand64();
+
     }
 
-    for (unsigned i = 0; i < 16; i++) {
-        CastlingHashKeys[i] = rand64();
-    }
-
-    for (unsigned i = 0; i < 8; i++) {
-        EnPassantHashKeys[i] = rand64();
-    }
-
-    TurnHashKeys[WHITE] = rand64();
-    TurnHashKeys[BLACK] = rand64();
-
-}
+} // End of Hash namespace
 
 // Set hash table to a given size in megabytes
 void TranspositionTable::set_size(const unsigned megabytes) {
@@ -94,9 +98,9 @@ void TranspositionTable::set_size(const unsigned megabytes) {
         table = new TTBucket [bucketCount];
     } catch (std::bad_alloc& exception) {
         std::cerr << "Error: Failed to allocate memory of size "
-                  << megabytes
-                  << " megabytes for Transposition Table." << std::endl
-                  << "OS message: " << exception.what();
+                << megabytes
+                << " megabytes for Transposition Table." << std::endl
+                << "OS message: " << exception.what();
         std::exit(EXIT_FAILURE);
     }
 
@@ -159,7 +163,7 @@ void TranspositionTable::store(const uint64_t key, const Depth depth, const Valu
             replace = entry;
             break;
         } else if (replace->depth() - (generation - replace->generation()) >=
-                   entry->depth()   - (generation - entry->generation())) {
+                entry->depth()   - (generation - entry->generation())) {
             replace = entry;
         }
     }
@@ -193,7 +197,7 @@ unsigned TranspositionTable::hashfull() {
     for (unsigned bucketIndex = 0; bucketIndex < 1000; bucketIndex++) {
         for (unsigned entryIndex = 0; entryIndex < TT_BUCKET_SIZE; entryIndex++) {
             usedCount +=    table[bucketIndex].entries[entryIndex].bound() != BOUND_NONE
-                         && table[bucketIndex].entries[entryIndex].generation() == generation;
+                        && table[bucketIndex].entries[entryIndex].generation() == generation;
         }
     }
 

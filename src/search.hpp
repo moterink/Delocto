@@ -196,6 +196,8 @@ class CounterMoveTable : public ButterflyTable<Move> {
 
 };
 
-extern void init_search();
+namespace Search {
+    extern void init();
+}
 
 #endif

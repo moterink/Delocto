@@ -29,29 +29,17 @@
 
 int main(int argc, char* argv[]) {
 
-    // Init Zobrist Hash Keys
-    init_hashkeys();
-
-    // Initialize king distance array
-    init_king_distance();
-
-    // Init Bitboard Lookup Tables
-    init_bitboards();
-
-    // Initialize Piece Square Tables
-    init_psqt();
-
-    // Initialize Eval
-    init_eval();
-
-    // Initialize Search
-    init_search();
+    Hash::init();
+    Bitboards::init();
+    Eval::init();
+    Search::init();
+    UCI::init();
 
     // Show name, author and version in console
     std::cout << "Delocto " << VERSION << " by Moritz Terink" << std::endl << std::endl;
 
     // Start Universal Chess Interface (UCI) input loop
-    uci_loop(argc, argv);
+    UCI::loop(argc, argv);
 
     return EXIT_SUCCESS;
 

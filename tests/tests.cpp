@@ -36,12 +36,10 @@ static uint64_t BenchmarkResult;
 
 int main(int argc, char* argv[]) {
 
-    init_hashkeys();
-    init_king_distance();
-    init_bitboards();
-    init_psqt();
-    init_eval();
-    init_search();
+    Hash::init();
+    Bitboards::init();
+    Eval::init();
+    Search::init();
 
     TTable.set_size(HashOption.get_default());
 

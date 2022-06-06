@@ -143,42 +143,6 @@ inline Bitboard generate_pawns_attacks(const Bitboard pawns, const Color color) 
 
 }
 
-// Returns a bitboard of all possible destination squares for a knight on the given square
-inline Bitboard knight_target_squares(const unsigned sq, const Bitboard ownPieces) {
-
-    return KnightAttacks[sq] & ~ownPieces;
-
-}
-
-// Returns a bitboard of all possible destination squares for a king on the given square
-inline Bitboard king_target_squares(const unsigned sq, const Bitboard ownPieces) {
-
-    return KingAttacks[sq] & ~ownPieces;
-
-}
-
-// Sliding Pieces
-// Returns a bitboard of all possible destination squares for a bishop on the given square
-inline Bitboard bishop_target_squares(const Square sq, const Bitboard both, const Bitboard friendly) {
-
-    return BishopMagics[sq].attacks[get_magic_index(both, &BishopMagics[sq])] & ~friendly;
-
-}
-
-// Returns a bitboard of all possible destination squares for a rook on the given square
-inline Bitboard rook_target_squares(const Square sq, const Bitboard both, const Bitboard friendly) {
-
-    return RookMagics[sq].attacks[get_magic_index(both, &RookMagics[sq])] & ~friendly;
-
-}
-
-// Returns a bitboard of all possible destination squares for a queen on the given square
-inline Bitboard queen_target_squares(const Square sq, const Bitboard both, const Bitboard friendly) {
-
-    return bishop_target_squares(sq, both, friendly) | rook_target_squares(sq, both, friendly);
-
-}
-
 template<MoveGenerationType T, MoveLegality L>
 extern MoveList generate_moves(const Board& board, const Color color);
 

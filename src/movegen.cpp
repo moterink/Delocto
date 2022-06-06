@@ -49,7 +49,7 @@ void MoveList::print() {
 
 }
 
-static void generate_pawn_promotions(const Board& board, MoveList& moveList, const Square fromSq, const Bitboard targets) {
+static void generate_pawn_promotions(MoveList& moveList, const Square fromSq, const Bitboard targets) {
 
     Bitboard squares = targets;
     while (squares) {
@@ -76,9 +76,9 @@ void generate_promotions(const Board& board, MoveList& moves, const Color color,
         const Square fromSq = pop_lsb(pawns);
 
         if constexpr (T == QUIET) {
-            generate_pawn_promotions(board, moves, fromSq, SQUARES[fromSq + direction(color, UP)] & targets);
+            generate_pawn_promotions(moves, fromSq, SQUARES[fromSq + direction(color, UP)] & targets);
         } else if constexpr (T == CAPTURE) {
-            generate_pawn_promotions(board, moves, fromSq, PawnAttacks[color][fromSq] & targets);
+            generate_pawn_promotions(moves, fromSq, PawnAttacks[color][fromSq] & targets);
         }
     }
 
@@ -144,7 +144,7 @@ static void generate_knight_moves(const Board& board, MoveList& moveList, Color 
     while (knights) {
 
         const Square sq = pop_lsb(knights);
-        Bitboard moves = KnightAttacks[sq] & targets;
+        Bitboard moves = piece_attacks<KNIGHT>(sq) & targets;
 
         while (moves) {
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
@@ -160,7 +160,7 @@ static void generate_bishop_moves(const Board& board, MoveList& moveList, Color 
     while (bishops) {
 
         const Square sq = pop_lsb(bishops);
-        Bitboard moves = bishop_target_squares(sq, board.pieces(BOTH), board.pieces(color)) & targets;
+        Bitboard moves = piece_attacks<BISHOP>(sq, board.pieces(BOTH)) & targets;
 
         while (moves) {
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
@@ -176,7 +176,7 @@ static void generate_rook_moves(const Board& board, MoveList& moveList, Color co
     while (rooks) {
 
         const Square sq = pop_lsb(rooks);
-        Bitboard moves = rook_target_squares(sq, board.pieces(BOTH), board.pieces(color)) & targets;
+        Bitboard moves = piece_attacks<ROOK>(sq, board.pieces(BOTH)) & targets;
 
         while (moves) {
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
@@ -192,7 +192,7 @@ static void generate_queen_moves(const Board& board, MoveList& moveList, Color c
     while (queens) {
 
         const Square sq = pop_lsb(queens);
-        Bitboard moves = queen_target_squares(sq, board.pieces(BOTH), board.pieces(color)) & targets;
+        Bitboard moves = piece_attacks<QUEEN>(sq, board.pieces(BOTH)) & targets;
 
         while (moves) {
             moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
@@ -205,7 +205,7 @@ static void generate_queen_moves(const Board& board, MoveList& moveList, Color c
 static void generate_king_moves(const Board& board, MoveList& moveList, Color color, Bitboard targets) {
 
     const Square sq = lsb_index(board.pieces(color, KING));
-    Bitboard moves = KingAttacks[sq] & targets;
+    Bitboard moves = piece_attacks<KING>(sq) & targets;
 
     while (moves) {
         moveList.append(make_move(sq, pop_lsb(moves), NORMAL));
@@ -380,49 +380,17 @@ MoveList generate_moves<ALL, LEGAL>(const Board& board, const Color color) {
 // Checks wether a move is giving check to the opponent's king
 bool Board::gives_check(const Move move) {
 
-    const Square ksq    = lsb_index(pieces(!stm, KING));
     const Square fromSq = from_sq(move);
     const Square toSq   = to_sq(move);
-
-    Bitboard attacks = 0;
-
-    switch(pieceTypes[fromSq]) {
-
-        case PAWN:
-            attacks = PawnAttacks[stm][toSq];
-            break;
-
-        case KNIGHT:
-            attacks = KnightAttacks[toSq];
-            break;
-
-        case BISHOP:
-            attacks = bishop_target_squares(toSq, bbColors[BOTH], bbColors[stm]);
-            break;
-
-        case ROOK:
-            attacks = rook_target_squares(toSq, bbColors[BOTH], bbColors[stm]);
-            break;
-
-        case QUEEN:
-            attacks = queen_target_squares(toSq, bbColors[BOTH], bbColors[stm]);
-            break;
-
-        case KING:
-            break;
-
-        default:
-            assert(false);
-
-    }
+    Piecetype pt = pieceTypes[fromSq];
 
     // Check if the piece attacks the opponents king directly
-    if (attacks & SQUARES[ksq]) {
+    if (SQUARES[toSq] & check_squares(pt)) {
         return true;
     }
 
     // Check for discovered checks from sliders which appear by moving the piece
-    if (slider_attackers_discovered(stm, ksq, fromSq, toSq)) {
+    if (slider_attackers_discovered(stm, king_square(!stm), fromSq, toSq)) {
         return true;
     }
 

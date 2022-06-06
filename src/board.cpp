@@ -60,8 +60,8 @@ void Board::clear() {
     bbColors[BLACK] = 0;
     bbColors[BOTH] = 0;
 
-    for (Color c = WHITE; c < COLOR_COUNT; c++) {
-        for (Piecetype pt = PAWN; pt < PIECETYPE_COUNT; pt++) {
+    for (Color c = WHITE; c < COLOR_COUNT; ++c) {
+        for (Piecetype pt = PAWN; pt < PIECETYPE_COUNT; ++pt) {
             bbPieces[pt] = 0;
             pieceCounts[c][pt] = 0; // Reset the piece counters
         }
@@ -116,8 +116,8 @@ void Board::calc_keys() {
     }
 
     // Generate the material hash key
-    for (Color c = WHITE; c < COLOR_COUNT; c++) {
-        for (Piecetype pt = PAWN; pt < PIECETYPE_COUNT; pt++) {
+    for (Color c = WHITE; c < COLOR_COUNT; ++c) {
+        for (Piecetype pt = PAWN; pt < PIECETYPE_COUNT; ++pt) {
             hash_material(c, pt);
         }
     }
@@ -136,6 +136,15 @@ void Board::update_check_info() {
     state.kingBlockers[BLACK] = get_slider_blockers(bbColors[WHITE], lsb_index(pieces(BLACK, KING)));
 
     state.checkers = sq_attackers(!stm, lsb_index(pieces(stm, KING)), bbColors[BOTH]);
+
+    Square ksq = king_square(!stm);
+
+    state.checkSquares[PAWN]   = PawnAttacks[!stm][ksq];
+    state.checkSquares[KNIGHT] = piece_attacks<KNIGHT>(ksq);
+    state.checkSquares[BISHOP] = piece_attacks<BISHOP>(ksq, bbColors[BOTH]);
+    state.checkSquares[ROOK]   = piece_attacks<ROOK>(ksq, bbColors[BOTH]);
+    state.checkSquares[QUEEN]  = state.checkSquares[BISHOP] | state.checkSquares[ROOK];
+    state.checkSquares[KING]   = 0;
 
 }
 
@@ -158,7 +167,7 @@ Bitboard Board::get_slider_blockers(const Bitboard sliders, const Square sq) con
 
     // We first try to find all potential pinners by looking in all directions from the square
     Bitboard blockers = 0;
-    Bitboard pinners  = ((BishopAttacks[sq] & (bbPieces[BISHOP] | bbPieces[QUEEN])) | (RookAttacks[sq] & (bbPieces[ROOK] | bbPieces[QUEEN]))) & sliders;
+    Bitboard pinners  = ((PseudoAttacks[BISHOP][sq] & (bbPieces[BISHOP] | bbPieces[QUEEN])) | (PseudoAttacks[ROOK][sq] & (bbPieces[ROOK] | bbPieces[QUEEN]))) & sliders;
     Bitboard occupied = bbColors[BOTH] ^ pinners ^ SQUARES[sq];
 
     // We loop over all potential pinners until there are no more left
@@ -323,10 +332,10 @@ std::string Board::get_fen() const {
     std::string fen;
     unsigned emptySquaresCount = 0;
 
-    for (int rank = RANK_8; rank >= RANK_1; rank--) {
-        for (int file = FILE_A; file >= FILE_H; file--) {
+    for (Rank r = RANK_8; r >= RANK_1; --r) {
+        for (File f = FILE_A; f >= FILE_H; --f) {
 
-            const Square sq = square(file, rank);
+            const Square sq = square(f, r);
 
             if (is_sq_empty(sq)) {
                 emptySquaresCount++;
@@ -347,7 +356,7 @@ std::string Board::get_fen() const {
             emptySquaresCount = 0;
         }
 
-        if (rank > RANK_1) {
+        if (r > RANK_1) {
             fen += '/';
         }
 
@@ -392,13 +401,13 @@ std::string Board::to_string() const {
     std::stringstream ss;
 
     char labels[2][6] = { { 'P', 'N', 'B', 'R', 'Q', 'K' }, { 'p', 'n', 'b', 'r', 'q', 'k' } };
-    unsigned r  = 0;
-    unsigned sq = 0;
+    Rank r = RANK_1;
+    Square sq = SQUARE_H1;
 
     while (sq != SQUARE_NONE) {
         if (rank(sq) != r) {
             ss << std::endl;
-            r++;
+            ++r;
         }
 
         if (pieceTypes[sq] != PIECE_NONE) {
@@ -733,11 +742,12 @@ bool Board::check_draw() {
 // not check wether the own king might be left in check.
 bool Board::is_valid(const Move move) const {
 
-    const unsigned fromSq = from_sq(move);
-    const unsigned toSq   = to_sq(move);
+    const Square fromSq = from_sq(move);
+    const Square toSq   = to_sq(move);
+    const Piecetype pt  = piecetype(fromSq);
 
     // Move is illegal when there is no piece on the origin square, it's not the owners turn or it would capture a friendly piece
-    if (   pieceTypes[fromSq] == PIECE_NONE
+    if (   pt == PIECE_NONE
         || owner(fromSq) != stm
         || (SQUARES[toSq] & bbColors[stm]))
     {
@@ -749,7 +759,7 @@ bool Board::is_valid(const Move move) const {
     if (moveType == NORMAL) {
 
         // Special rules for pawns
-        if (pieceTypes[fromSq] == PAWN) {
+        if (pt == PAWN) {
 
             // Push to 8th rank invalid -> would be promotion, so move type can't be NORMAL
             if (relative_rank(stm, toSq) == 7) {
@@ -766,7 +776,7 @@ bool Board::is_valid(const Move move) const {
                     return false;
                 }
         // If the piece cannot move to the target square, the move is not valid
-        } else if (!(SQUARES[toSq] & piece_attacks(pieceTypes[fromSq], stm, fromSq))) {
+        } else if (!(SQUARES[toSq] & piece_attacks(pt, fromSq, bbColors[BOTH]))) {
             return false;
         }
 
@@ -776,7 +786,7 @@ bool Board::is_valid(const Move move) const {
         }
 
         if (is_promotion(move)) {
-            if (   !(pieceTypes[fromSq] == PAWN)
+            if (   !(pt == PAWN)
                 || !(SQUARES[toSq] & PAWN_FINALRANK[stm])
                 || !(SQUARES[toSq] & generate_pawn_moves(stm, fromSq, bbColors[BOTH], bbColors[!stm])))
             {
