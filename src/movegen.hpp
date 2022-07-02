@@ -60,7 +60,7 @@ class MoveList {
 };
 
 // Flags for the castling rights
-typedef unsigned CastleRight;
+typedef uint8_t CastleRight;
 
 constexpr CastleRight CASTLE_NONE = 0x0;
 constexpr CastleRight CASTLE_WHITE_SHORT = 0x1;
@@ -68,10 +68,12 @@ constexpr CastleRight CASTLE_WHITE_LONG  = CASTLE_WHITE_SHORT << 1;
 constexpr CastleRight CASTLE_BLACK_SHORT = CASTLE_WHITE_SHORT << 2;
 constexpr CastleRight CASTLE_BLACK_LONG  = CASTLE_WHITE_SHORT << 3;
 
-constexpr unsigned CASTLE_SHORT = 0;
-constexpr unsigned CASTLE_LONG  = 1;
+enum CastleType : uint8_t {
+    CASTLE_SHORT,
+    CASTLE_LONG
+};
 
-constexpr CastleRight CASTLE_TYPES[COLOR_COUNT][2] = {
+constexpr CastleRight CASTLE_RIGHTS[COLOR_COUNT][2] = {
     { CASTLE_WHITE_SHORT, CASTLE_WHITE_LONG },
     { CASTLE_BLACK_SHORT, CASTLE_BLACK_LONG }
 };

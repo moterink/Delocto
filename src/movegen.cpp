@@ -247,19 +247,17 @@ static void generate_quiets(const Board& board, MoveList& moveList, const Color 
 bool Board::is_castling_valid(const unsigned type) const {
 
     if (!checkers()) {
-
-        return (   state.castlingRights & CASTLE_TYPES[stm][type]
+        return (   state.castleRights & CASTLE_RIGHTS[stm][type]
                 && pieces(stm, KING)    & SQUARES[KING_INITIAL_SQUARE[stm]]
                 && pieces(stm, ROOK)    & SQUARES[CASTLE_ROOK_ORIGIN_SQUARE[stm][type]]
                 && !(pieces(BOTH)       & CASTLE_PATH[stm][type]));
-
     }
 
     return false;
 
 }
 
-// Generates all castling moves for the given position or a given color and adds them to the move list
+// Generates all castling moves for a color for the given position and adds them to the move list
 static void generate_castlings(const Board& board, MoveList& moveList, const Color color) {
 
     if (board.is_castling_valid(CASTLE_SHORT)) {

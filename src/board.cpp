@@ -30,19 +30,6 @@
 #include <sstream>
 #include <ctype.h>
 
-constexpr unsigned CASTLE_MASK[SQUARE_COUNT] = {
-
-    14, 15, 15, 12, 15, 15, 15, 13,
-    15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15,
-    11, 15, 15,  3, 15, 15, 15,  7
-
-};
-
 static const char PieceToChar[COLOR_COUNT][PIECETYPE_COUNT] = {
     { 'P', 'N', 'B', 'R', 'Q', 'K' },
     { 'p', 'n', 'b', 'r', 'q', 'k' }
@@ -66,13 +53,17 @@ void Board::clear() {
             pieceCounts[c][pt] = 0; // Reset the piece counters
         }
     }
-    // Clear the piece type array
+    
+    // Clear the piece types array
     pieceTypes.fill(PIECE_NONE);
+
+    // Clear the castle mask array
+    castleMask.fill(CASTLE_NONE);
 
     // Reset the game state
     state.enPassant = SQUARE_NONE;
-    state.castlingRights = 0;
-    state.fiftyMoves = 0;
+    state.castleRights = 0;
+    state.fiftyMovesCount = 0;
     state.repetitionCount = 0;
     state.material[WHITE] = V(0, 0);
     state.material[BLACK] = V(0, 0);
@@ -289,10 +280,10 @@ void Board::set_fen(std::string fen) {
 
         switch (fen[i]) {
 
-            case 'K': { state.set_castling_right(CASTLE_WHITE_SHORT); break; }
-            case 'Q': { state.set_castling_right(CASTLE_WHITE_LONG); break; }
-            case 'k': { state.set_castling_right(CASTLE_BLACK_SHORT); break; }
-            case 'q': { state.set_castling_right(CASTLE_BLACK_LONG); break; }
+            case 'K': { add_castle_right(WHITE, CASTLE_SHORT); break; }
+            case 'Q': { add_castle_right(WHITE, CASTLE_LONG); break; }
+            case 'k': { add_castle_right(BLACK, CASTLE_SHORT); break; }
+            case 'q': { add_castle_right(BLACK, CASTLE_LONG); break; }
 
         }
 
@@ -316,7 +307,7 @@ void Board::set_fen(std::string fen) {
     if (fen.size() >= i && isdigit(fen[i])) {
         std::string cut = fen.substr(i);
         unsigned space = cut.find(" ");
-        state.fiftyMoves = std::stoi(cut.substr(0, space));
+        state.fiftyMovesCount = std::stoi(cut.substr(0, space));
         ply = (std::stoi(cut.substr(space)) - 1) * 2;
     }
 
@@ -366,19 +357,19 @@ std::string Board::get_fen() const {
     fen += stm == WHITE ? " w " : " b ";
 
     // Castling rights
-    if (state.castlingRights == CASTLE_NONE) {
+    if (state.castleRights == CASTLE_NONE) {
         fen += '-';
     } else {
-        if (state.castlingRights & CASTLE_WHITE_SHORT) {
+        if (state.castleRights & CASTLE_WHITE_SHORT) {
             fen += 'K';
         }
-        if (state.castlingRights & CASTLE_WHITE_LONG) {
+        if (state.castleRights & CASTLE_WHITE_LONG) {
             fen += 'Q';
         }
-        if (state.castlingRights & CASTLE_BLACK_SHORT) {
+        if (state.castleRights & CASTLE_BLACK_SHORT) {
             fen += 'k';
         }
-        if (state.castlingRights & CASTLE_BLACK_LONG) {
+        if (state.castleRights & CASTLE_BLACK_LONG) {
             fen += 'q';
         }
     }
@@ -389,7 +380,7 @@ std::string Board::get_fen() const {
     fen += ' ' + (epSq != SQUARE_NONE ? SQUARE_NAMES[epSq] : "-") + ' ';
 
     // Halfmove & fullmove number
-    fen += std::to_string(state.fiftyMoves) + ' ' + std::to_string(ply / 2 + (ply % 2 == 0));
+    fen += std::to_string(state.fiftyMovesCount) + ' ' + std::to_string(ply / 2 + (ply % 2 == 0));
 
     return fen;
 
@@ -509,6 +500,20 @@ void Board::move_piece(const Square fromSq, const Square toSq) {
 
 }
 
+void Board::add_castle_right(Color color, CastleType type) {
+
+    CastleRight right = CASTLE_RIGHTS[color][type];
+
+    state.castleRights |= right;
+
+    Square kingSq = king_square(color);
+    Square rookSq = CASTLE_ROOK_ORIGIN_SQUARE[color][type];
+
+    castleMask[kingSq] |= right;
+    castleMask[rookSq] |= right;
+
+}
+
 // Play a move on the board
 void Board::do_move(const Move move) {
 
@@ -527,21 +532,28 @@ void Board::do_move(const Move move) {
     states.push_back(state);
     moves.push_back(move);
 
-    // Update position hash key for enPassant and castlingRights
+    // Reset position hash key for enPassant
     hash_enPassant();
-    hash_castling();
 
     state.captured = captured;
     state.checkers = 0;
     state.enPassant = SQUARE_NONE;
-    state.fiftyMoves++;
+    state.fiftyMovesCount++;
 
     // NOTE: no need to check if piece on square -> pieces[PIECE_NONE] is trash
 
     // If there is a piece on the target square, remove it and reset the fifty moves counter
     if (captured != PIECE_NONE) {
         remove_piece(toSq);
-        state.fiftyMoves = 0;
+        state.fiftyMovesCount = 0;
+    }
+
+    // If there are castle rights and the from/to square is set in the
+    // castle mask, then remove the corresponding right(s)
+    if (state.castleRights && (castleMask[fromSq] | castleMask[toSq])) {
+        hash_castling();
+        state.castleRights &= ~(castleMask[fromSq] | castleMask[toSq]);
+        hash_castling();
     }
 
     // Move the piece to its destination square
@@ -553,18 +565,15 @@ void Board::do_move(const Move move) {
         {
             if (pieceType == PAWN) {
                 // Reset the fifty moves counter if we move with a pawn
-                state.fiftyMoves = 0;
+                state.fiftyMovesCount = 0;
                 if (std::abs(fromSq - toSq) == 2 * UP) {
+                    // Set the en-passant square if an enemy pawn could capture there on the next move
                     if (PawnAttacks[stm][fromSq + direction(stm, UP)] & pieces(!stm, PAWN)) {
-                        // Update the en-passant square
                         state.enPassant = fromSq + direction(stm, UP);
                         hash_enPassant();
                     }
                 }
             }
-
-            // Update castling state
-            state.castlingRights &= CASTLE_MASK[fromSq];
         }
         break;
 
@@ -575,9 +584,6 @@ void Board::do_move(const Move move) {
 
                 // If we castle, we need to move the rook as well
                 move_piece(rookFromSq, rookToSq);
-
-                // Update castling state
-                state.castlingRights &= CASTLE_MASK[fromSq];
             }
             break;
 
@@ -589,7 +595,7 @@ void Board::do_move(const Move move) {
 
                 // Remove the pawn which has been captured en-passant
                 remove_piece(capSq);
-                state.fiftyMoves = 0;
+                state.fiftyMovesCount = 0;
             }
             break;
 
@@ -602,15 +608,11 @@ void Board::do_move(const Move move) {
                 add_piece(stm, promotionType, toSq);
 
                 // Reset the fifty moves counter since we moved with a pawn
-                state.fiftyMoves = 0;
+                state.fiftyMovesCount = 0;
             }
             break;
 
     }
-
-    // TODO: Is this correct?
-    // Update position hash key for castling rights
-    hash_castling();
 
     // Switch turn and update position hash key for turn
     hash_turn();
@@ -732,7 +734,7 @@ void Board::undo_nullmove() {
 // Stalemate is settled by search, insufficient material by evaluation
 bool Board::check_draw() {
 
-    return state.repetitionCount >= 2 || state.fiftyMoves >= 100 || is_material_draw();
+    return state.repetitionCount >= 2 || state.fiftyMovesCount >= 100 || is_material_draw();
 
 }
 

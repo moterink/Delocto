@@ -621,10 +621,10 @@ static const EvalTerm evaluate_king_safety(const Board& board, const Color color
 
     // Idea from Stockfish
     // If we can still castle, and the shelter bonus after the castling is greater, use the better value
-    if (board.may_castle(CASTLE_TYPES[color][CASTLE_SHORT])) {
+    if (board.may_castle(CASTLE_RIGHTS[color][CASTLE_SHORT])) {
         pawnValue = evaluate_shelter_storm(board, color, CASTLE_KING_TARGET_SQUARE[color][CASTLE_SHORT], pawnValue);
     }
-    if (board.may_castle(CASTLE_TYPES[color][CASTLE_LONG])) {
+    if (board.may_castle(CASTLE_RIGHTS[color][CASTLE_LONG])) {
         pawnValue = evaluate_shelter_storm(board, color, CASTLE_KING_TARGET_SQUARE[color][CASTLE_LONG], pawnValue);
     }
 

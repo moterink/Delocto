@@ -35,23 +35,25 @@ static const std::string INITIAL_POSITION_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPP
 
 struct StateInfo {
 
-    CastleRight castlingRights = 0u; // Castling rights
+    CastleRight castleRights = CASTLE_NONE; // Castling rights
     Square enPassant = SQUARE_NONE; // En-passant square
-    unsigned fiftyMoves = 0; // Fifty moves counter
+    unsigned fiftyMovesCount = 0; // Fifty moves counter
     unsigned repetitionCount = 0;
     Piecetype captured = PIECE_NONE; // Last captured piece, necessary for undoing a move
+
+    // Evaluation terms
     EvalTerm pst[2]; // Piece Square Table balances
     EvalTerm material[2]; // Material balances
+
+    // Check info
     Bitboard kingBlockers[2]; // Pieces blocking sliding attacks to the kings
     Bitboard checkers = 0; // Pieces attacking the king
     Bitboard checkSquares[PIECETYPE_COUNT];
+
+    // Hash keys
     uint64_t hashKey = 0;
     uint64_t pawnKey = 0;
     uint64_t materialKey = 0;
-
-    inline void set_castling_right(CastleRight right) {
-        castlingRights |= right;
-    }
 
 };
 
@@ -77,16 +79,17 @@ class Board {
         inline Bitboard pieces(const Color color) const { return bbColors[color]; }
         inline Bitboard pieces(const Piecetype pt) const { return bbPieces[pt]; }
         inline Bitboard pieces(const Color color, const Piecetype pt) const { return bbColors[color] & bbPieces[pt]; }
-
+        
         inline Bitboard empty_squares() const { return ~bbColors[BOTH]; }
+        
+        inline Bitboard checkers() const { return state.checkers; }
         inline Bitboard check_squares(const Piecetype pt) const { return state.checkSquares[pt]; }
 
         inline Color owner(const Square sq) const { return Color(!(bbColors[WHITE] & SQUARES[sq])); }
         inline Piecetype piecetype(const Square sq) const { return pieceTypes[sq]; }
         inline bool is_sq_empty(const Square sq) const { return pieceTypes[sq] == PIECE_NONE; }
 
-        inline Bitboard checkers() const { return state.checkers; }
-        inline CastleRight castleRights() const { return state.castlingRights; }
+        inline CastleRight castle_rights() const { return state.castleRights; }
 
         inline Square enpassant_square() const { return state.enPassant; }
         inline Square king_square(const Color color) const { return lsb_index(bbPieces[KING] & bbColors[color]); };
@@ -96,6 +99,7 @@ class Board {
         inline uint64_t pawnkey() const { return state.pawnKey; }
 
         inline unsigned plies() const { return ply; }
+        inline unsigned fifty_moves_count() const { return state.fiftyMovesCount; }
         inline void reset_plies() { ply = 0; }
 
         inline EvalTerm material(const Color color) const { return state.material[color]; }
@@ -168,6 +172,8 @@ class Board {
         // Number of half-moves played on the board so far
         unsigned ply = 0;
 
+        std::array<CastleRight, SQUARE_COUNT> castleMask;
+
         void clear();
 
         inline void hash_pawn(const Color color, const Square sq);
@@ -182,6 +188,7 @@ class Board {
         void add_piece(const Color color, const Piecetype pt, const Square sq);
         void remove_piece(const Square sq);
         void move_piece(const Square fromSq, const Square toSq);
+        void add_castle_right(Color color, CastleType type);
 
         inline Bitboard sq_attackers(const Color color, const Square sq, const Bitboard occupied) const;
         inline Bitboard slider_attackers(const Square sq, const Bitboard occupied) const;
@@ -209,7 +216,7 @@ inline unsigned Board::scale() const {
 // Returns true if the given castling move can still be performed
 inline bool Board::may_castle(const CastleRight right) const {
 
-    return state.castlingRights & right;
+    return state.castleRights & right;
 
 }
 
@@ -286,7 +293,7 @@ inline void Board::hash_piece(const Color color, const Piecetype pt, const Squar
 // Hash castling key in/out zobrist key
 inline void Board::hash_castling() {
 
-    state.hashKey ^= CastlingHashKeys[state.castlingRights];
+    state.hashKey ^= CastlingHashKeys[state.castleRights];
 
 }
 

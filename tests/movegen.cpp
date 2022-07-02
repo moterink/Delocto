@@ -120,7 +120,6 @@ TEST_CASE("Generate pseudolegal moves") {
                 MoveList receivedMoves = generate_moves<ALL, PSEUDO_LEGAL>(board, board.turn());
                 REQUIRE(receivedMoves.size() == moves[f].size());
                 for (unsigned m = 0; m < moves[f].size(); m++) {
-                    //std::cout << move_to_string(receivedMoves[m]) << ":" << move_to_string(moves[f][m]) << std::endl;
                     REQUIRE(receivedMoves[m] == moves[f][m]);
                 }
             }
