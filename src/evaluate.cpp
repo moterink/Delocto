@@ -313,6 +313,80 @@ bool Board::is_material_draw() const {
 
 }
 
+// Computes the phase of the current position (inspired by Fruit chess engine by Fabien Letouzy)
+// The phase determines whether the midgame or endgame term should have more weight
+// If there are less pieces left on the board, this means we are usually in an endgame
+static Phase compute_phase(const Board& board) {
+
+    static const int MaterialLimitMG = 76; // Sum of all piece values in starting position
+    static const int MaterialLimitEG = 8;
+
+    int material = std::clamp(
+        int(
+            14 * board.piece_count(QUEEN) +
+            6 * board.piece_count(ROOK) +
+            3 * (board.piece_count(BISHOP) + board.piece_count(KNIGHT))
+        ),
+        MaterialLimitEG,
+        MaterialLimitMG
+    );
+
+    // Based on the material, we calculate the phase which is somewhere between PHASE_ENDGAME and PHASE_MIDGAME
+    return Phase((material - MaterialLimitEG) * PHASE_MIDGAME / (MaterialLimitMG - MaterialLimitEG));
+
+}
+
+// Computes the scale factor for
+static ScaleFactor compute_scale_factor(const Board& board, const EvalTerm value) {
+
+    int factor = SCALE_FACTOR_NORMAL;
+
+    const Color strong = value.mg > 0 ? WHITE : BLACK;
+    const Color weak = !strong;
+    const Bitboard minorsAndRooks = board.pieces(KNIGHT) | board.pieces(BISHOP) | board.pieces(ROOK);
+    const bool pawnsBothHalves = (board.pieces(PAWN) & KING_HALF) && (board.pieces(PAWN) & QUEEN_HALF);
+
+    // Opposite colored bishops endgames without other pieces tend to be drawish
+    if (   board.piece_count(WHITE, BISHOP) == 1
+        && board.piece_count(BLACK, BISHOP) == 1
+        && popcount(board.pieces(BISHOP) & SQUARES_WHITE) == 1)
+    {
+        factor = 42 + 6 * popcount(board.minors_and_majors(strong) | board.pieces(strong, PAWN));
+    }
+    // If there is only one queen left, then scale based on the number of minor pieces of the other side
+    else if (board.piece_count(QUEEN) == 1) {
+        factor = 74 + 6 * popcount(board.minors(board.piece_count(WHITE, QUEEN) == 1 ? BLACK : WHITE));
+    }
+    // If there are no more queens and only lone minor pieces or rooks for both sides,
+    // and the strong side has a big pawn advantage, then scale towards the endgame
+    else if (   board.piece_count(QUEEN) == 0
+             && popcount(minorsAndRooks & board.pieces(WHITE)) <= 1
+             && popcount(minorsAndRooks & board.pieces(BLACK)) <= 1
+             && board.piece_count(strong, PAWN) - board.piece_count(weak, PAWN) > 2) {
+        factor = 136 + 3 * board.piece_count(strong, PAWN);
+    }
+    // Otherwise, determine scale factor based on number of pawns of the strong side
+    else {
+        factor = std::min(int(SCALE_FACTOR_NORMAL), int(72 + 14 * board.piece_count(strong, PAWN)));
+    }
+
+    // Reduce scale factor if pawns are only on a single half of the board
+    factor -= 8 * !pawnsBothHalves;
+
+    return ScaleFactor(factor);
+
+}
+
+// Returns the scaled evaluation based on the current phase and calculated scale factor
+static int scale_evaluation(const Board& board, const int phase, const EvalTerm value) {
+
+    const ScaleFactor scaleFactor = compute_scale_factor(board, value);
+
+    return   (value.mg * phase
+           +  value.eg * (PHASE_MIDGAME - phase) * scaleFactor / SCALE_FACTOR_NORMAL) / PHASE_MIDGAME;
+
+}
+
 // Update attack info for calculating king safety
 static void update_attack_info(Color color, Piecetype pt, Bitboard moves, EvalInfo& info) {
 
@@ -810,8 +884,8 @@ static const EvalTerm evaluate_imbalances(const Board& board, const Color color)
     EvalTerm value;
 
     const unsigned pieceCounts[2][6] = {
-        { board.piececount(WHITE, BISHOP) > 1, board.piececount(WHITE, PAWN), board.piececount(WHITE, KNIGHT), board.piececount(WHITE, BISHOP), board.piececount(WHITE, ROOK), board.piececount(WHITE, QUEEN) },
-        { board.piececount(BLACK, BISHOP) > 1, board.piececount(BLACK, PAWN), board.piececount(BLACK, KNIGHT), board.piececount(BLACK, BISHOP), board.piececount(BLACK, ROOK), board.piececount(BLACK, QUEEN) }
+        { board.piece_count(WHITE, BISHOP) > 1, board.piece_count(WHITE, PAWN), board.piece_count(WHITE, KNIGHT), board.piece_count(WHITE, BISHOP), board.piece_count(WHITE, ROOK), board.piece_count(WHITE, QUEEN) },
+        { board.piece_count(BLACK, BISHOP) > 1, board.piece_count(BLACK, PAWN), board.piece_count(BLACK, KNIGHT), board.piece_count(BLACK, BISHOP), board.piece_count(BLACK, ROOK), board.piece_count(BLACK, QUEEN) }
     };
 
     // Loop over all piece types
@@ -970,8 +1044,8 @@ int evaluate(const Board& board, const unsigned threadIndex) {
     Thread* thread = Threads.get_thread(threadIndex);
 
     EvalTerm value;
-
     EvalInfo info;
+    int phase;
 
     // Check for draw by insufficient material
     if (board.is_material_draw()) {
@@ -1042,20 +1116,24 @@ int evaluate(const Board& board, const unsigned threadIndex) {
     // Imbalances
     MaterialEntry * mentry = thread->materialTable.probe(board.materialkey());
     if (mentry != NULL) {
+        phase = mentry->phase;
         value += mentry->value;
         assert(mentry->value == (evaluate_imbalances(board, WHITE) - evaluate_imbalances(board, BLACK)));
     } else {
+        phase = compute_phase(board);
         EvalTerm imbalanceValue = evaluate_imbalances(board, WHITE) - evaluate_imbalances(board, BLACK);
-        thread->materialTable.store(board.materialkey(), imbalanceValue);
+        thread->materialTable.store(board.materialkey(), phase, imbalanceValue);
         value += imbalanceValue;
     }
 
-    assert(std::abs(scaled_eval(board.scale(), value)) < VALUE_MATE_MAX);
+    int scaledEval = scale_evaluation(board, phase, value);
+
+    assert(std::abs(scaledEval) < VALUE_MATE_MAX);
 
     // Return the scaled evaluation and add a tempo bonus for the color to move
     // Also, invert the evaluation to match the perspective of the color to move
-    return ((board.turn() == WHITE) ?  scaled_eval(board.scale(), value)
-                                    : -scaled_eval(board.scale(), value)) + tempoBonus;
+    return ((board.turn() == WHITE) ?  scaledEval
+                                    : -scaledEval) + tempoBonus;
 
 }
 
@@ -1150,16 +1228,21 @@ void evaluate_info(const Board& board) {
     value += whiteKingSafety - blackKingSafety;
     value += whiteThreats - blackThreats;
 
-    int finalValue = scaled_eval(board.scale(), value);
+    int phase = compute_phase(board);
+    ScaleFactor scaleFactor = compute_scale_factor(board, value);
+    int scaledEval = scale_evaluation(board, phase, value);
     int normalEval = evaluate(board, 0);
 
-    if (std::abs(finalValue + (board.turn() == WHITE ? tempoBonus : -tempoBonus)) != std::abs(normalEval)) {
+    if (std::abs(scaledEval + (board.turn() == WHITE ? tempoBonus : -tempoBonus)) != std::abs(normalEval)) {
         std::cout << "ERROR: Difference between evaluation functions!!!" << std::endl;
-        std::cout << (finalValue + (board.turn() == WHITE ? tempoBonus : -tempoBonus)) << std::endl;
+        std::cout << (scaledEval + (board.turn() == WHITE ? tempoBonus : -tempoBonus)) << std::endl;
         std::cout << normalEval - tempoBonus << std::endl;
         abort();
     }
 
-    std::cout << "Total(For White): " << scaled_eval(board.scale(), value) << std::endl;
+    std::cout << "Phase: " << phase << std::endl;
+    std::cout << "Scale factor: " << scaleFactor << std::endl;
+
+    std::cout << "Total(For White): " << scaledEval << std::endl;
 
 }

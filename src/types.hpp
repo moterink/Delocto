@@ -272,6 +272,9 @@ constexpr Bitboard PAWN_FINALRANK[COLOR_COUNT] = {
 
 };
 
+constexpr Bitboard QUEEN_HALF = BB_FILE_A | BB_FILE_B | BB_FILE_C | BB_FILE_D;
+constexpr Bitboard KING_HALF = BB_FILE_E | BB_FILE_F | BB_FILE_G | BB_FILE_H;
+
 // Get least significant set bit in unsigned 64bit integer
 inline Square lsb_index(const Bitboard b) {
 

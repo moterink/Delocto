@@ -43,10 +43,15 @@ static const EvalTerm Material[6] = {
 };
 
 // Game Phases
-enum Phase : unsigned {
+enum Phase : int {
+    PHASE_ENDGAME = 0,
+    PHASE_MIDGAME = 128
+};
 
-    MG, EG
-
+enum ScaleFactor : int {
+    SCALE_FACTOR_DRAW = 0,
+    SCALE_FACTOR_NORMAL = 128,
+    SCALE_FACTOR_MAX = 256
 };
 
 struct EvalInfo {
@@ -67,13 +72,6 @@ struct EvalInfo {
     EvalTerm mobility[2] = { V(0, 0), V(0, 0) };
 
 };
-
-// Return the scaled evaluation based on the calculated scale factor
-inline int scaled_eval(const int scale, const EvalTerm value) {
-
-    return ((value.mg * (256 - scale)) + (value.eg * scale)) / 256;
-
-}
 
 extern EvalTerm PieceSquareTable[2][6][64];
 

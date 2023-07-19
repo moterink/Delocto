@@ -93,6 +93,7 @@ struct PawnEntry {
 struct MaterialEntry {
 
     uint64_t key;
+    int phase;
     EvalTerm value;
 
 };
@@ -160,7 +161,7 @@ class MaterialTable {
 
         void clear();
         MaterialEntry * probe(const uint64_t key);
-        void store(const uint64_t key, const EvalTerm value);
+        void store(const uint64_t key, const int phase, const EvalTerm value);
 
         MaterialTable() {
             table = new MaterialEntry [size];

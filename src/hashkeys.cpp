@@ -208,7 +208,7 @@ unsigned TranspositionTable::hashfull() {
 // Clears the material hash table
 void MaterialTable::clear() {
 
-    std::memset(table, size, sizeof(MaterialEntry) * size);
+    std::memset(table, 0, sizeof(MaterialEntry) * size);
 
 }
 
@@ -226,16 +226,16 @@ MaterialEntry * MaterialTable::probe(const uint64_t key) {
 }
 
 // Stores a material imbalance evaluation in the material hash table given the masterial hash key
-void MaterialTable::store(const uint64_t key, const EvalTerm value) {
+void MaterialTable::store(const uint64_t key, const int phase, const EvalTerm value) {
 
-    table[key % size] = { key, value };
+    table[key % size] = { key, phase, value };
 
 }
 
 // Clears the pawn hash table
 void PawnTable::clear() {
 
-    std::memset(table, size, sizeof(PawnEntry) * size);
+    std::memset(table, 0, sizeof(PawnEntry) * size);
 
 }
 

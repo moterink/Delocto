@@ -105,8 +105,8 @@ class Board {
         inline EvalTerm material(const Color color) const { return state.material[color]; }
         inline EvalTerm pst     (const Color color) const { return state.pst[color];      }
 
-        inline unsigned piececount(const Color color, const Piecetype pt) const { return pieceCounts[color][pt]; }
-        inline unsigned scale() const;
+        inline unsigned piece_count(const Color color, const Piecetype pt) const { return pieceCounts[color][pt]; }
+        inline unsigned piece_count(const Piecetype pt) const { return pieceCounts[WHITE][pt] + pieceCounts[BLACK][pt]; }
 
         void set_fen(std::string fen);
         std::string get_fen() const;
@@ -131,7 +131,10 @@ class Board {
         int see(const Move move) const;
 
         inline Bitboard minors_and_majors(const Color color) const;
+        inline Bitboard minors() const;
         inline Bitboard majors() const;
+        inline Bitboard minors(const Color color) const;
+        inline Bitboard majors(const Color color) const;
         inline Bitboard sliders() const;
         inline Bitboard sliders(const Color color) const;
 
@@ -164,7 +167,7 @@ class Board {
         std::array<Piecetype, SQUARE_COUNT> pieceTypes;
 
         // Piece type counts
-        std::array<std::array<unsigned, 6>,2> pieceCounts;
+        std::array<std::array<unsigned, PIECETYPE_COUNT>, COLOR_COUNT> pieceCounts;
 
         // Color to move
         Color stm;
@@ -204,15 +207,6 @@ class Board {
 
 };
 
-// Computes the scale factor for evaluation (taken from Fruit chess engine by Fabien Letouzy)
-// The scale factor determines wether the midgame or endgame term should have more weight
-// If there are less pieces left on the board, this means we are usually in an endgame
-inline unsigned Board::scale() const {
-
-    return std::max(((24 - 4 * int(pieceCounts[WHITE][QUEEN] + pieceCounts[BLACK][QUEEN]) - 2 * int(pieceCounts[WHITE][ROOK] + pieceCounts[BLACK][QUEEN]) - int(pieceCounts[WHITE][BISHOP] + pieceCounts[BLACK][BISHOP]) - int(pieceCounts[WHITE][KNIGHT] + pieceCounts[BLACK][KNIGHT])) * 256 + 12) / 24, 0);
-
-}
-
 // Returns true if the given castling move can still be performed
 inline bool Board::may_castle(const CastleRight right) const {
 
@@ -223,7 +217,19 @@ inline bool Board::may_castle(const CastleRight right) const {
 // Returns a bitboard of all minor and major pieces for a given color, essentially all pieces except pawns and the king
 inline Bitboard Board::minors_and_majors(const Color color) const {
 
-    return (bbPieces[KNIGHT] | bbPieces[BISHOP] | bbPieces[ROOK] | bbPieces[QUEEN]) & bbColors[color];
+    return (minors() | majors()) & bbColors[color];
+
+}
+
+inline Bitboard Board::minors() const {
+
+    return bbPieces[KNIGHT] | bbPieces[BISHOP];
+
+}
+
+inline Bitboard Board::minors(const Color color) const {
+
+    return minors() & bbColors[color];
 
 }
 
@@ -231,6 +237,12 @@ inline Bitboard Board::minors_and_majors(const Color color) const {
 inline Bitboard Board::majors() const {
 
     return bbPieces[ROOK] | bbPieces[QUEEN];
+
+}
+
+inline Bitboard Board::majors(const Color color) const {
+
+    return majors() & bbColors[color];
 
 }
 
