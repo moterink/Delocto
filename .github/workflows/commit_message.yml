@@ -1,0 +1,36 @@
+name: Check commit message
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+  push:
+    branches:
+      - master
+
+jobs:
+  check-commit-message:
+    name: Check commit message
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check benchmark
+        uses: gsactions/commit-message-checker@v2
+        with:
+          pattern: '[Bb]ench(mark)?:\s[0-9]+$'
+          error: 'Commit message invalid; needs "Benchmark: ..." as last line of commit message.'
+      - name: Check SPRT results or no functional change
+        uses: gsactions/commit-message-checker@v2
+        with:
+          pattern: '(TEST NAME\s+:.+\nTIME CONTROL\s: .+s \+ .+s\nRESULTS\s+: W: \d+ D: \d+ L: \d+ T: \d+\nELO\s+: .+\nSPRT\s+: .+\nSTATUS\s+: (Passed|Failed)\n)|No functional change'
+          error: 'Commit message invalid; missing SPRT result or "No functional change" in commit message.'

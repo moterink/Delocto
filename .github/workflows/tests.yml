@@ -1,62 +1,61 @@
-name: Delocto
+name: Build & run tests
 
 on:
   push:
     branches: master
 
   workflow_dispatch:
-    inputs: ~
 
 jobs:
   build:
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
     env:
-      COMPILER_PACKAGE: ${{ matrix.config.compiler_package }}
       CXX: ${{ matrix.config.compiler }}
-      EXECUTABLE: ${{ matrix.config.executable }}
+      EXECUTABLE: ./delocto
 
     strategy:
       fail-fast: false
       matrix:
         config:
-        #  - {
-        #      name: "Windows Latest GCC++",
-        #      os: windows-latest,
-        #      compiler: g++,
-        #      executable: delocto.exe
-        #    }
+          - {
+              name: "Windows Latest GCC",
+              os: windows-latest,
+              compiler: g++
+            }
+          - {
+              name: "Windows Latest Clang",
+              os: windows-latest,
+              compiler: clang++
+            }
           - {
               name: "Ubuntu Latest GCC",
               os: ubuntu-latest,
-              compiler_package: gcc,
-              compiler: g++,
-              executable: ./delocto
+              compiler: g++
             }
           - {
               name: "Ubuntu Latest Clang",
               os: ubuntu-latest,
-              compiler_package: clang,
-              compiler: clang++,
-              executable: ./delocto
+              compiler: clang++
+            }
+          - {
+              name: "macOS Latest Clang",
+              os: macos-latest,
+              compiler: clang++
             }
     defaults:
       run:
         working-directory: src
+        shell: bash
     steps:
       - uses: actions/checkout@master
-
-      - name: Download dependencies
-        run: |
-          sudo apt update
-          sudo apt install $COMPILER_PACKAGE
       
-      - name: Print env
+      - name: Print trigger & compiler version
         run: |
           echo Trigger: ${{ github.event_name }}
           $CXX -v
 
-      - name: Build Executable
+      - name: Build
         run: |
           make
 
